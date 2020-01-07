@@ -50,11 +50,7 @@ END
 
 IDD_CONFIRM DIALOG DISCARDABLE 0, 0, 160, 68
 STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
-<<<<<<< HEAD
-CAPTION "�X���[�v�̊m�F"
-=======
 CAPTION "スリープの確認"
->>>>>>> upstream/develop
 FONT 9, "Meiryo UI"
 BEGIN
 	DEFPUSHBUTTON "OK", IDOK, 52, 44, 48, 16
