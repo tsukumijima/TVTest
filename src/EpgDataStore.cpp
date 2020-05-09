@@ -1,6 +1,6 @@
 /*
   TVTest
-  Copyright(c) 2008-2019 DBCTRADO
+  Copyright(c) 2008-2020 DBCTRADO
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -54,8 +54,7 @@ bool CEpgDataStore::Open(LibISDB::EPGDatabase *pEPGDatabase, LPCTSTR pszFileName
 		LibISDB::EPGDataFile::OpenFlag::Read |
 		LibISDB::EPGDataFile::OpenFlag::Write |
 		LibISDB::EPGDataFile::OpenFlag::ShareRead |
-		LibISDB::EPGDataFile::OpenFlag::DiscardOld |
-		LibISDB::EPGDataFile::OpenFlag::Flush;
+		LibISDB::EPGDataFile::OpenFlag::DiscardOld;
 	if (!!(Flags & OpenFlag::LoadBackground))
 		FileOpenFlags |= LibISDB::EPGDataFile::OpenFlag::PriorityIdle;
 

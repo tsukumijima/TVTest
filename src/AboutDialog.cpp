@@ -1,6 +1,6 @@
 /*
   TVTest
-  Copyright(c) 2008-2019 DBCTRADO
+  Copyright(c) 2008-2020 DBCTRADO
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -24,6 +24,7 @@
 #include "AboutDialog.h"
 #include "DialogUtil.h"
 #include "TVTestVersion.h"
+#include "LibISDB/LibISDB/LibISDBVersion.hpp"
 #include "resource.h"
 #include "Common/DebugDef.h"
 

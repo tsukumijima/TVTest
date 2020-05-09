@@ -1,6 +1,6 @@
 /*
   TVTest
-  Copyright(c) 2008-2019 DBCTRADO
+  Copyright(c) 2008-2020 DBCTRADO
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -70,7 +70,6 @@ const CMainWindow::DirectShowFilterPropertyInfo CMainWindow::m_DirectShowFilterP
 	{LibISDB::ViewerFilter::PropertyFilterType::MPEG2Demultiplexer, CM_DEMULTIPLEXERPROPERTY},
 };
 
-ATOM CMainWindow::m_atomChildOldWndProcProp = 0;
 CMainWindow *CMainWindow::m_pThis = nullptr;
 
 
@@ -132,6 +131,7 @@ CMainWindow::CMainWindow(CAppMain &App)
 	, m_fShowCursor(true)
 	, m_fNoHideCursor(false)
 
+	, m_fLButtonDown(false)
 	, m_fDragging(false)
 	, m_fEnterSizeMove(false)
 	, m_fResizePanel(false)
@@ -185,10 +185,6 @@ CMainWindow::CMainWindow(CAppMain &App)
 CMainWindow::~CMainWindow()
 {
 	Destroy();
-	if (m_atomChildOldWndProcProp != 0) {
-		::GlobalDeleteAtom(m_atomChildOldWndProcProp);
-		m_atomChildOldWndProcProp = 0;
-	}
 }
 
 
@@ -1000,9 +996,22 @@ LRESULT CMainWindow::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 	case WM_ENTERSIZEMOVE:
 		m_fEnterSizeMove = true;
 		m_fResizePanel = false;
+
+		// リサイズ開始時のカーソル位置とウィンドウ位置を記憶
+		::GetCursorPos(&m_ptDragStartPos);
+		::GetWindowRect(hwnd, &m_rcDragStart);
+
+		if (m_fDragging) {
+			// ドラッグ中はカーソルが消えないようにする
+			m_Timer.EndTimer(TIMER_ID_HIDECURSOR);
+			//::SetCursor(::LoadCursor(nullptr, IDC_ARROW));
+			ShowCursor(true);
+		}
 		return 0;
 
 	case WM_EXITSIZEMOVE:
+		m_fEnterSizeMove = false;
+
 		if (m_fResizePanel) {
 			m_fResizePanel = false;
 
@@ -1010,6 +1019,15 @@ LRESULT CMainWindow::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 				m_LayoutBase.GetContainerByID(CONTAINER_ID_PANELSPLITTER));
 			pSplitter->SetAdjustPane(pSplitter->GetPane(!pSplitter->IDToIndex(CONTAINER_ID_PANEL))->GetID());
 		}
+
+		if (m_fDragging) {
+			m_fDragging = false;
+			if (m_App.ViewOptions.GetHideCursor())
+				m_Timer.BeginTimer(TIMER_ID_HIDECURSOR, HIDE_CURSOR_DELAY);
+		}
+		m_fLButtonDown = false;
+
+		m_TitleBarManager.EndDrag();
 		return 0;
 
 	case WM_WINDOWPOSCHANGING:
@@ -1063,46 +1081,56 @@ LRESULT CMainWindow::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 		}
 		return 0;
 
-	case WM_NCLBUTTONDOWN:
-		if (wParam != HTCAPTION)
-			break;
-		ForegroundWindow(hwnd);
 	case WM_LBUTTONDOWN:
-		if (!GetMaximize()
-				&& (uMsg == WM_NCLBUTTONDOWN || m_App.OperationOptions.GetDisplayDragMove())) {
-			m_fDragging = true;
-			/*
+		if (m_App.OperationOptions.GetDisplayDragMove()) {
+			// 画面ドラッグによるウィンドウの移動
+
 			m_ptDragStartPos.x = GET_X_LPARAM(lParam);
 			m_ptDragStartPos.y = GET_Y_LPARAM(lParam);
 			::ClientToScreen(hwnd, &m_ptDragStartPos);
-			*/
-			::GetCursorPos(&m_ptDragStartPos);
-			::GetWindowRect(hwnd, &m_rcDragStart);
+
+			m_fLButtonDown = true;
 			::SetCapture(hwnd);
-			m_Timer.EndTimer(TIMER_ID_HIDECURSOR);
-			::SetCursor(::LoadCursor(nullptr, IDC_ARROW));
 			return 0;
 		}
 		break;
 
-	case WM_NCLBUTTONUP:
 	case WM_LBUTTONUP:
+		m_fLButtonDown = false;
 		if (::GetCapture() == hwnd)
 			::ReleaseCapture();
-		return 0;
-
-	case WM_CAPTURECHANGED:
-		if (m_fDragging) {
-			m_fDragging = false;
-			m_TitleBarManager.EndDrag();
-			if (m_App.ViewOptions.GetHideCursor())
-				m_Timer.BeginTimer(TIMER_ID_HIDECURSOR, HIDE_CURSOR_DELAY);
-		}
 		return 0;
 
 	case WM_MOUSEMOVE:
 		OnMouseMove(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 		return 0;
+
+	case WM_MOVING:
+		{
+			RECT *pPos = reinterpret_cast<RECT*>(lParam);
+
+			POINT pt;
+			::GetCursorPos(&pt);
+
+			// カーソル位置から移動後のウィンドウ位置を求める
+			pPos->left = m_rcDragStart.left + (pt.x - m_ptDragStartPos.x);
+			pPos->top = m_rcDragStart.top + (pt.y - m_ptDragStartPos.y);
+			pPos->right = pPos->left + (m_rcDragStart.right - m_rcDragStart.left);
+			pPos->bottom = pPos->top + (m_rcDragStart.bottom - m_rcDragStart.top);
+
+			// ウィンドウと画面の端に吸着させる
+			bool fSnap = m_App.ViewOptions.GetSnapAtWindowEdge();
+			if (::GetKeyState(VK_SHIFT) < 0)
+				fSnap = !fSnap;
+			if (fSnap) {
+				SnapWindow(
+					m_hwnd, pPos,
+					m_App.ViewOptions.GetSnapAtWindowEdgeMargin(),
+					m_App.Panel.IsAttached() ? nullptr : m_App.Panel.Frame.GetHandle());
+			}
+			return TRUE;
+		}
+		break;
 
 	case WM_LBUTTONDBLCLK:
 		m_App.CommandManager.InvokeCommand(
@@ -2144,30 +2172,14 @@ void CMainWindow::OnGetMinMaxInfo(HWND hwnd, LPMINMAXINFO pmmi)
 
 void CMainWindow::OnMouseMove(int x, int y)
 {
-	if (m_fDragging) {
-		// ウィンドウ移動中
-		POINT pt;
-		RECT rc;
-
-		/*
-		pt.x = x;
-		pt.y = y;
-		::ClientToScreen(hwnd, &pt);
-		*/
-		::GetCursorPos(&pt);
-		rc.left = m_rcDragStart.left + (pt.x - m_ptDragStartPos.x);
-		rc.top = m_rcDragStart.top + (pt.y - m_ptDragStartPos.y);
-		rc.right = rc.left + (m_rcDragStart.right - m_rcDragStart.left);
-		rc.bottom = rc.top + (m_rcDragStart.bottom - m_rcDragStart.top);
-		bool fSnap = m_App.ViewOptions.GetSnapAtWindowEdge();
-		if (::GetKeyState(VK_SHIFT) < 0)
-			fSnap = !fSnap;
-		if (fSnap)
-			SnapWindow(
-				m_hwnd, &rc,
-				m_App.ViewOptions.GetSnapAtWindowEdgeMargin(),
-				m_App.Panel.IsAttached() ? nullptr : m_App.Panel.Frame.GetHandle());
-		SetPosition(&rc);
+	if (m_fLButtonDown) {
+		POINT pt = {x, y};
+		::ClientToScreen(m_hwnd, &pt);
+		if (pt.x != m_ptDragStartPos.x || pt.y != m_ptDragStartPos.y) {
+			m_fDragging = true;
+			::ReleaseCapture();
+			::SendMessage(m_hwnd, WM_NCLBUTTONDOWN, HTCAPTION, MAKELPARAM(pt.x, pt.y));
+		}
 	} else if (!m_pCore->GetFullscreen()) {
 		const POINT pt = {x, y};
 
@@ -4747,115 +4759,103 @@ void CMainWindow::HookWindows(HWND hwnd)
 }
 
 
-const LPCTSTR CHILD_PROP_THIS = APP_NAME TEXT("ChildThis");
-
 void CMainWindow::HookChildWindow(HWND hwnd)
 {
 	if (hwnd == nullptr)
 		return;
 
-	if (m_atomChildOldWndProcProp == 0) {
-		m_atomChildOldWndProcProp = ::GlobalAddAtom(APP_NAME TEXT("ChildOldWndProc"));
-		if (m_atomChildOldWndProcProp == 0)
-			return;
-	}
+	// this のアドレスを ID として使う
+	const UINT_PTR SubclassID = reinterpret_cast<UINT_PTR>(this);
 
-	if (::GetProp(hwnd, MAKEINTATOM(m_atomChildOldWndProcProp)) == nullptr) {
+	// 既にサブクラス化されているか確認
+	DWORD_PTR RefData;
+	if (::GetWindowSubclass(hwnd, ChildSubclassProc, SubclassID, &RefData) && RefData == SubclassID)
+		return;
+
 #ifdef _DEBUG
+	{
 		TCHAR szClass[256];
 		::GetClassName(hwnd, szClass, lengthof(szClass));
 		TRACE(TEXT("Hook window %p \"%s\"\n"), hwnd, szClass);
-#endif
-		WNDPROC pOldWndProc = SubclassWindow(hwnd, ChildHookProc);
-		::SetProp(hwnd, MAKEINTATOM(m_atomChildOldWndProcProp), reinterpret_cast<HANDLE>(pOldWndProc));
-		::SetProp(hwnd, CHILD_PROP_THIS, this);
 	}
+#endif
+	::SetWindowSubclass(hwnd, ChildSubclassProc, SubclassID, reinterpret_cast<DWORD_PTR>(this));
 }
 
 
-LRESULT CALLBACK CMainWindow::ChildHookProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
+LRESULT CALLBACK CMainWindow::ChildSubclassProc(
+	HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData)
 {
-	WNDPROC pOldWndProc = reinterpret_cast<WNDPROC>(::GetProp(hwnd, MAKEINTATOM(m_atomChildOldWndProcProp)));
-
-	if (pOldWndProc == nullptr)
-		return ::DefWindowProc(hwnd, uMsg, wParam, lParam);
+	CMainWindow *pThis = reinterpret_cast<CMainWindow*>(dwRefData);
 
 	switch (uMsg) {
 	case WM_NCHITTEST:
-		{
-			CMainWindow *pThis = static_cast<CMainWindow*>(::GetProp(hwnd, CHILD_PROP_THIS));
+		if (pThis->m_fCustomFrame && !::IsZoomed(pThis->m_hwnd)
+				&& ::GetAncestor(hwnd, GA_ROOT) == pThis->m_hwnd) {
+			const POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+			RECT rc;
 
-			if (pThis != nullptr && pThis->m_fCustomFrame && !::IsZoomed(pThis->m_hwnd)
-					&& ::GetAncestor(hwnd, GA_ROOT) == pThis->m_hwnd) {
-				POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-				RECT rc;
+			pThis->GetScreenPosition(&rc);
+			if (::PtInRect(&rc, pt)) {
+				Style::Margins FrameWidth = pThis->m_Style.ResizingMargin;
+				if (FrameWidth.Left < pThis->m_CustomFrameWidth)
+					FrameWidth.Left = pThis->m_CustomFrameWidth;
+				if (FrameWidth.Top < pThis->m_CustomFrameWidth)
+					FrameWidth.Top = pThis->m_CustomFrameWidth;
+				if (FrameWidth.Right < pThis->m_CustomFrameWidth)
+					FrameWidth.Right = pThis->m_CustomFrameWidth;
+				if (FrameWidth.Bottom < pThis->m_CustomFrameWidth)
+					FrameWidth.Bottom = pThis->m_CustomFrameWidth;
+				int CornerMarginLeft = FrameWidth.Left * 2;
+				int CornerMarginRight = FrameWidth.Right * 2;
+				RECT rcFrame = rc;
+				Style::Subtract(&rcFrame, FrameWidth);
+				int Code = HTNOWHERE;
 
-				pThis->GetScreenPosition(&rc);
-				if (::PtInRect(&rc, pt)) {
-					Style::Margins FrameWidth = pThis->m_Style.ResizingMargin;
-					if (FrameWidth.Left < pThis->m_CustomFrameWidth)
-						FrameWidth.Left = pThis->m_CustomFrameWidth;
-					if (FrameWidth.Top < pThis->m_CustomFrameWidth)
-						FrameWidth.Top = pThis->m_CustomFrameWidth;
-					if (FrameWidth.Right < pThis->m_CustomFrameWidth)
-						FrameWidth.Right = pThis->m_CustomFrameWidth;
-					if (FrameWidth.Bottom < pThis->m_CustomFrameWidth)
-						FrameWidth.Bottom = pThis->m_CustomFrameWidth;
-					int CornerMarginLeft = FrameWidth.Left * 2;
-					int CornerMarginRight = FrameWidth.Right * 2;
-					RECT rcFrame = rc;
-					Style::Subtract(&rcFrame, FrameWidth);
-					int Code = HTNOWHERE;
-
-					if (pt.y < rcFrame.top) {
-						if (pt.x < rcFrame.left + CornerMarginLeft)
-							Code = HTTOPLEFT;
-						else if (pt.x >= rcFrame.right - CornerMarginRight)
-							Code = HTTOPRIGHT;
-						else
-							Code = HTTOP;
-					} else if (pt.y >= rcFrame.bottom) {
-						if (pt.x < rcFrame.left + CornerMarginLeft)
-							Code = HTBOTTOMLEFT;
-						else if (pt.x >= rcFrame.right - CornerMarginRight)
-							Code = HTBOTTOMRIGHT;
-						else
-							Code = HTBOTTOM;
-					} else if (pt.x < rcFrame.left) {
-						Code = HTLEFT;
-					} else if (pt.x >= rcFrame.right) {
-						Code = HTRIGHT;
-					}
-					if (Code != HTNOWHERE) {
-						return Code;
-					}
+				if (pt.y < rcFrame.top) {
+					if (pt.x < rcFrame.left + CornerMarginLeft)
+						Code = HTTOPLEFT;
+					else if (pt.x >= rcFrame.right - CornerMarginRight)
+						Code = HTTOPRIGHT;
+					else
+						Code = HTTOP;
+				} else if (pt.y >= rcFrame.bottom) {
+					if (pt.x < rcFrame.left + CornerMarginLeft)
+						Code = HTBOTTOMLEFT;
+					else if (pt.x >= rcFrame.right - CornerMarginRight)
+						Code = HTBOTTOMRIGHT;
+					else
+						Code = HTBOTTOM;
+				} else if (pt.x < rcFrame.left) {
+					Code = HTLEFT;
+				} else if (pt.x >= rcFrame.right) {
+					Code = HTRIGHT;
+				}
+				if (Code != HTNOWHERE) {
+					return Code;
 				}
 			}
 		}
 		break;
 
 	case WM_NCLBUTTONDOWN:
-		{
-			CMainWindow *pThis = static_cast<CMainWindow*>(::GetProp(hwnd, CHILD_PROP_THIS));
+		if (pThis->m_fCustomFrame && ::GetAncestor(hwnd, GA_ROOT) == pThis->m_hwnd) {
+			BYTE Flag = 0;
 
-			if (pThis != nullptr && pThis->m_fCustomFrame && ::GetAncestor(hwnd, GA_ROOT) == pThis->m_hwnd) {
-				BYTE Flag = 0;
+			switch (wParam) {
+			case HTTOP:         Flag = WMSZ_TOP;         break;
+			case HTTOPLEFT:     Flag = WMSZ_TOPLEFT;     break;
+			case HTTOPRIGHT:    Flag = WMSZ_TOPRIGHT;    break;
+			case HTLEFT:        Flag = WMSZ_LEFT;        break;
+			case HTRIGHT:       Flag = WMSZ_RIGHT;       break;
+			case HTBOTTOM:      Flag = WMSZ_BOTTOM;      break;
+			case HTBOTTOMLEFT:  Flag = WMSZ_BOTTOMLEFT;  break;
+			case HTBOTTOMRIGHT: Flag = WMSZ_BOTTOMRIGHT; break;
+			}
 
-				switch (wParam) {
-				case HTTOP:         Flag = WMSZ_TOP;         break;
-				case HTTOPLEFT:     Flag = WMSZ_TOPLEFT;     break;
-				case HTTOPRIGHT:    Flag = WMSZ_TOPRIGHT;    break;
-				case HTLEFT:        Flag = WMSZ_LEFT;        break;
-				case HTRIGHT:       Flag = WMSZ_RIGHT;       break;
-				case HTBOTTOM:      Flag = WMSZ_BOTTOM;      break;
-				case HTBOTTOMLEFT:  Flag = WMSZ_BOTTOMLEFT;  break;
-				case HTBOTTOMRIGHT: Flag = WMSZ_BOTTOMRIGHT; break;
-				}
-
-				if (Flag != 0) {
-					::SendMessage(pThis->m_hwnd, WM_SYSCOMMAND, SC_SIZE | Flag, lParam);
-					return 0;
-				}
+			if (Flag != 0) {
+				::SendMessage(pThis->m_hwnd, WM_SYSCOMMAND, SC_SIZE | Flag, lParam);
+				return 0;
 			}
 		}
 		break;
@@ -4868,13 +4868,11 @@ LRESULT CALLBACK CMainWindow::ChildHookProc(HWND hwnd, UINT uMsg, WPARAM wParam,
 			TRACE(TEXT("Unhook window %p \"%s\"\n"), hwnd, szClass);
 		}
 #endif
-		::SetWindowLongPtr(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(pOldWndProc));
-		::RemoveProp(hwnd, MAKEINTATOM(m_atomChildOldWndProcProp));
-		::RemoveProp(hwnd, CHILD_PROP_THIS);
+		::RemoveWindowSubclass(hwnd, ChildSubclassProc, reinterpret_cast<UINT_PTR>(pThis));
 		break;
 	}
 
-	return ::CallWindowProc(pOldWndProc, hwnd, uMsg, wParam, lParam);
+	return ::DefSubclassProc(hwnd, uMsg, wParam, lParam);
 }
 
 
@@ -5688,7 +5686,7 @@ bool CMainWindow::CFullscreen::OnCreate()
 	if (pViewer != nullptr)
 		pViewer->SetViewStretchMode(m_App.VideoOptions.GetFullscreenStretchMode());
 
-	m_fShowCursor = true;
+	m_fShowCursor = false;
 	m_fMenu = false;
 	m_fShowStatusView = false;
 	m_fShowTitleBar = false;

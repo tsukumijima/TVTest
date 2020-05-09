@@ -1,6 +1,6 @@
 /*
   TVTest
-  Copyright(c) 2008-2019 DBCTRADO
+  Copyright(c) 2008-2020 DBCTRADO
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -408,7 +408,7 @@ int CSplitter::GetPaneSize(int ID)
 	int Index = IDToIndex(ID);
 
 	if (Index < 0)
-		return false;
+		return 0;
 	if (Index == 0)
 		return m_BarPos;
 	int Size;

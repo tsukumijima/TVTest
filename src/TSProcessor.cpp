@@ -1,6 +1,6 @@
 /*
   TVTest
-  Copyright(c) 2008-2019 DBCTRADO
+  Copyright(c) 2008-2020 DBCTRADO
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -306,7 +306,7 @@ bool CTSProcessor::ShowPropertyPage(HWND hwndOwner, HINSTANCE hinst)
 				pSpecifyPropPages2->Release();
 			} else {
 				IUnknown *pObject;
-				hr = m_pTSProcessor->QueryInterface(IID_PPV_ARGS(&pObject));
+				hr = m_pTSProcessor->QueryInterface(IID_IUnknown, reinterpret_cast<void**>(&pObject));
 				if (SUCCEEDED(hr)) {
 					hr = ::OleCreatePropertyFrame(
 						hwndOwner, 0, 0, L"プロパティ",

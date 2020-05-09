@@ -1,6 +1,6 @@
 /*
   TVTest
-  Copyright(c) 2008-2019 DBCTRADO
+  Copyright(c) 2008-2020 DBCTRADO
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -1254,7 +1254,7 @@ bool CPopupMenu::CheckItem(UINT ID, bool fCheck)
 {
 	if (m_hmenu == nullptr)
 		return false;
-	return ::CheckMenuItem(m_hmenu, ID, MF_BYCOMMAND | (fCheck ? MFS_CHECKED : MFS_UNCHECKED)) >= 0;
+	return ::CheckMenuItem(m_hmenu, ID, MF_BYCOMMAND | (fCheck ? MFS_CHECKED : MFS_UNCHECKED)) != (DWORD)-1;
 }
 
 

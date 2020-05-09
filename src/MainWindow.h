@@ -1,6 +1,6 @@
 /*
   TVTest
-  Copyright(c) 2008-2019 DBCTRADO
+  Copyright(c) 2008-2020 DBCTRADO
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -539,6 +539,7 @@ namespace TVTest
 		bool m_fNoHideCursor;
 		CCursorTracker m_CursorTracker;
 
+		bool m_fLButtonDown;
 		bool m_fDragging;
 		POINT m_ptDragStartPos;
 		RECT m_rcDragStart;
@@ -593,7 +594,6 @@ namespace TVTest
 		};
 
 		static const DirectShowFilterPropertyInfo m_DirectShowFilterPropertyList[];
-		static ATOM m_atomChildOldWndProcProp;
 		static CMainWindow *m_pThis;
 
 	// CUISkin
@@ -698,7 +698,9 @@ namespace TVTest
 		void PostCommand(int Command) { PostMessage(WM_COMMAND, Command, 0); }
 
 		static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-		static LRESULT CALLBACK ChildHookProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+		static LRESULT CALLBACK ChildSubclassProc(
+			HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam,
+			UINT_PTR uIdSubclass, DWORD_PTR dwRefData);
 	};
 
 	TVTEST_ENUM_FLAGS(CMainWindow::ResumeInfo::ViewerSuspendFlag)

@@ -1,6 +1,6 @@
 /*
   TVTest
-  Copyright(c) 2008-2019 DBCTRADO
+  Copyright(c) 2008-2020 DBCTRADO
 
   This program is free software; you can redistribute it and/or modify
   it under the terms of the GNU General Public License as published by
@@ -2279,7 +2279,7 @@ LRESULT CPlugin::OnCallback(PluginParam *pParam, UINT Message, LPARAM lParam1, L
 
 			CreateAppCommandList();
 
-			if (pInfo->Index < 0 || (size_t)pInfo->Index >= m_AppCommandList.size())
+			if (pInfo->Index >= m_AppCommandList.size())
 				return FALSE;
 
 			const AppCommand &Command = m_AppCommandList[pInfo->Index];
