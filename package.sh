@@ -121,7 +121,7 @@ do
 done
 
 version=
-if [[ $(grep -aE ^#define[[:space:]]+VERSION_TEXT_A src/TVTestVersion.h) =~ \"(.+)\"$ ]]
+if [[ $(bash -c 'sed "s/\r//g" src/TVTestVersion.h | grep -aE ^#define[[:space:]]+VERSION_TEXT_A -') =~ \"(.+)\"$ ]]
 then
     version=${BASH_REMATCH[1]}_
 fi
