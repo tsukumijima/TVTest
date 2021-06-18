@@ -300,14 +300,22 @@ bool CRichEditUtil::DetectURL(
 				cr.cpMax = cr.cpMin + Length;
 				::SendMessage(hwndEdit, EM_EXSETSEL, 0, reinterpret_cast<LPARAM>(&cr));
 #ifdef UNICODE
-				if (!!(Flags & DetectURLFlag::ToHalfWidth) && *q >= 0xFF01) {
-					LPWSTR pszURL = new WCHAR[Length + 1];
-					for (int j = 0; j < Length; j++)
-						pszURL[j] = q[j] - 0xFEE0;
-					pszURL[Length] = L'\0';
-					::SendMessage(hwndEdit, EM_REPLACESEL, 0, reinterpret_cast<LPARAM>(pszURL));
-					delete [] pszURL;
-					::SendMessage(hwndEdit, EM_EXSETSEL, 0, reinterpret_cast<LPARAM>(&cr));
+				if (!!(Flags & DetectURLFlag::ToHalfWidth)) {
+					LPWSTR pszURL = nullptr;
+					for (int j = 0; j < Length; j++) {
+						LPCWSTR pFound = ::StrChr(m_pszURLFullWidthChars, q[j]);
+						if (pFound != nullptr) {
+							pszURL = szText + (q - szText);
+							pszURL[j] = m_pszURLChars[pFound - m_pszURLFullWidthChars];
+						}
+					}
+					if (pszURL != nullptr) {
+						WCHAR cEnd = pszURL[Length];
+						pszURL[Length] = L'\0';
+						::SendMessage(hwndEdit, EM_REPLACESEL, 0, reinterpret_cast<LPARAM>(pszURL));
+						pszURL[Length] = cEnd;
+						::SendMessage(hwndEdit, EM_EXSETSEL, 0, reinterpret_cast<LPARAM>(&cr));
+					}
 				}
 #endif
 				::SendMessage(hwndEdit, EM_SETCHARFORMAT, SCF_SELECTION, reinterpret_cast<LPARAM>(&cfLink));
@@ -349,15 +357,21 @@ bool CRichEditUtil::SearchNextURL(LPCTSTR *ppszText, int *pLength)
 					&& ::CompareString(
 							LOCALE_USER_DEFAULT, NORM_IGNOREWIDTH,
 							&p[i], URLLength, Prefix.pszPrefix, URLLength) == CSTR_EQUAL) {
-				if (p[i] < 0x0080) {
-					while (i + URLLength < TextLength && ::StrChr(m_pszURLChars, p[i + URLLength]) != nullptr)
-						URLLength++;
-				} else {
-					while (i + URLLength < TextLength && ::StrChr(m_pszURLFullWidthChars, p[i + URLLength]) != nullptr)
-						URLLength++;
+				while (i + URLLength < TextLength) {
+					if (p[i + URLLength] < 0x0080) {
+						if (::StrChr(m_pszURLChars, p[i + URLLength]) == nullptr)
+							break;
+					} else {
+						if (::StrChr(m_pszURLFullWidthChars, p[i + URLLength]) == nullptr)
+							break;
+					}
+					URLLength++;
 				}
 #ifdef UNICODE
-				if (i > 0 && p[i - 1] == L'(' && p[i + URLLength - 1] == L')')
+				const WCHAR LastChar = p[i + URLLength - 1];
+				if ((i > 0 && (p[i - 1] == L'(' || p[i - 1] == L'（') && (LastChar == L')' || LastChar == L'）'))
+						|| LastChar == L'('
+						|| LastChar == L'（')
 					URLLength--;
 #endif
 				*ppszText = p + i;
