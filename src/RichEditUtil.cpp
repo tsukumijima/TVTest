@@ -241,6 +241,14 @@ int CRichEditUtil::GetMaxLineWidth(HWND hwndEdit)
 }
 
 
+void CRichEditUtil::DisableAutoFont(HWND hwndEdit)
+{
+	LPARAM Options = ::SendMessage(hwndEdit, EM_GETLANGOPTIONS, 0, 0);
+	Options &= ~(IMF_AUTOFONT | IMF_DUALFONT);
+	::SendMessage(hwndEdit, EM_SETLANGOPTIONS, 0, Options);
+}
+
+
 bool CRichEditUtil::DetectURL(
 	HWND hwndEdit, const CHARFORMAT *pcf, int FirstLine, int LastLine,
 	DetectURLFlag Flags, CharRangeList *pCharRangeList)
@@ -448,6 +456,86 @@ bool CRichEditUtil::OpenLink(HWND hwndEdit, const CHARRANGE &Range)
 	::ShellExecute(nullptr, TEXT("open"), szURL, nullptr, nullptr, SW_SHOWNORMAL);
 
 	return true;
+}
+
+
+
+
+void CRichEditLinkHandler::Reset()
+{
+	m_LinkList.clear();
+	m_ClickPos.x = -1;
+	m_ClickPos.y = -1;
+	m_fCursorOverLink = false;
+}
+
+
+bool CRichEditLinkHandler::DetectURL(
+	HWND hwndEdit, const CHARFORMAT *pcf, int FirstLine, int LastLine,
+	CRichEditUtil::DetectURLFlag Flags)
+{
+	Reset();
+	m_hwndEdit = hwndEdit;
+	return CRichEditUtil::DetectURL(hwndEdit, pcf, FirstLine, LastLine, Flags, &m_LinkList);
+}
+
+
+bool CRichEditLinkHandler::OnMsgFilter(MSGFILTER *pMsgFilter)
+{
+	switch (pMsgFilter->msg) {
+	case WM_LBUTTONDOWN:
+		m_ClickPos.x = GET_X_LPARAM(pMsgFilter->lParam);
+		m_ClickPos.y = GET_Y_LPARAM(pMsgFilter->lParam);
+		return true;
+		break;
+
+	case WM_MOUSEMOVE:
+		m_ClickPos.x = -1;
+		m_ClickPos.y = -1;
+		{
+			const POINT pt = {GET_X_LPARAM(pMsgFilter->lParam), GET_Y_LPARAM(pMsgFilter->lParam)};
+
+			if (CRichEditUtil::LinkHitTest(m_hwndEdit, pt, m_LinkList) >= 0) {
+				m_fCursorOverLink = true;
+				::SetCursor(m_hLinkCursor);
+			} else {
+				m_fCursorOverLink = false;
+			}
+		}
+		return true;
+
+	case WM_LBUTTONUP:
+		{
+			const POINT pt = {GET_X_LPARAM(pMsgFilter->lParam), GET_Y_LPARAM(pMsgFilter->lParam)};
+
+			if (m_ClickPos.x == pt.x && m_ClickPos.y == pt.y)
+				CRichEditUtil::HandleLinkClick(m_hwndEdit, pt, m_LinkList);
+		}
+		return true;
+	}
+
+	return false;
+}
+
+
+bool CRichEditLinkHandler::OnSetCursor(HWND hwnd, WPARAM wParam, LPARAM lParam)
+{
+	if (reinterpret_cast<HWND>(wParam) == m_hwndEdit
+			&& LOWORD(lParam) == HTCLIENT
+			&& m_fCursorOverLink) {
+		::SetCursor(m_hLinkCursor);
+		return true;
+	}
+
+	return false;
+}
+
+
+void CRichEditLinkHandler::LeaveCursor()
+{
+	m_ClickPos.x = -1;
+	m_ClickPos.y = -1;
+	m_fCursorOverLink = false;
 }
 
 

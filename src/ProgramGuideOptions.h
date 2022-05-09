@@ -36,7 +36,8 @@ namespace TVTest
 	{
 	public:
 		enum {
-			UPDATE_EVENTICONS = 0x00000001UL
+			UPDATE_EVENTICONS = 0x00000001UL,
+			UPDATE_ARIBSYMBOL = 0x00000002UL
 		};
 
 		CProgramGuideOptions(CProgramGuide *pProgramGuide, CPluginManager *pPluginManager);
@@ -55,6 +56,7 @@ namespace TVTest
 		bool ScrollToCurChannel() const { return m_fScrollToCurChannel; }
 		const Style::Font &GetFont() const { return m_Font; }
 		UINT GetVisibleEventIcons() const { return m_VisibleEventIcons; }
+		bool GetUseARIBSymbol() const { return m_fUseARIBSymbol; }
 		LPCTSTR GetProgramLDoubleClickCommand() const { return StringUtility::GetCStrOrNull(m_ProgramLDoubleClickCommand); }
 		int ParseCommand(LPCTSTR pszCommand) const;
 
@@ -74,6 +76,7 @@ namespace TVTest
 		Style::Font m_CurSettingFont;
 		bool m_fUseDirectWrite;
 		CDirectWriteRenderer::RenderingParams m_DirectWriteRenderingParams;
+		bool m_fUseARIBSymbol;
 		UINT m_VisibleEventIcons;
 		CProgramGuideToolList m_ToolList;
 		int m_WheelScrollLines;

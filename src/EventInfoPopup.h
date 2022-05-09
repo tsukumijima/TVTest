@@ -28,6 +28,7 @@
 #include "RichEditUtil.h"
 #include "GUIUtil.h"
 #include "WindowUtil.h"
+#include "EpgUtil.h"
 #include "LibISDB/LibISDB/EPG/EventInfo.hpp"
 
 
@@ -66,8 +67,7 @@ namespace TVTest
 		bool IsOwnWindow(HWND hwnd) const;
 		void GetSize(int *pWidth, int *pHeight) const;
 		bool SetSize(int Width, int Height);
-		void SetColor(COLORREF BackColor, COLORREF TextColor);
-		void SetTitleColor(COLORREF BackColor, COLORREF TextColor);
+		void SetTheme(const Theme::CThemeManager *pThemeManager);
 		bool SetFont(const Style::Font &Font);
 		void SetEventHandler(CEventHandler *pEventHandler);
 		bool IsSelected() const;
@@ -84,11 +84,14 @@ namespace TVTest
 		LibISDB::EventInfo m_EventInfo;
 		HWND m_hwndEdit;
 		CRichEditUtil m_RichEditUtil;
+		CRichEditLinkHandler m_RichEditLink;
 		Style::CStyleScaling m_StyleScaling;
-		COLORREF m_BackColor;
-		COLORREF m_TextColor;
-		COLORREF m_TitleBackColor;
-		COLORREF m_TitleTextColor;
+		CEpgTheme m_EpgTheme;
+		Theme::ThemeColor m_BackColor;
+		Theme::ThemeColor m_TextColor;
+		Theme::ThemeColor m_EventTitleColor;
+		Theme::ThemeColor m_TitleBackColor;
+		Theme::ThemeColor m_TitleTextColor;
 		Style::Font m_StyleFont;
 		DrawUtil::CFont m_Font;
 		DrawUtil::CFont m_TitleFont;
@@ -117,12 +120,14 @@ namespace TVTest
 
 		bool Create(HWND hwndParent, DWORD Style, DWORD ExStyle, int ID) override;
 		void SetEventInfo(const LibISDB::EventInfo *pEventInfo);
+		void UpdateEventInfo();
 		void FormatAudioInfo(
 			const LibISDB::EventInfo::AudioInfo *pAudioInfo,
 			LPTSTR pszText, int MaxLength) const;
 		void CalcTitleHeight();
 		void GetCloseButtonRect(RECT *pRect) const;
 		void SetNcRendering();
+		void ShowContextMenu();
 	};
 
 	class CEventInfoPopupManager

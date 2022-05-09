@@ -74,6 +74,7 @@ CChannelPanel::CChannelPanel()
 	, m_fShowGenreColor(false)
 	, m_fShowFeaturedMark(true)
 	, m_fShowProgressBar(false)
+	, m_fUseARIBSymbol(false)
 	, m_ProgressBarStyle(ProgressBarStyle::Elapsed)
 	, m_EventsPerChannel(2)
 	, m_ExpandAdditionalEvents(4)
@@ -159,6 +160,7 @@ void CChannelPanel::SetTheme(const Theme::CThemeManager *pThemeManager)
 	SetChannelPanelTheme(Theme);
 
 	m_EpgTheme.SetTheme(pThemeManager);
+	m_EventInfoPopup.SetTheme(pThemeManager);
 }
 
 
@@ -633,6 +635,16 @@ void CChannelPanel::SetProgressBarStyle(ProgressBarStyle Style)
 }
 
 
+void CChannelPanel::SetUseARIBSymbol(bool fUseARIBSymbol)
+{
+	if (m_fUseARIBSymbol != fUseARIBSymbol) {
+		m_fUseARIBSymbol = fUseARIBSymbol;
+		if (m_hwnd != nullptr)
+			Invalidate();
+	}
+}
+
+
 bool CChannelPanel::QueryUpdateProgress()
 {
 	if (m_fShowProgressBar && m_hwnd != nullptr) {
@@ -1052,7 +1064,7 @@ void CChannelPanel::Draw(HDC hdc, const RECT *prcPaint)
 				}
 
 				DrawUtil::SelectObject(hdcDst, m_Font);
-				pChannelInfo->DrawEventName(j, TextDraw, rcText, m_FontHeight);
+				pChannelInfo->DrawEventName(j, TextDraw, rcText, m_FontHeight, m_fUseARIBSymbol);
 			}
 
 			if (hdcDst != hdc)
@@ -1359,10 +1371,6 @@ bool CChannelPanel::ShowEventInfoPopup(LPARAM Param, CEventInfoPopup *pPopup)
 	if (!pChEventInfo->IsEventEnabled(Event))
 		return false;
 
-	pPopup->SetTitleColor(
-		m_EpgTheme.GetGenreColor(pChEventInfo->GetEventInfo(Event)),
-		m_EpgTheme.GetColor(CEpgTheme::COLOR_EVENTNAME));
-
 	HICON hIcon = nullptr;
 	if (m_pLogoManager != nullptr) {
 		int IconWidth, IconHeight;
@@ -1571,14 +1579,18 @@ void CChannelPanel::CChannelEventInfo::DrawChannelName(
 
 
 void CChannelPanel::CChannelEventInfo::DrawEventName(
-	int Index, CTextDraw &TextDraw, const RECT &Rect, int LineHeight)
+	int Index, CTextDraw &TextDraw, const RECT &Rect, int LineHeight, bool fUseARIBSymbol)
 {
 	if (IsEventEnabled(Index)) {
 		const LibISDB::EventInfo &Info = m_EventList[Index];
-		TCHAR szText[256], szTime[EpgUtil::MAX_EVENT_TIME_LENGTH];
+		TCHAR szText[256];
 
-		EpgUtil::FormatEventTime(Info, szTime, lengthof(szTime), EpgUtil::FormatEventTimeFlag::Hour2Digits);
-		StringPrintf(szText, TEXT("%s %s"), szTime, Info.EventName.c_str());
+		int Length = EpgUtil::FormatEventTime(Info, szText, lengthof(szText), EpgUtil::FormatEventTimeFlag::Hour2Digits);
+		szText[Length++] = TEXT(' ');
+		if (fUseARIBSymbol)
+			EpgUtil::MapARIBSymbol(Info.EventName.c_str(), szText + Length, lengthof(szText) - Length);
+		else
+			StringPrintf(szText + Length, lengthof(szText) - Length, TEXT("%s"), Info.EventName.c_str());
 		TextDraw.Draw(szText, Rect, LineHeight);
 	}
 }

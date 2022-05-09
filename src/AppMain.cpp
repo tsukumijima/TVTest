@@ -893,7 +893,6 @@ int CAppMain::Main(HINSTANCE hInstance, LPCTSTR pszCmdLine, int nCmdShow)
 	CDropDownMenu::Initialize(m_hInst);
 	CHomeDisplay::Initialize(m_hInst);
 	CChannelDisplay::Initialize(m_hInst);
-	CStreamInfo::Initialize(m_hInst);
 
 	// ウィンドウ位置とサイズの設定
 	if (CmdLineOptions.m_fMaximize)
@@ -1308,6 +1307,11 @@ bool CAppMain::ShowOptionDialog(HWND hwndOwner, int StartPage)
 
 	if ((ProgramGuideOptions.GetUpdateFlags() & CProgramGuideOptions::UPDATE_EVENTICONS) != 0)
 		Panel.ProgramListPanel.SetVisibleEventIcons(ProgramGuideOptions.GetVisibleEventIcons());
+	if ((ProgramGuideOptions.GetUpdateFlags() & CProgramGuideOptions::UPDATE_ARIBSYMBOL) != 0) {
+		Panel.ProgramListPanel.SetUseARIBSymbol(ProgramGuideOptions.GetUseARIBSymbol());
+		Panel.ChannelPanel.SetUseARIBSymbol(ProgramGuideOptions.GetUseARIBSymbol());
+	}
+
 	TaskTrayManager.SetMinimizeToTray(ViewOptions.GetMinimizeToTray());
 
 	SaveSettings(SaveSettingsFlag::Options);
@@ -1738,10 +1742,9 @@ void CAppMain::CStreamInfoEventHandler::OnRestoreSettings()
 #endif
 }
 
-bool CAppMain::CStreamInfoEventHandler::OnClose()
+void CAppMain::CStreamInfoEventHandler::OnClose()
 {
 	m_App.UICore.SetCommandCheckedState(CM_STREAMINFO, false);
-	return true;
 }
 
 
