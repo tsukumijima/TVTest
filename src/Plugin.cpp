@@ -230,7 +230,8 @@ static void ConvertChannelInfo(const CChannelInfo *pChInfo, ChannelInfo *pChanne
 	StringCopy(pChannelInfo->szChannelName, pChInfo->GetName());
 	if (pChannelInfo->Size >= CHANNELINFO_SIZE_V2) {
 		pChannelInfo->PhysicalChannel = pChInfo->GetPhysicalChannel();
-		pChannelInfo->ServiceIndex = 0;	// 使用不可
+		pChannelInfo->Reserved = 0;
+		pChannelInfo->ServiceType = pChInfo->GetServiceType();
 		pChannelInfo->ServiceID = pChInfo->GetServiceID();
 		if (pChannelInfo->Size == sizeof(ChannelInfo)) {
 			pChannelInfo->Flags = 0;
@@ -627,6 +628,43 @@ static void FreeFavoriteList(FavoriteList *pList)
 	}
 }
 
+
+static bool CopyESList(const LibISDB::AnalyzerFilter::ESInfoList &SrcList, ElementaryStreamInfoList *pList)
+{
+	pList->ESCount = static_cast<WORD>(SrcList.size());
+	pList->ESList = static_cast<ElementaryStreamInfo *>(std::malloc(sizeof(ElementaryStreamInfo) * SrcList.size()));
+	if (pList->ESList == nullptr)
+		return false;
+
+	for (size_t i = 0; i < SrcList.size(); i++) {
+		const LibISDB::AnalyzerFilter::ESInfo &SrcInfo = SrcList[i];
+		ElementaryStreamInfo &Info = pList->ESList[i];
+		Info.PID = SrcInfo.PID;
+		Info.HierarchicalReferencePID = SrcInfo.HierarchicalReferencePID;
+		Info.StreamType = SrcInfo.StreamType;
+		Info.ComponentTag = SrcInfo.ComponentTag;
+		Info.QualityLevel = SrcInfo.QualityLevel;
+		Info.Reserved = 0;
+	}
+
+	return true;
+}
+
+
+static void AnalyzerServiceInfoToServiceInfo2(
+	const LibISDB::AnalyzerFilter::ServiceInfo &Info, ServiceInfo2 *pServiceInfo)
+{
+	pServiceInfo->Status = 0;
+	if (Info.FreeCAMode)
+		pServiceInfo->Status |= SERVICE_INFO2_STATUS_FREE_CA_MODE;
+	pServiceInfo->ServiceID = Info.ServiceID;
+	pServiceInfo->ServiceType = Info.ServiceType;
+	pServiceInfo->Reserved = 0;
+	pServiceInfo->PMT_PID = Info.PMTPID;
+	pServiceInfo->PCR_PID = Info.PCRPID;
+	StringCopy(pServiceInfo->szServiceName, Info.ServiceName.c_str());
+	StringCopy(pServiceInfo->szProviderName, Info.ProviderName.c_str());
+}
 
 
 
@@ -1300,15 +1338,16 @@ LRESULT CPlugin::OnCallback(PluginParam *pParam, UINT Message, LPARAM lParam1, L
 			pServiceInfo->ServiceID = ServiceID;
 			pServiceInfo->VideoPID =
 				Info.VideoESList.empty() ? LibISDB::PID_INVALID : Info.VideoESList[0].PID;
-			pServiceInfo->NumAudioPIDs = (int)Info.AudioESList.size();
-			for (size_t i = 0; i < Info.AudioESList.size(); i++)
+			const int NumAudioPIDs = std::min((int)Info.AudioESList.size(), 4);
+			pServiceInfo->NumAudioPIDs = NumAudioPIDs;
+			for (int i = 0; i < NumAudioPIDs; i++)
 				pServiceInfo->AudioPID[i] = Info.AudioESList[i].PID;
 			StringCopy(pServiceInfo->szServiceName, Info.ServiceName.c_str());
 			if (pServiceInfo->Size == sizeof(ServiceInfo)) {
 				int ServiceIndex = pAnalyzer->GetServiceIndexByID(ServiceID);
-				for (size_t i = 0; i < Info.AudioESList.size(); i++) {
+				for (int i = 0; i < NumAudioPIDs; i++) {
 					pServiceInfo->AudioComponentType[i] =
-						pAnalyzer->GetAudioComponentType(ServiceIndex, (int)i);
+						pAnalyzer->GetAudioComponentType(ServiceIndex, i);
 				}
 				if (Info.CaptionESList.size() > 0)
 					pServiceInfo->SubtitlePID = Info.CaptionESList[0].PID;
@@ -3007,6 +3046,293 @@ LRESULT CPlugin::OnCallback(PluginParam *pParam, UINT Message, LPARAM lParam1, L
 
 			return SetWindowDarkTheme(hwnd, fDark);
 		}
+
+	case MESSAGE_GETELEMENTARYSTREAMINFOLIST:
+		{
+			ElementaryStreamInfoList *pList = reinterpret_cast<ElementaryStreamInfoList *>(lParam1);
+
+			if (pList == nullptr
+					|| pList->Size != sizeof(ElementaryStreamInfoList))
+				return FALSE;
+
+			pList->ESCount = 0;
+			pList->ESList = nullptr;
+
+			if (pList->Flags != 0)
+				return FALSE;
+
+			CCoreEngine &CoreEngine = GetAppClass().CoreEngine;
+			LibISDB::AnalyzerFilter *pAnalyzer = CoreEngine.GetFilter<LibISDB::AnalyzerFilter>();
+			if (pAnalyzer == nullptr)
+				return FALSE;
+
+			WORD ServiceID = pList->ServiceID;
+			if (ServiceID == 0) {
+				ServiceID = CoreEngine.GetServiceID();
+				if (ServiceID == LibISDB::SERVICE_ID_INVALID)
+					return FALSE;
+			}
+			LibISDB::AnalyzerFilter::ServiceInfo Info;
+			if (!pAnalyzer->GetServiceInfoByID(ServiceID, &Info))
+				return FALSE;
+
+			switch (pList->Media) {
+			case ES_MEDIA_ALL:
+				if (!CopyESList(Info.ESList, pList))
+					return FALSE;
+				break;
+
+			case ES_MEDIA_VIDEO:
+				if (!CopyESList(Info.VideoESList, pList))
+					return FALSE;
+				break;
+
+			case ES_MEDIA_AUDIO:
+				if (!CopyESList(Info.AudioESList, pList))
+					return FALSE;
+				break;
+
+			case ES_MEDIA_CAPTION:
+				if (!CopyESList(Info.CaptionESList, pList))
+					return FALSE;
+				break;
+
+			case ES_MEDIA_DATA_CARROUSEL:
+				if (!CopyESList(Info.DataCarrouselESList, pList))
+					return FALSE;
+				break;
+
+			default:
+				return FALSE;
+			}
+		}
+		return TRUE;
+
+	case MESSAGE_GETSERVICECOUNT:
+		{
+			CCoreEngine &CoreEngine = GetAppClass().CoreEngine;
+			const LibISDB::AnalyzerFilter *pAnalyzer = CoreEngine.GetFilter<LibISDB::AnalyzerFilter>();
+			if (pAnalyzer != nullptr)
+				return pAnalyzer->GetServiceCount();
+		}
+		return 0;
+
+	case MESSAGE_GETSERVICEINFO2:
+		{
+			const int Service = static_cast<int>(lParam1);
+			ServiceInfo2 *pServiceInfo = reinterpret_cast<ServiceInfo2*>(lParam2);
+
+			if (pServiceInfo == nullptr
+					|| pServiceInfo->Size != sizeof(ServiceInfo2)
+					|| (pServiceInfo->Flags & ~(
+							SERVICE_INFO2_FLAG_BY_ID |
+							SERVICE_INFO2_FLAG_BY_SELECTABLE_INDEX)) != 0)
+				return FALSE;
+
+			CCoreEngine &CoreEngine = GetAppClass().CoreEngine;
+			const LibISDB::AnalyzerFilter *pAnalyzer = CoreEngine.GetFilter<LibISDB::AnalyzerFilter>();
+			if (pAnalyzer == nullptr)
+				return FALSE;
+
+			LibISDB::AnalyzerFilter::ServiceInfo Info;
+
+			if (Service == -1) {
+				const uint16_t ServiceID = CoreEngine.GetServiceID();
+				if (ServiceID == LibISDB::SERVICE_ID_INVALID)
+					return FALSE;
+				if (!pAnalyzer->GetServiceInfoByID(ServiceID, &Info))
+					return FALSE;
+			} else if ((pServiceInfo->Flags & SERVICE_INFO2_FLAG_BY_ID) != 0) {
+				if ((pServiceInfo->Flags & SERVICE_INFO2_FLAG_BY_SELECTABLE_INDEX) != 0)
+					return FALSE;
+				if (!pAnalyzer->GetServiceInfoByID(static_cast<uint16_t>(Service), &Info))
+					return FALSE;
+			} else if ((pServiceInfo->Flags & SERVICE_INFO2_FLAG_BY_SELECTABLE_INDEX) != 0) {
+				const uint16_t ServiceID = CoreEngine.GetSelectableServiceID(Service);
+				if (ServiceID == LibISDB::SERVICE_ID_INVALID)
+					return FALSE;
+				if (!pAnalyzer->GetServiceInfoByID(ServiceID, &Info))
+					return FALSE;
+			} else {
+				if (!pAnalyzer->GetServiceInfo(Service, &Info))
+					return FALSE;
+			}
+
+			AnalyzerServiceInfoToServiceInfo2(Info, pServiceInfo);
+			// 厳密にいえば GetServiceInfo() と同期が必要
+			pServiceInfo->NetworkID = pAnalyzer->GetTransportStreamID();
+			pServiceInfo->TransportStreamID = pAnalyzer->GetNetworkID();
+		}
+		return TRUE;
+
+	case MESSAGE_GETSERVICEINFOLIST:
+		{
+			ServiceInfoList *pList = reinterpret_cast<ServiceInfoList*>(lParam1);
+
+			if (pList == nullptr
+					|| pList->Size != sizeof(ServiceInfoList)
+					|| (pList->Flags & ~(
+							SERVICE_INFO_LIST_FLAG_SELECTABLE_ONLY |
+							SERVICE_INFO_LIST_FLAG_SDT_ACTUAL)) != 0)
+				return FALSE;
+
+			pList->Reserved = 0;
+			pList->ServiceCount = 0;
+			pList->ServiceList = nullptr;
+
+			CCoreEngine &CoreEngine = GetAppClass().CoreEngine;
+			const LibISDB::AnalyzerFilter *pAnalyzer = CoreEngine.GetFilter<LibISDB::AnalyzerFilter>();
+			if (pAnalyzer == nullptr)
+				return FALSE;
+
+			// 厳密にいえば GetServiceList() 等と同期が必要
+			const uint16_t NetworkID = pAnalyzer->GetNetworkID();
+			const uint16_t TransportStreamID = pAnalyzer->GetTransportStreamID();
+
+			if ((pList->Flags & SERVICE_INFO_LIST_FLAG_SDT_ACTUAL) != 0) {
+				// 同時に指定できないフラグ
+				if ((pList->Flags & SERVICE_INFO_LIST_FLAG_SELECTABLE_ONLY) != 0)
+					return FALSE;
+
+				LibISDB::AnalyzerFilter::SDTServiceList SDTList;
+				if (!pAnalyzer->GetSDTServiceList(&SDTList) || SDTList.empty())
+					return FALSE;
+				pList->ServiceList = static_cast<ServiceInfo2*>(std::malloc(sizeof(ServiceInfo2) * SDTList.size()));
+				if (pList->ServiceList == nullptr)
+					return FALSE;
+				pList->ServiceCount = static_cast<DWORD>(SDTList.size());
+
+				for (size_t i = 0; i < SDTList.size(); i++) {
+					ServiceInfo2 &Info = pList->ServiceList[i];
+					const LibISDB::AnalyzerFilter::SDTServiceInfo &SDTInfo = SDTList[i];
+
+					Info.Size = sizeof(ServiceInfo2);
+					Info.Flags = 0;
+					Info.Status = 0;
+					if (SDTInfo.FreeCAMode)
+						Info.Status |= SERVICE_INFO2_STATUS_FREE_CA_MODE;
+					Info.NetworkID = NetworkID;
+					Info.TransportStreamID = TransportStreamID;
+					Info.ServiceID = SDTInfo.ServiceID;
+					Info.ServiceType = SDTInfo.ServiceType;
+					Info.Reserved = 0;
+					Info.PMT_PID = 0xFFFF;
+					Info.PCR_PID = 0xFFFF;
+					StringCopy(Info.szServiceName, SDTInfo.ServiceName.c_str());
+					StringCopy(Info.szProviderName, SDTInfo.ProviderName.c_str());
+				}
+			} else {
+				LibISDB::AnalyzerFilter::ServiceList List;
+
+				if ((pList->Flags & SERVICE_INFO_LIST_FLAG_SELECTABLE_ONLY) != 0) {
+					if (!CoreEngine.GetSelectableServiceList(&List) || List.empty())
+						return FALSE;
+				} else {
+					if (!pAnalyzer->GetServiceList(&List) || List.empty())
+						return FALSE;
+				}
+
+				pList->ServiceList = static_cast<ServiceInfo2*>(std::malloc(sizeof(ServiceInfo2) * List.size()));
+				if (pList->ServiceList == nullptr)
+					return FALSE;
+				pList->ServiceCount = static_cast<DWORD>(List.size());
+
+				for (size_t i = 0; i < List.size(); i++) {
+					ServiceInfo2 &Info = pList->ServiceList[i];
+					Info.Size = sizeof(ServiceInfo2);
+					Info.Flags = 0;
+					AnalyzerServiceInfoToServiceInfo2(List[i], &Info);
+					Info.NetworkID = NetworkID;
+					Info.TransportStreamID = TransportStreamID;
+				}
+			}
+		}
+		return TRUE;
+
+	case MESSAGE_GETAUDIOINFO:
+		{
+			AudioInfo *pInfo = reinterpret_cast<AudioInfo*>(lParam1);
+
+			if (pInfo == nullptr
+					|| pInfo->Size != sizeof(AudioInfo))
+				return FALSE;
+
+			LibISDB::ViewerFilter *pViewer =
+				GetAppClass().CoreEngine.GetFilter<LibISDB::ViewerFilter>();
+			if (pViewer == nullptr)
+				return FALSE;
+			LibISDB::ViewerFilter::AudioInfo Info;
+			if (!pViewer->GetAudioInfo(&Info))
+				return FALSE;
+
+			pInfo->Status = 0;
+			if (Info.DualMono)
+				pInfo->Status |= AUDIO_INFO_STATUS_DUAL_MONO;
+			if (pViewer->IsSPDIFPassthrough())
+				pInfo->Status |= AUDIO_INFO_STATUS_SPDIF;
+
+			if (Info.OriginalChannelCount == 2) {
+				switch (pViewer->GetStereoMode()) {
+				case LibISDB::DirectShow::AudioDecoderFilter::StereoMode::Left:
+					pInfo->Status |= AUDIO_INFO_STATUS_LEFT_ONLY;
+					break;
+				case LibISDB::DirectShow::AudioDecoderFilter::StereoMode::Right:
+					pInfo->Status |= AUDIO_INFO_STATUS_RIGHT_ONLY;
+					break;
+				}
+			}
+
+			pInfo->Frequency = Info.Frequency;
+			pInfo->OriginalChannelCount = Info.OriginalChannelCount;
+			pInfo->OutputChannelCount = pViewer->GetAudioOutputChannelCount();
+			if (pInfo->OutputChannelCount == LibISDB::ViewerFilter::AudioChannelCount_Invalid)
+				pInfo->OutputChannelCount = 0;
+		}
+		return TRUE;
+
+	case MESSAGE_GETELEMENTARYSTREAMCOUNT:
+		{
+			const ElementaryStreamMediaType Media = static_cast<ElementaryStreamMediaType>(lParam1);
+			WORD ServiceID = static_cast<WORD>(lParam2);
+
+			CCoreEngine &CoreEngine = GetAppClass().CoreEngine;
+			LibISDB::AnalyzerFilter *pAnalyzer = CoreEngine.GetFilter<LibISDB::AnalyzerFilter>();
+			if (pAnalyzer == nullptr)
+				return 0;
+
+			if (ServiceID == 0) {
+				ServiceID = CoreEngine.GetServiceID();
+				if (ServiceID == LibISDB::SERVICE_ID_INVALID)
+					return 0;
+			}
+			const int ServiceIndex = pAnalyzer->GetServiceIndexByID(ServiceID);
+			if (ServiceIndex < 0)
+				return 0;
+
+			switch (Media) {
+			case ES_MEDIA_ALL:
+				// TODO: AnalyzerFilter に GetESCount を追加する。
+				{
+					LibISDB::AnalyzerFilter::ServiceInfo Info;
+					if (!pAnalyzer->GetServiceInfo(ServiceIndex, &Info))
+						return 0;
+					return Info.ESList.size();
+				}
+
+			case ES_MEDIA_VIDEO:
+				return pAnalyzer->GetVideoESCount(ServiceIndex);
+
+			case ES_MEDIA_AUDIO:
+				return pAnalyzer->GetAudioESCount(ServiceIndex);
+
+			case ES_MEDIA_CAPTION:
+				return pAnalyzer->GetCaptionESCount(ServiceIndex);
+
+			case ES_MEDIA_DATA_CARROUSEL:
+				return pAnalyzer->GetDataCarrouselESCount(ServiceIndex);
+			}
+		}
+		return 0;
 
 #ifdef _DEBUG
 	default:
