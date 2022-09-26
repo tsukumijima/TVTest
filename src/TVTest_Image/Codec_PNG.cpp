@@ -49,7 +49,6 @@ bool SavePNGFile(const ImageSaveInfo *pInfo)
 
 	if (_tfopen_s(&fp, pInfo->pszFileName, TEXT("wbN")) != 0)
 		return false;
-	}
 	// 書き込み単位がとても小さく保存先によってはバッファリングの効果が大きいため
 	setvbuf(fp, nullptr, _IOFBF, 64 * 1024);
 
