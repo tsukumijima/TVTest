@@ -802,6 +802,7 @@ INT_PTR CChannelScan::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam
 			ListView_SetExtendedListViewStyle(
 				hwndList,
 				LVS_EX_FULLROWSELECT | LVS_EX_CHECKBOXES | LVS_EX_LABELTIP | LVS_EX_GRIDLINES);
+			SetListViewTooltipsTopMost(hwndList);
 
 			HDC hdc = ::GetDC(hwndList);
 			HFONT hfont = GetWindowFont(hwndList);
@@ -928,10 +929,9 @@ INT_PTR CChannelScan::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam
 
 					ListView_DeleteAllItems(hwndList);
 
-					if (::DialogBoxParam(
-								GetAppClass().GetResourceInstance(),
-								MAKEINTRESOURCE(IDD_CHANNELSCAN), ::GetParent(hDlg),
-								ScanDialogProc, reinterpret_cast<LPARAM>(this)) == IDOK) {
+					CScanDialog ScanDialog(this);
+
+					if (ScanDialog.Show(::GetParent(hDlg))) {
 						if (ListView_GetItemCount(hwndList) > 0) {
 							// 元あったチャンネルで検出されなかったものがある場合、残すか問い合わせる
 							CChannelList *pChannelList = m_TuningSpaceList.GetChannelList(Space);
@@ -1277,29 +1277,6 @@ INT_PTR CChannelScan::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam
 	}
 
 	return FALSE;
-}
-
-
-INT_PTR CALLBACK CChannelScan::ScanDialogProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-	CChannelScan *pThis;
-
-	if (uMsg == WM_INITDIALOG) {
-		pThis = reinterpret_cast<CChannelScan*>(lParam);
-		pThis->m_hScanDlg = hDlg;
-		::SetProp(hDlg, TEXT("This"), pThis);
-	} else {
-		pThis = static_cast<CChannelScan*>(::GetProp(hDlg, TEXT("This")));
-		if (pThis == nullptr)
-			return FALSE;
-		if (uMsg == WM_NCDESTROY) {
-			pThis->m_hScanDlg = nullptr;
-			::RemoveProp(hDlg, TEXT("This"));
-			return TRUE;
-		}
-	}
-
-	return pThis->ScanDlgProc(hDlg, uMsg, wParam, lParam);
 }
 
 
@@ -1919,6 +1896,40 @@ INT_PTR CChannelScan::CScanSettingsDialog::DlgProc(
 	}
 
 	return FALSE;
+}
+
+
+
+
+CChannelScan::CScanDialog::CScanDialog(CChannelScan *pChannelScan)
+	: m_pChannelScan(pChannelScan)
+{
+}
+
+
+bool CChannelScan::CScanDialog::Show(HWND hwndOwner)
+{
+	return ShowDialog(
+		hwndOwner,
+		GetAppClass().GetResourceInstance(),
+		MAKEINTRESOURCE(IDD_CHANNELSCAN)) == IDOK;
+}
+
+
+INT_PTR CChannelScan::CScanDialog::DlgProc(
+	HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
+{
+	switch (uMsg) {
+	case WM_INITDIALOG:
+		m_pChannelScan->m_hScanDlg = hDlg;
+		break;
+
+	case WM_NCDESTROY:
+		m_pChannelScan->m_hScanDlg = nullptr;
+		break;
+	}
+
+	return m_pChannelScan->ScanDlgProc(hDlg, uMsg, wParam, lParam);
 }
 
 

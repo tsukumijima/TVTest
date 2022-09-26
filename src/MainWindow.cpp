@@ -2777,6 +2777,8 @@ void CMainWindow::OnTimer(HWND hwnd, UINT id)
 				m_App.StatusView.UpdateItem(STATUS_ITEM_VIDEOSIZE);
 				m_App.Panel.InfoPanel.UpdateItem(CInformationPanel::ITEM_VIDEOINFO);
 				m_App.Panel.ControlPanel.UpdateItem(CONTROLPANEL_ITEM_VIDEO);
+
+				m_App.AppEventManager.OnVideoFormatChanged();
 			}
 
 			// 音声形式の変化
@@ -2786,14 +2788,12 @@ void CMainWindow::OnTimer(HWND hwnd, UINT id)
 					 CCoreEngine::StatusFlag::AudioComponentType |
 					 CCoreEngine::StatusFlag::SPDIFPassthrough))) {
 				TRACE(TEXT("Audio status changed.\n"));
-				/*
-				if ((UpdateStatus & CCoreEngine::StatusFlag::SPDIFPassthrough) == 0)
-					AutoSelectStereoMode();
-				*/
 				m_App.StatusView.UpdateItem(STATUS_ITEM_AUDIOCHANNEL);
 				m_App.Panel.ControlPanel.UpdateItem(CONTROLPANEL_ITEM_AUDIO);
 				m_pCore->SetCommandCheckedState(
 					CM_SPDIF_TOGGLE, m_App.CoreEngine.IsSPDIFPassthroughEnabled());
+
+				m_App.AppEventManager.OnAudioFormatChanged();
 			}
 
 			bool fUpdateEventInfo = false;
@@ -2887,10 +2887,8 @@ void CMainWindow::OnTimer(HWND hwnd, UINT id)
 					if (m_App.RecordManager.IsRecording())
 						m_App.Panel.InfoPanel.UpdateItem(CInformationPanel::ITEM_RECORD);
 
-					if (fUpdateEventInfo) {
+					if (fUpdateEventInfo)
 						m_App.Panel.InfoPanel.UpdateItem(CInformationPanel::ITEM_PROGRAMINFO);
-						m_App.Panel.ControlPanel.UpdateItem(CONTROLPANEL_ITEM_AUDIO);
-					}
 					break;
 
 				case PANEL_ID_CHANNEL:
@@ -2898,7 +2896,7 @@ void CMainWindow::OnTimer(HWND hwnd, UINT id)
 					if (!m_App.EpgOptions.IsEpgDataLoading()) {
 						if (m_App.Panel.ChannelPanel.QueryUpdate()) {
 							m_App.Panel.ChannelPanel.UpdateAllChannels();
-						} else if (fUpdateEventInfo) {
+						} else if (!!(UpdateStatus & CCoreEngine::StatusFlag::EventInfo)) {
 							CAppCore::StreamIDInfo Info;
 							if (m_App.Core.GetCurrentStreamIDInfo(&Info))
 								m_App.Panel.ChannelPanel.UpdateChannels(Info.NetworkID, Info.TransportStreamID);
@@ -2911,6 +2909,11 @@ void CMainWindow::OnTimer(HWND hwnd, UINT id)
 				case PANEL_ID_PROGRAMLIST:
 					if (fUpdateEventInfo)
 						m_App.Panel.UpdateContent();
+					break;
+
+				case PANEL_ID_CONTROL:
+					if (fUpdateEventInfo)
+						m_App.Panel.ControlPanel.UpdateItem(CONTROLPANEL_ITEM_AUDIO);
 					break;
 				}
 			}
@@ -3392,30 +3395,6 @@ bool CMainWindow::OnInitMenuPopup(HMENU hmenu)
 					CM_DUALMONO_MAIN, CM_DUALMONO_BOTH,
 					CurDualMonoMode == LibISDB::DirectShow::AudioDecoderFilter::DualMonoMode::Main ? CM_DUALMONO_MAIN :
 					CurDualMonoMode == LibISDB::DirectShow::AudioDecoderFilter::DualMonoMode::Sub ? CM_DUALMONO_SUB : CM_DUALMONO_BOTH);
-			} else if (Channels == 2
-					&& pAnalyzer->GetAudioComponentType(
-						m_App.CoreEngine.GetServiceIndex(),
-						m_App.CoreEngine.GetAudioStream()) == 0) {
-				if (Menu.GetItemCount() > 0)
-					Menu.AppendSeparator();
-				static const int StereoModeMenuList[] = {
-					CM_STEREOMODE_STEREO,
-					CM_STEREOMODE_LEFT,
-					CM_STEREOMODE_RIGHT
-				};
-				for (int Command : StereoModeMenuList) {
-					TCHAR szText[64];
-					::LoadString(hinstRes, Command, szText, lengthof(szText));
-					Menu.Append(Command, szText);
-				}
-				const LibISDB::DirectShow::AudioDecoderFilter::StereoMode CurStereoMode = m_pCore->GetStereoMode();
-				Menu.CheckRadioItem(
-					CM_STEREOMODE_STEREO, CM_STEREOMODE_RIGHT,
-					CurStereoMode == LibISDB::DirectShow::AudioDecoderFilter::StereoMode::Stereo ?
-						CM_STEREOMODE_STEREO :
-					CurStereoMode == LibISDB::DirectShow::AudioDecoderFilter::StereoMode::Left ?
-						CM_STEREOMODE_LEFT :
-						CM_STEREOMODE_RIGHT);
 			}
 		}
 
@@ -4477,13 +4456,6 @@ void CMainWindow::OnMuteChanged(bool fMute)
 
 
 void CMainWindow::OnDualMonoModeChanged(LibISDB::DirectShow::AudioDecoderFilter::DualMonoMode Mode)
-{
-	m_App.StatusView.UpdateItem(STATUS_ITEM_AUDIOCHANNEL);
-	m_App.Panel.ControlPanel.UpdateItem(CONTROLPANEL_ITEM_AUDIO);
-}
-
-
-void CMainWindow::OnStereoModeChanged(LibISDB::DirectShow::AudioDecoderFilter::StereoMode Mode)
 {
 	m_App.StatusView.UpdateItem(STATUS_ITEM_AUDIOCHANNEL);
 	m_App.Panel.ControlPanel.UpdateItem(CONTROLPANEL_ITEM_AUDIO);

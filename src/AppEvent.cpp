@@ -162,6 +162,12 @@ void CAppEventManager::OnPlaybackStateChanged(bool fPlayback)
 }
 
 
+void CAppEventManager::OnVideoFormatChanged()
+{
+	CALL_HANDLERS(OnVideoFormatChanged());
+}
+
+
 void CAppEventManager::OnPanAndScanChanged()
 {
 	CALL_HANDLERS(OnPanAndScanChanged());
@@ -192,15 +198,15 @@ void CAppEventManager::OnDualMonoModeChanged(LibISDB::DirectShow::AudioDecoderFi
 }
 
 
-void CAppEventManager::OnStereoModeChanged(LibISDB::DirectShow::AudioDecoderFilter::StereoMode Mode)
-{
-	CALL_HANDLERS(OnStereoModeChanged(Mode));
-}
-
-
 void CAppEventManager::OnAudioStreamChanged(int Stream)
 {
 	CALL_HANDLERS(OnAudioStreamChanged(Stream));
+}
+
+
+void CAppEventManager::OnAudioFormatChanged()
+{
+	CALL_HANDLERS(OnAudioFormatChanged());
 }
 
 

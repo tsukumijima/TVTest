@@ -100,12 +100,18 @@
 	  ・MESSAGE_GETSERVICEINFOLIST
 	  ・MESSAGE_GETAUDIOINFO
 	  ・MESSAGE_GETELEMENTARYSTREAMCOUNT
+	  ・MESSAGE_SELECTAUDIO
+	  ・MESSAGE_GETSELECTEDAUDIO
+	  ・MESSAGE_GETCURRENTEPGEVENTINFO
 	・以下のイベントを追加した
 	  ・EVENT_DARKMODECHANGED
 	  ・EVENT_MAINWINDOWDARKMODECHANGED
 	  ・EVENT_PROGRAMGUIDEDARKMODECHANGED
+	  ・EVENT_VIDEOFORMATCHANGE
+	  ・EVENT_AUDIOFORMATCHANGE
 	・チャンネル選択のフラグに CHANNEL_SELECT_FLAG_ALLOWDISABLED を追加した
 	・ダイアログ表示のフラグに SHOW_DIALOG_FLAG_DISABLE_DARK_MODE を追加した
+	・番組表のイベントのフラグに PROGRAMGUIDE_EVENT_COMMAND_ALWAYS を追加した
 
 	ver.0.0.14 (TVTest ver.0.9.0 or later)
 	・以下のメッセージを追加した
@@ -507,6 +513,9 @@ enum {
 	MESSAGE_GETSERVICEINFOLIST,          // サービスの情報のリストを取得
 	MESSAGE_GETAUDIOINFO,                // 音声の情報を取得
 	MESSAGE_GETELEMENTARYSTREAMCOUNT,    // Elementary Stream (ES) の数を取得
+	MESSAGE_SELECTAUDIO,                 // 音声を選択
+	MESSAGE_GETSELECTEDAUDIO,            // 選択された音声を取得
+	MESSAGE_GETCURRENTEPGEVENTINFO,      // 現在の番組情報を取得
 #endif
 	MESSAGE_TRAILER
 };
@@ -582,6 +591,8 @@ enum {
 	EVENT_DARKMODECHANGED,                     // ダークモード状態が変わった
 	EVENT_MAINWINDOWDARKMODECHANGED,           // メインウィンドウのダークモード状態が変わった
 	EVENT_PROGRAMGUIDEDARKMODECHANGED,         // 番組表のダークモード状態が変わった
+	EVENT_VIDEOFORMATCHANGE,                   // 映像の形式が変わった
+	EVENT_AUDIOFORMATCHANGE,                   // 音声の形式が変わった
 #endif
 	EVENT_TRAILER
 };
@@ -1066,12 +1077,16 @@ enum {
 };
 
 // ステレオモードを取得する
+// TVTest ver.0.9.0 以降は、デュアルモノラル時に選択される音声を取得します。
+// ver.0.9.0 より前は、ステレオもしくはデュアルモノラル時に現在選択されている音声を取得します。
 inline int MsgGetStereoMode(PluginParam *pParam)
 {
 	return (int)(*pParam->Callback)(pParam, MESSAGE_GETSTEREOMODE, 0, 0);
 }
 
 // ステレオモードを設定する
+// TVTest ver.0.10.0 以降は、デュアルモノラル時に選択される音声を設定します。
+// ver.0.10.0 より前は、ステレオもしくはデュアルモノラル時に再生される音声を設定します。
 inline bool MsgSetStereoMode(PluginParam *pParam, int StereoMode)
 {
 	return (*pParam->Callback)(pParam, MESSAGE_SETSTEREOMODE, StereoMode, 0) != 0;
@@ -1268,7 +1283,7 @@ struct ProgramInfo
 // MaxEventName / MaxEventText / MaxEventExtText メンバにバッファの長さ(要素数)を設定します。
 // 必要のない情報は、ポインタを nullptr にすると取得されません。
 // 引数 fNext を true にすると、次の番組の情報が取得されます。
-// MsgGetEpgEventInfo で、より詳しい番組情報を取得することもできます。
+// MsgGetEpgEventInfo または MsgGetCurrentEpgEventInfo で、より詳しい番組情報を取得することもできます。
 inline bool MsgGetCurrentProgramInfo(PluginParam *pParam, ProgramInfo *pInfo, bool fNext = false)
 {
 	return (*pParam->Callback)(pParam, MESSAGE_GETCURRENTPROGRAMINFO, (LPARAM)pInfo, fNext) != 0;
@@ -2064,6 +2079,10 @@ struct ProgramGuideProgramInitializeMenuInfo
 enum {
 	PROGRAMGUIDE_EVENT_GENERAL = 0x0001, // 全体のイベント(EVENT_PROGRAMGUIDE_*)
 	PROGRAMGUIDE_EVENT_PROGRAM = 0x0002  // 各番組のイベント(EVENT_PROGRAMGUIDE_PROGRAM_*)
+#if TVTEST_PLUGIN_VERSION >= TVTEST_PLUGIN_VERSION_(0, 0, 15)
+	, PROGRAMGUIDE_EVENT_COMMAND_ALWAYS = 0x0004 // コマンドのイベント(EVENT_PROGRAMGUIDE_COMMAND)をプラグイン無効時にも送る
+	                                             // EVENT_PROGRAMGUIDE_COMMAND は PROGRAMGUIDE_EVENT_GENERAL を指定した場合にも送られるが、プラグインが無効状態の時は送られない
+#endif
 };
 
 // 番組表のイベントの有効/無効を設定する
@@ -3689,6 +3708,57 @@ inline int MsgGetAudioStreamCount(PluginParam *pParam)
 	return MsgGetElementaryStreamCount(pParam, ES_MEDIA_AUDIO);
 }
 
+// デュアルモノラルのチャンネル
+enum DualMonoChannel {
+	DUAL_MONO_CHANNEL_INVALID, // 無効
+	DUAL_MONO_CHANNEL_MAIN,    // 主音声(左)
+	DUAL_MONO_CHANNEL_SUB,     // 副音声(右)
+	DUAL_MONO_CHANNEL_BOTH     // 主+副音声(左右)
+};
+
+// 音声選択の情報
+struct AudioSelectInfo
+{
+	DWORD Size;               // 構造体のサイズ
+	DWORD Flags;              // フラグ(AUDIO_SELECT_FLAG_*)
+	int Index;                // インデックス
+	BYTE ComponentTag;        // コンポーネントタグ(component_tag)
+	BYTE Reserved[3];         // 予約
+	DualMonoChannel DualMono; // デュアルモノラルのチャンネル
+};
+
+// 音声選択のフラグ
+enum {
+	AUDIO_SELECT_FLAG_COMPONENT_TAG = 0x00000001U, // コンポーネントタグ(component_tag)で選択する
+	AUDIO_SELECT_FLAG_DUAL_MONO     = 0x00000002U  // DualMono メンバが有効
+};
+
+// 音声を選択する
+// Flags に AUDIO_SELECT_FLAG_COMPONENT_TAG が指定されている場合、ComponentTag メンバでコンポーネントタグを指定します。
+// それ以外の場合、Index メンバに音声ストリームのインデックスを指定します。
+inline bool MsgSelectAudio(PluginParam *pParam, const AudioSelectInfo *pInfo)
+{
+	return (*pParam->Callback)(pParam, MESSAGE_SELECTAUDIO, (LPARAM)pInfo, 0) != FALSE;
+}
+
+// 選択された音声を取得する
+// 事前に AudioSelectInfo 構造体の Size と Flags メンバを設定して呼び出します。
+// Flags は今のところ常に0に設定します。
+inline bool MsgGetSelectedAudio(PluginParam *pParam, AudioSelectInfo *pInfo)
+{
+	return (*pParam->Callback)(pParam, MESSAGE_GETSELECTEDAUDIO, (LPARAM)pInfo, 0) != FALSE;
+}
+
+// 現在の番組情報を取得する
+// 引数 ServiceID に0を指定すると、現在のサービスの情報が取得されます。
+// 引数 fNext を true にすると、次の番組の情報が取得されます。
+// 取得した情報が不要になった場合、MsgFreeEpgEventInfo で解放します。
+// 情報が取得できなかった場合は nullptr が返ります。
+inline EpgEventInfo *MsgGetCurrentEpgEventInfo(PluginParam *pParam, WORD ServiceID = 0, bool fNext = false)
+{
+	return (EpgEventInfo*)(*pParam->Callback)(pParam, MESSAGE_GETCURRENTEPGEVENTINFO, ServiceID, fNext);
+}
+
 #endif	// TVTEST_PLUGIN_VERSION >= TVTEST_PLUGIN_VERSION_(0, 0, 15)
 
 /*
@@ -4786,6 +4856,26 @@ public:
 	{
 		return MsgGetAudioStreamCount(m_pParam);
 	}
+
+	// 音声を選択
+	bool SelectAudio(const AudioSelectInfo *pInfo)
+	{
+		return MsgSelectAudio(m_pParam, pInfo);
+	}
+
+	// 選択された音声を取得
+	bool GetSelectedAudio(AudioSelectInfo *pInfo)
+	{
+		pInfo->Size = sizeof(AudioSelectInfo);
+		return MsgGetSelectedAudio(m_pParam, pInfo);
+	}
+
+	// 現在の番組情報を取得
+	// (不要になったら FreeEpgEventInfo で解放)
+	EpgEventInfo *GetCurrentEpgEventInfo(WORD ServiceID = 0, bool fNext = false)
+	{
+		return MsgGetCurrentEpgEventInfo(m_pParam, ServiceID, fNext);
+	}
 #endif
 };
 
@@ -4976,6 +5066,10 @@ protected:
 	virtual void OnMainWindowDarkModeChanged(bool fDarkMode) {}
 	// 番組表のダークモードの状態が変わった
 	virtual void OnProgramGuideDarkModeChanged(bool fDarkMode) {}
+	// 映像の形式が変わった
+	virtual void OnVideoFormatChange() {}
+	// 音声の形式が変わった
+	virtual void OnAudioFormatChange() {}
 #endif
 
 public:
@@ -5086,6 +5180,12 @@ public:
 			return 0;
 		case EVENT_PROGRAMGUIDEDARKMODECHANGED:
 			OnProgramGuideDarkModeChanged(lParam1 != 0);
+			return 0;
+		case EVENT_VIDEOFORMATCHANGE:
+			OnVideoFormatChange();
+			return 0;
+		case EVENT_AUDIOFORMATCHANGE:
+			OnAudioFormatChange();
 			return 0;
 #endif
 		}

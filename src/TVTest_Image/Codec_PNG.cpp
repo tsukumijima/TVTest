@@ -19,6 +19,7 @@
 
 
 #include <windows.h>
+#include <stdio.h>
 #include <tchar.h>
 #include "libpng/png.h"
 #include "zlib/zlib.h"
@@ -34,62 +35,10 @@ namespace ImageLib
 {
 
 
-struct FILE_BUFF_CONTAINER
-{
-	FILE_BUFF_CONTAINER(): hFile(INVALID_HANDLE_VALUE), dwLength(0) {}
-	~FILE_BUFF_CONTAINER() { Flush(); if (hFile != INVALID_HANDLE_VALUE) CloseHandle(hFile); }
-	bool Flush()
-	{
-		bool bRet = false;
-		if (hFile != INVALID_HANDLE_VALUE) {
-			DWORD dwWrite;
-			bRet = dwLength == 0 || (WriteFile(hFile, Buff, dwLength, &dwWrite, nullptr) && dwWrite == dwLength);
-		}
-		dwLength = 0;
-		return bRet;
-	}
-	HANDLE hFile;
-	DWORD dwLength;
-	BYTE Buff[256 * 1024];
-};
-
-
-static void WriteData(png_structp pPNG, png_bytep pbData, png_size_t Length)
-{
-	FILE_BUFF_CONTAINER *pFile = (FILE_BUFF_CONTAINER*)png_get_io_ptr(pPNG);
-	DWORD dwWrite;
-
-	if (Length > sizeof(pFile->Buff) - pFile->dwLength) {
-		// あふれるのでバッファをフラッシュする
-		if (!pFile->Flush())
-			png_error(pPNG, "Write Error");
-	}
-	if (Length > sizeof(pFile->Buff)) {
-		// そのまま書き込む
-		if (!WriteFile(pFile->hFile, pbData, (DWORD)Length, &dwWrite, nullptr) || dwWrite != Length)
-			png_error(pPNG, "Write Error");
-	} else {
-		// ためる
-		memcpy(pFile->Buff + pFile->dwLength, pbData, Length);
-		pFile->dwLength += (DWORD)Length;
-	}
-}
-
-
-static void FlushData(png_structp pPNG)
-{
-	FILE_BUFF_CONTAINER *pFile = (FILE_BUFF_CONTAINER*)png_get_io_ptr(pPNG);
-
-	pFile->Flush();
-}
-
-
 // PNG をファイルに保存する
 bool SavePNGFile(const ImageSaveInfo *pInfo)
 {
-	// libpng/pngwio.c のコメントにあるように WriteData() はとても小さな単位で
-	// コールバックされるので、保存先によってはバッファリングの効果が大きい
-	FILE_BUFF_CONTAINER *pFile = new FILE_BUFF_CONTAINER();
+	FILE *fp;
 	int Width, Height, BitsPerPixel;
 	png_structp pPNG;
 	png_infop pPNGInfo;
@@ -98,32 +47,31 @@ bool SavePNGFile(const ImageSaveInfo *pInfo)
 	png_bytep pbRow;
 	BYTE *pBuff = nullptr;
 
-	pFile->hFile = CreateFile(
-		pInfo->pszFileName, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
-		FILE_ATTRIBUTE_NORMAL, nullptr);
-	if (pFile->hFile == INVALID_HANDLE_VALUE) {
-		delete pFile;
+	if (_tfopen_s(&fp, pInfo->pszFileName, TEXT("wbN")) != 0)
 		return false;
 	}
+	// 書き込み単位がとても小さく保存先によってはバッファリングの効果が大きいため
+	setvbuf(fp, nullptr, _IOFBF, 64 * 1024);
+
 	pPNG = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
 	if (pPNG == nullptr) {
-		delete pFile;
+		fclose(fp);
 		return false;
 	}
 	pPNGInfo = png_create_info_struct(pPNG);
 	if (pPNGInfo == nullptr) {
 		png_destroy_write_struct(&pPNG, nullptr);
-		delete pFile;
+		fclose(fp);
 		return false;
 	}
 	if (setjmp(png_jmpbuf(pPNG))) {
 		png_destroy_write_struct(&pPNG, &pPNGInfo);
 		if (pBuff != nullptr)
 			delete [] pBuff;
-		delete pFile;
+		fclose(fp);
 		return false;
 	}
-	png_set_write_fn(pPNG, pFile, WriteData, FlushData);
+	png_init_io(pPNG, fp);
 	png_set_compression_level(pPNG, _ttoi(pInfo->pszOption));
 	Width = pInfo->pbmi->bmiHeader.biWidth;
 	Height = abs(pInfo->pbmi->bmiHeader.biHeight);
@@ -215,11 +163,7 @@ bool SavePNGFile(const ImageSaveInfo *pInfo)
 	}
 	png_write_end(pPNG, pPNGInfo);
 	png_destroy_write_struct(&pPNG, &pPNGInfo);
-
-	// libpng の実装に迷いがあるようで FlushData() は適切に呼ばれないので注意
-	// (libpng/pngwrite.c の PNG_WRITE_FLUSH_AFTER_IEND_SUPPORTED を参照)
-	// 最終的にここでフラッシュされる
-	delete pFile;
+	fclose(fp);
 	return true;
 }
 
