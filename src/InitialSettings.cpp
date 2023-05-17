@@ -39,7 +39,6 @@ namespace TVTest
 
 CInitialSettings::CInitialSettings(const CDriverManager *pDriverManager)
 	: m_pDriverManager(pDriverManager)
-	, m_fDrawLogo(false)
 {
 	// ビデオレンダラのデフォルトをEVRにする
 	m_VideoRenderer = LibISDB::DirectShow::VideoRenderer::RendererType::EVR;
@@ -74,7 +73,7 @@ INT_PTR CInitialSettings::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 	case WM_INITDIALOG:
 		{
 			{
-				HWND hwndLogo = ::GetDlgItem(hDlg, IDC_INITIALSETTINGS_LOGO);
+				const HWND hwndLogo = ::GetDlgItem(hDlg, IDC_INITIALSETTINGS_LOGO);
 				RECT rc;
 
 				::GetWindowRect(hwndLogo, &rc);
@@ -87,7 +86,7 @@ INT_PTR CInitialSettings::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 						MAKEINTRESOURCE(IDB_LOGO32), TEXT("PNG"));
 					::ShowWindow(hwndLogo, SW_HIDE);
 				} else {
-					HBITMAP hbm = static_cast<HBITMAP>(
+					const HBITMAP hbm = static_cast<HBITMAP>(
 						::LoadImage(
 							GetAppClass().GetResourceInstance(),
 							MAKEINTRESOURCE(IDB_LOGO),
@@ -150,7 +149,7 @@ INT_PTR CInitialSettings::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 
 				for (int i = 0; CVideoOptions::GetRendererInfo(i, &Info); i++) {
 					DlgComboBox_AddString(hDlg, IDC_INITIALSETTINGS_VIDEORENDERER, Info.pszName);
-					DlgComboBox_SetItemData(hDlg, IDC_INITIALSETTINGS_VIDEORENDERER, i, (LPARAM)Info.Renderer);
+					DlgComboBox_SetItemData(hDlg, IDC_INITIALSETTINGS_VIDEORENDERER, i, static_cast<LPARAM>(Info.Renderer));
 					if (Info.Renderer == m_VideoRenderer)
 						Sel = i;
 				}
@@ -213,11 +212,11 @@ INT_PTR CInitialSettings::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 
 		case IDOK:
 			{
-				bool fMpeg2Decoder =
+				const bool fMpeg2Decoder =
 					DlgComboBox_GetCount(hDlg, IDC_INITIALSETTINGS_MPEG2DECODER) > 1;
-				bool fH264Decoder =
+				const bool fH264Decoder =
 					DlgComboBox_GetCount(hDlg, IDC_INITIALSETTINGS_H264DECODER) > 1;
-				bool fH265Decoder =
+				const bool fH265Decoder =
 					DlgComboBox_GetCount(hDlg, IDC_INITIALSETTINGS_H265DECODER) > 1;
 				if (!fMpeg2Decoder || !fH264Decoder || !fH265Decoder) {
 					String Codecs, Message;
@@ -233,11 +232,11 @@ INT_PTR CInitialSettings::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 							Codecs += TEXT("/");
 						Codecs += TEXT("H.265(HEVC)");
 					}
-					StringUtility::Format(
-						Message,
-						TEXT("%s のデコーダが見付からないため、%s の映像は再生できません。\n")
+					StringFormat(
+						&Message,
+						TEXT("{0} のデコーダが見付からないため、{0} の映像は再生できません。\n")
 						TEXT("映像を再生するにはデコーダをインストールしてください。"),
-						Codecs.c_str(), Codecs.c_str());
+						Codecs);
 					::MessageBox(hDlg, Message.c_str(), TEXT("お知らせ"), MB_OK | MB_ICONINFORMATION);
 				}
 
@@ -249,11 +248,11 @@ INT_PTR CInitialSettings::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 				if (fH265Decoder)
 					GetDecoderSetting(IDC_INITIALSETTINGS_H265DECODER, &H265DecoderName);
 
-				LibISDB::DirectShow::VideoRenderer::RendererType VideoRenderer =
-					(LibISDB::DirectShow::VideoRenderer::RendererType)
+				const LibISDB::DirectShow::VideoRenderer::RendererType VideoRenderer =
+					static_cast<LibISDB::DirectShow::VideoRenderer::RendererType>(
 						DlgComboBox_GetItemData(
 							hDlg, IDC_INITIALSETTINGS_VIDEORENDERER,
-							DlgComboBox_GetCurSel(hDlg, IDC_INITIALSETTINGS_VIDEORENDERER));
+							DlgComboBox_GetCurSel(hDlg, IDC_INITIALSETTINGS_VIDEORENDERER)));
 
 				// 相性の悪い組み合わせに対して注意を表示する
 				static const struct {
@@ -270,7 +269,7 @@ INT_PTR CInitialSettings::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 					},
 				};
 				for (const auto &e : ConflictList) {
-					int Length = ::lstrlen(e.pszDecoder);
+					const int Length = ::lstrlen(e.pszDecoder);
 					if (VideoRenderer == e.Renderer
 							&& (::StrCmpNI(Mpeg2DecoderName.c_str(), e.pszDecoder, Length) == 0
 								|| ::StrCmpNI(H264DecoderName.c_str(), e.pszDecoder, Length) == 0)
@@ -302,10 +301,10 @@ INT_PTR CInitialSettings::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 				::GetDlgItemText(
 					hDlg, IDC_INITIALSETTINGS_RECORDFOLDER,
 					szRecordFolder, lengthof(szRecordFolder));
-				CAppMain::CreateDirectoryResult CreateDirResult =
+				const CAppMain::CreateDirectoryResult CreateDirResult =
 					GetAppClass().CreateDirectory(
 						hDlg, szRecordFolder,
-						TEXT("録画ファイルの保存先フォルダ \"%s\" がありません。\n")
+						TEXT("録画ファイルの保存先フォルダ \"{}\" がありません。\n")
 						TEXT("作成しますか?"));
 				if (CreateDirResult == CAppMain::CreateDirectoryResult::Error) {
 					SetDlgItemFocus(hDlg, IDC_INITIALSETTINGS_RECORDFOLDER);
@@ -313,6 +312,7 @@ INT_PTR CInitialSettings::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 				}
 				m_RecordFolder = szRecordFolder;
 			}
+			[[fallthrough]];
 		case IDCANCEL:
 			::EndDialog(hDlg, LOWORD(wParam));
 			return TRUE;
@@ -352,10 +352,10 @@ INT_PTR CInitialSettings::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 
 	case WM_DESTROY:
 		{
-			HBITMAP hbm = reinterpret_cast<HBITMAP>(
+			const HBITMAP hbm = reinterpret_cast<HBITMAP>(
 				::SendDlgItemMessage(
 					hDlg, IDC_INITIALSETTINGS_LOGO,
-					STM_SETIMAGE, IMAGE_BITMAP, reinterpret_cast<LPARAM>((HBITMAP)nullptr)));
+					STM_SETIMAGE, IMAGE_BITMAP, reinterpret_cast<LPARAM>(nullptr)));
 
 			if (hbm != nullptr) {
 				::DeleteObject(hbm);
@@ -372,7 +372,7 @@ INT_PTR CInitialSettings::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 
 void CInitialSettings::InitDecoderList(int ID, const GUID &SubType, LPCTSTR pszDecoderName)
 {
-	LPCWSTR pszDefaultDecoderName =
+	const LPCWSTR pszDefaultDecoderName =
 		LibISDB::DirectShow::KnownDecoderManager::IsDecoderAvailable(SubType) ?
 		LibISDB::DirectShow::KnownDecoderManager::GetDecoderName(SubType) : nullptr;
 	LibISDB::DirectShow::FilterFinder FilterFinder;
@@ -391,14 +391,14 @@ void CInitialSettings::InitDecoderList(int ID, const GUID &SubType, LPCTSTR pszD
 			}
 		}
 		if (FilterList.size() > 1) {
-			std::sort(
-				FilterList.begin(), FilterList.end(),
+			std::ranges::sort(
+				FilterList,
 				[](const String Filter1, const String & Filter2) {
 					return ::CompareString(
 						LOCALE_USER_DEFAULT,
 						NORM_IGNORECASE | NORM_IGNORESYMBOLS,
-						Filter1.data(), (int)Filter1.length(),
-						Filter2.data(), (int)Filter2.length()) == CSTR_LESS_THAN;
+						Filter1.data(), static_cast<int>(Filter1.length()),
+						Filter2.data(), static_cast<int>(Filter2.length())) == CSTR_LESS_THAN;
 				});
 		}
 		for (const String &e :FilterList) {
@@ -410,7 +410,7 @@ void CInitialSettings::InitDecoderList(int ID, const GUID &SubType, LPCTSTR pszD
 		DlgComboBox_InsertString(m_hDlg, ID, 0, pszDefaultDecoderName);
 
 	if (!IsStringEmpty(pszDecoderName))
-		Sel = (int)DlgComboBox_FindStringExact(m_hDlg, ID, -1, pszDecoderName) + 1;
+		Sel = static_cast<int>(DlgComboBox_FindStringExact(m_hDlg, ID, -1, pszDecoderName)) + 1;
 
 	DlgComboBox_InsertString(
 		m_hDlg, ID,
@@ -421,7 +421,7 @@ void CInitialSettings::InitDecoderList(int ID, const GUID &SubType, LPCTSTR pszD
 
 void CInitialSettings::GetDecoderSetting(int ID, String *pDecoderName) const
 {
-	int Sel = (int)DlgComboBox_GetCurSel(m_hDlg, ID);
+	const int Sel = static_cast<int>(DlgComboBox_GetCurSel(m_hDlg, ID));
 	if (Sel > 0) {
 		TCHAR szDecoder[MAX_DECODER_NAME];
 		DlgComboBox_GetLBString(m_hDlg, ID, Sel, szDecoder);

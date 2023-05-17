@@ -1,19 +1,11 @@
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include <windows.h>
 #include <shlwapi.h>
 #include <initguid.h>
 #include <dshow.h>
 #include "VideoDecoder.h"
-
-
-CVideoDecoder::CVideoDecoder()
-	: m_hLib(nullptr)
-	, m_pDecoder(nullptr)
-	, m_pFrameCapture(nullptr)
-	, m_pCreateInstance(nullptr)
-	, m_Deinterlace(Deinterlace_Blend)
-	, m_RefCount(1)
-{
-}
 
 
 CVideoDecoder::~CVideoDecoder()

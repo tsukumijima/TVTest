@@ -45,10 +45,10 @@ namespace TVTest
 		STATUS_ITEM_BUFFERING,
 		STATUS_ITEM_TUNER,
 		STATUS_ITEM_MEDIABITRATE,
-		STATUS_ITEM_FAVORITES
+		STATUS_ITEM_FAVORITES,
+		STATUS_ITEM_FIRST = STATUS_ITEM_CHANNEL,
+		STATUS_ITEM_LAST  = STATUS_ITEM_FAVORITES
 	};
-#define STATUS_ITEM_FIRST STATUS_ITEM_CHANNEL
-#define STATUS_ITEM_LAST  STATUS_ITEM_FAVORITES
 
 
 	class CChannelStatusItem
@@ -60,7 +60,7 @@ namespace TVTest
 	// CStatusItem
 		LPCTSTR GetIDText() const override { return TEXT("Channel"); }
 		LPCTSTR GetName() const override { return TEXT("チャンネル"); }
-		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags) override;
+		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags) override;
 		void OnLButtonDown(int x, int y) override;
 		void OnRButtonDown(int x, int y) override;
 		bool OnMouseWheel(int x, int y, bool fHorz, int Delta, int *pCommand) override;
@@ -76,14 +76,14 @@ namespace TVTest
 		LPCTSTR GetIDText() const override { return TEXT("Video"); }
 		LPCTSTR GetName() const override { return TEXT("映像サイズ"); }
 		bool UpdateContent() override;
-		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags) override;
+		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags) override;
 		void OnLButtonDown(int x, int y) override;
 		void OnRButtonDown(int x, int y) override;
 
 	private:
-		int m_OriginalVideoWidth;
-		int m_OriginalVideoHeight;
-		int m_ZoomPercentage;
+		int m_OriginalVideoWidth = 0;
+		int m_OriginalVideoHeight = 0;
+		int m_ZoomPercentage = 0;
 	};
 
 	class CVolumeStatusItem
@@ -95,7 +95,7 @@ namespace TVTest
 	// CStatusItem
 		LPCTSTR GetIDText() const override { return TEXT("Volume"); }
 		LPCTSTR GetName() const override { return TEXT("音量"); }
-		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags) override;
+		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags) override;
 		void OnLButtonDown(int x, int y) override;
 		void OnRButtonDown(int x, int y) override;
 		void OnMouseMove(int x, int y) override;
@@ -108,11 +108,9 @@ namespace TVTest
 	private:
 		struct VolumeStatusStyle
 		{
-			Style::IntValue BarHeight;
-			Style::Margins BarPadding;
-			Style::IntValue BarBorderWidth;
-
-			VolumeStatusStyle();
+			Style::IntValue BarHeight{8};
+			Style::Margins BarPadding{1};
+			Style::IntValue BarBorderWidth{1};
 		};
 
 		VolumeStatusStyle m_Style;
@@ -127,7 +125,7 @@ namespace TVTest
 	// CStatusItem
 		LPCTSTR GetIDText() const override { return TEXT("Audio"); }
 		LPCTSTR GetName() const override { return TEXT("音声"); }
-		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags) override;
+		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags) override;
 		void OnLButtonDown(int x, int y) override;
 		void OnRButtonDown(int x, int y) override;
 		bool OnMouseWheel(int x, int y, bool fHorz, int Delta, int *pCommand) override;
@@ -139,11 +137,11 @@ namespace TVTest
 	class CRecordStatusItem
 		: public CStatusItem
 	{
-		COLORREF m_CircleColor;
-		bool m_fRemain;
+		COLORREF m_CircleColor = RGB(223, 63, 0);
+		bool m_fRemain = false;
 		CTooltip m_Tooltip;
 
-		int GetTipText(LPTSTR pszText, int MaxLength);
+		size_t GetTipText(LPTSTR pszText, size_t MaxLength);
 		void SetTipFont();
 
 	public:
@@ -152,7 +150,7 @@ namespace TVTest
 	// CStatusItem
 		LPCTSTR GetIDText() const override { return TEXT("Record"); }
 		LPCTSTR GetName() const override { return TEXT("録画"); }
-		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags) override;
+		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags) override;
 		void OnLButtonDown(int x, int y) override;
 		void OnRButtonDown(int x, int y) override;
 		bool OnMouseHover(int x, int y) override;
@@ -177,7 +175,7 @@ namespace TVTest
 	// CStatusItem
 		LPCTSTR GetIDText() const override { return TEXT("Capture"); }
 		LPCTSTR GetName() const override { return TEXT("キャプチャ"); }
-		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags) override;
+		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags) override;
 		void OnLButtonDown(int x, int y) override;
 		void OnRButtonDown(int x, int y) override;
 
@@ -195,14 +193,14 @@ namespace TVTest
 		LPCTSTR GetIDText() const override { return TEXT("Error"); }
 		LPCTSTR GetName() const override { return TEXT("エラー"); }
 		bool UpdateContent() override;
-		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags) override;
+		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags) override;
 		void OnLButtonDown(int x, int y) override;
 		void OnRButtonDown(int x, int y) override;
 
 	private:
-		ULONGLONG m_ContinuityErrorPacketCount;
-		ULONGLONG m_ErrorPacketCount;
-		ULONGLONG m_ScramblePacketCount;
+		ULONGLONG m_ContinuityErrorPacketCount = 0;
+		ULONGLONG m_ErrorPacketCount = 0;
+		ULONGLONG m_ScramblePacketCount = 0;
 	};
 
 	class CSignalLevelStatusItem
@@ -215,15 +213,15 @@ namespace TVTest
 		LPCTSTR GetIDText() const override { return TEXT("Signal"); }
 		LPCTSTR GetName() const override { return TEXT("信号レベル"); }
 		bool UpdateContent() override;
-		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags) override;
+		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags) override;
 
 	// CSignalLevelStatusItem
 		void ShowSignalLevel(bool fShow);
 
 	private:
-		bool m_fShowSignalLevel;
-		float m_SignalLevel;
-		DWORD m_BitRate;
+		bool m_fShowSignalLevel = true;
+		float m_SignalLevel = 0.0f;
+		DWORD m_BitRate = 0;
 	};
 
 	class CClockStatusItem
@@ -236,7 +234,7 @@ namespace TVTest
 		LPCTSTR GetIDText() const override { return TEXT("Clock"); }
 		LPCTSTR GetName() const override { return TEXT("時計"); }
 		bool UpdateContent() override;
-		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags) override;
+		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags) override;
 		void OnLButtonDown(int x, int y) override;
 		void OnRButtonDown(int x, int y) override;
 
@@ -249,8 +247,8 @@ namespace TVTest
 	private:
 		void FormatTime(const LibISDB::DateTime &Time, LPTSTR pszText, int MaxLength) const;
 
-		bool m_fTOT;
-		bool m_fInterpolateTOT;
+		bool m_fTOT = false;
+		bool m_fInterpolateTOT = true;
 		LibISDB::DateTime m_Time;
 		LibISDB::MutexLock m_Lock;
 	};
@@ -258,14 +256,14 @@ namespace TVTest
 	class CProgramInfoStatusItem
 		: public CStatusItem
 	{
-		bool m_fNext;
-		bool m_fShowProgress;
-		bool m_fEnablePopupInfo;
+		bool m_fNext = false;
+		bool m_fShowProgress = true;
+		bool m_fEnablePopupInfo = true;
 		CEventInfoPopup m_EventInfoPopup;
 		String m_Text;
-		Theme::BackgroundStyle m_ProgressBackStyle;
-		Theme::BackgroundStyle m_ProgressElapsedStyle;
-		bool m_fValidProgress;
+		Theme::BackgroundStyle m_ProgressBackStyle{Theme::FillStyle(Theme::SolidStyle(Theme::ThemeColor(160, 160, 160)))};
+		Theme::BackgroundStyle m_ProgressElapsedStyle{Theme::FillStyle(Theme::SolidStyle(Theme::ThemeColor(0, 0, 128)))};
+		bool m_fValidProgress = false;
 		LibISDB::EventInfo m_EventInfo;
 		LibISDB::DateTime m_CurTime;
 
@@ -277,7 +275,7 @@ namespace TVTest
 	// CStatusItem
 		LPCTSTR GetIDText() const override { return TEXT("Program"); }
 		LPCTSTR GetName() const override { return TEXT("番組情報"); }
-		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags) override;
+		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags) override;
 		bool UpdateContent() override;
 		void OnLButtonDown(int x, int y) override;
 		void OnRButtonDown(int x, int y) override;
@@ -310,12 +308,12 @@ namespace TVTest
 		LPCTSTR GetIDText() const override { return TEXT("Buffering"); }
 		LPCTSTR GetName() const override { return TEXT("バッファリング"); }
 		bool UpdateContent() override;
-		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags) override;
+		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags) override;
 		void OnLButtonDown(int x, int y) override;
 
 	private:
-		DWORD m_StreamRemain;
-		int m_PacketBufferUsedPercentage;
+		DWORD m_StreamRemain = 0;
+		int m_PacketBufferUsedPercentage = 0;
 	};
 
 	class CTunerStatusItem
@@ -327,7 +325,7 @@ namespace TVTest
 	// CStatusItem
 		LPCTSTR GetIDText() const override { return TEXT("Tuner"); }
 		LPCTSTR GetName() const override { return TEXT("チューナー"); }
-		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags) override;
+		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags) override;
 		void OnLButtonDown(int x, int y) override;
 		void OnRButtonDown(int x, int y) override;
 	};
@@ -342,11 +340,11 @@ namespace TVTest
 		LPCTSTR GetIDText() const override { return TEXT("Bitrate"); }
 		LPCTSTR GetName() const override { return TEXT("ビットレート"); }
 		bool UpdateContent() override;
-		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags) override;
+		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags) override;
 
 	private:
-		DWORD m_VideoBitRate;
-		DWORD m_AudioBitRate;
+		DWORD m_VideoBitRate = 0;
+		DWORD m_AudioBitRate = 0;
 	};
 
 	class CFavoritesStatusItem
@@ -358,7 +356,7 @@ namespace TVTest
 	// CStatusItem
 		LPCTSTR GetIDText() const override { return TEXT("Favorites"); }
 		LPCTSTR GetName() const override { return TEXT("お気に入り"); }
-		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags) override;
+		void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags) override;
 		void OnLButtonDown(int x, int y) override;
 		void OnRButtonDown(int x, int y) override;
 

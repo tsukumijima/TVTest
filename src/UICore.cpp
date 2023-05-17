@@ -33,34 +33,16 @@ namespace TVTest
 
 CUICore::CUICore(CAppMain &App)
 	: m_App(App)
-	, m_pSkin(nullptr)
-	, m_fStandby(false)
-	, m_fTransientStandby(false)
-	, m_fFullscreen(false)
-	, m_fAlwaysOnTop(false)
-
-	, m_AspectRatioType(ASPECTRATIO_DEFAULT)
-
-	, m_fViewerInitializeError(false)
-
-	, m_fScreenSaverActiveOriginal(FALSE)
-	/*
-	, m_fLowPowerActiveOriginal(FALSE)
-	, m_fPowerOffActiveOriginal(FALSE)
-	*/
-
-	, m_PopupMenuDPI(0)
-	, m_TunerSelectMenu(*this)
-
-	, m_pColorScheme(nullptr)
-
-	, m_fStatusBarTrace(false)
 {
 }
 
 
 CUICore::~CUICore()
 {
+	if (m_hPowerRequest != INVALID_HANDLE_VALUE) {
+		SetPowerRequest(false);
+		::CloseHandle(m_hPowerRequest);
+	}
 }
 
 
@@ -224,7 +206,7 @@ bool CUICore::InitializeViewer(BYTE VideoStreamType)
 {
 	if (m_pSkin == nullptr)
 		return false;
-	bool fOK = m_pSkin->InitializeViewer(VideoStreamType);
+	const bool fOK = m_pSkin->InitializeViewer(VideoStreamType);
 	m_fViewerInitializeError = !fOK;
 	return fOK;
 }
@@ -456,7 +438,7 @@ bool CUICore::SelectAudio(int Index)
 
 bool CUICore::AutoSelectAudio()
 {
-	int Index = m_App.AudioManager.FindSelectedAudio();
+	const int Index = m_App.AudioManager.FindSelectedAudio();
 	if (Index >= 0)
 		return SelectAudio(Index);
 
@@ -604,7 +586,7 @@ int CUICore::FormatCurrentAudioText(LPTSTR pszText, int MaxLength) const
 	LibISDB::AnalyzerFilter::EventAudioInfo AudioInfo;
 
 	if (NumAudio > 1)
-		Formatter.AppendFormat(TEXT("#%d: "), GetAudioStream() + 1);
+		Formatter.AppendFormat(TEXT("#{}: "), GetAudioStream() + 1);
 
 	if (NumChannels == LibISDB::ViewerFilter::AudioChannelCount_DualMono) {
 		// Dual mono
@@ -645,7 +627,7 @@ int CUICore::FormatCurrentAudioText(LPTSTR pszText, int MaxLength) const
 					AudioInfo.LanguageCode2,
 					szLang2, lengthof(szLang2),
 					LibISDB::LanguageTextType::Short);
-				Formatter.AppendFormat(TEXT("%s+%s"), szLang1, szLang2);
+				Formatter.AppendFormat(TEXT("{}+{}"), szLang1, szLang2);
 				break;
 			}
 		} else {
@@ -674,7 +656,7 @@ int CUICore::FormatCurrentAudioText(LPTSTR pszText, int MaxLength) const
 			break;
 
 		default:
-			StringPrintf(szFormat, TEXT("[%dch]"), NumChannels);
+			StringFormat(szFormat, TEXT("[{}ch]"), NumChannels);
 			break;
 		}
 
@@ -687,7 +669,7 @@ int CUICore::FormatCurrentAudioText(LPTSTR pszText, int MaxLength) const
 				Pos++;
 				if (Pos < AudioInfo.Text.length() && AudioInfo.Text[Pos] == TEXT('\n'))
 					Pos++;
-				StringPrintf(szBuf + Pos, lengthof(szBuf) - Pos, TEXT("/%s"), AudioInfo.Text.c_str() + Pos);
+				StringFormat(szBuf + Pos, lengthof(szBuf) - Pos, TEXT("/{}"), AudioInfo.Text.c_str() + Pos);
 				StringUtility::ToHalfWidthNoKatakana(
 					szBuf, szAudio, lengthof(szAudio));
 			} else {
@@ -721,7 +703,7 @@ int CUICore::FormatCurrentAudioText(LPTSTR pszText, int MaxLength) const
 				LibISDB::LanguageTextType::Simple);
 		}
 
-		Formatter.AppendFormat(TEXT("%s %s"), szFormat, szAudio);
+		Formatter.AppendFormat(TEXT("{} {}"), szFormat, szAudio);
 	} else {
 		switch (NumChannels) {
 		case 1:
@@ -737,12 +719,12 @@ int CUICore::FormatCurrentAudioText(LPTSTR pszText, int MaxLength) const
 			break;
 
 		default:
-			Formatter.AppendFormat(TEXT("%dch"), NumChannels);
+			Formatter.AppendFormat(TEXT("{}ch"), NumChannels);
 			break;
 		}
 	}
 
-	return (int)Formatter.Length();
+	return static_cast<int>(Formatter.Length());
 }
 
 
@@ -793,7 +775,7 @@ bool CUICore::GetSelectedAudioText(LPTSTR pszText, int MaxLength) const
 				StringCopy(pszText, szAudio2, MaxLength);
 				break;
 			case LibISDB::DirectShow::AudioDecoderFilter::DualMonoMode::Both:
-				StringPrintf(pszText, MaxLength, TEXT("%s+%s"), szAudio1, szAudio2);
+				StringFormat(pszText, MaxLength, TEXT("{}+{}"), szAudio1, szAudio2);
 				break;
 			default:
 				return false;
@@ -802,13 +784,13 @@ bool CUICore::GetSelectedAudioText(LPTSTR pszText, int MaxLength) const
 			TCHAR szText[LibISDB::MAX_LANGUAGE_TEXT_LENGTH];
 			if (AudioInfo.Text.empty())
 				LibISDB::GetLanguageText_ja(AudioInfo.LanguageCode, szText, lengthof(szText));
-			StringPrintf(
-				pszText, MaxLength, TEXT("音声%d: %s"),
+			StringFormat(
+				pszText, MaxLength, TEXT("音声{}: {}"),
 				GetAudioStream() + 1,
 				AudioInfo.Text.empty() ? szText : AudioInfo.Text.c_str());
 		}
 	} else {
-		StringPrintf(pszText, MaxLength, TEXT("音声%d"), GetAudioStream() + 1);
+		StringFormat(pszText, MaxLength, TEXT("音声{}"), GetAudioStream() + 1);
 	}
 
 	return true;
@@ -900,9 +882,9 @@ bool CUICore::SetAlwaysOnTop(bool fTop)
 bool CUICore::PreventDisplaySave(bool fPrevent)
 {
 	if (fPrevent) {
-		bool fNoScreenSaver = m_App.ViewOptions.GetNoScreenSaver();
-		bool fNoMonitorLowPower = m_App.ViewOptions.GetNoMonitorLowPower();
-		bool fNoMonitorLowPowerActiveOnly = m_App.ViewOptions.GetNoMonitorLowPowerActiveOnly();
+		const bool fNoScreenSaver = m_App.ViewOptions.GetNoScreenSaver();
+		const bool fNoMonitorLowPower = m_App.ViewOptions.GetNoMonitorLowPower();
+		const bool fNoMonitorLowPowerActiveOnly = m_App.ViewOptions.GetNoMonitorLowPowerActiveOnly();
 
 		if (!fNoScreenSaver && m_fScreenSaverActiveOriginal) {
 			SystemParametersInfo(
@@ -910,25 +892,9 @@ bool CUICore::PreventDisplaySave(bool fPrevent)
 				SPIF_UPDATEINIFILE/* | SPIF_SENDWININICHANGE*/);
 			m_fScreenSaverActiveOriginal = FALSE;
 		}
-		if (!fNoMonitorLowPower || fNoMonitorLowPowerActiveOnly) {
-#if 1
-			if (m_pSkin != nullptr)
-				m_pSkin->PreventDisplaySleep(false);
-#else
-			if (m_fPowerOffActiveOriginal) {
-				SystemParametersInfo(
-					SPI_SETPOWEROFFACTIVE, TRUE, nullptr,
-					SPIF_UPDATEINIFILE | SPIF_SENDWININICHANGE);
-				m_fPowerOffActiveOriginal = FALSE;
-			}
-			if (m_fLowPowerActiveOriginal) {
-				SystemParametersInfo(
-					SPI_SETLOWPOWERACTIVE, TRUE, nullptr,
-					SPIF_UPDATEINIFILE | SPIF_SENDWININICHANGE);
-				m_fLowPowerActiveOriginal = FALSE;
-			}
-#endif
-		}
+		if (!fNoMonitorLowPower || fNoMonitorLowPowerActiveOnly)
+			SetPowerRequest(false);
+
 		if (fNoScreenSaver && !m_fScreenSaverActiveOriginal) {
 			if (!SystemParametersInfo(
 						SPI_GETSCREENSAVEACTIVE, 0,
@@ -940,59 +906,49 @@ bool CUICore::PreventDisplaySave(bool fPrevent)
 					0/*SPIF_UPDATEINIFILE | SPIF_SENDWININICHANGE*/);
 			}
 		}
-		if (fNoMonitorLowPower && !fNoMonitorLowPowerActiveOnly) {
-#if 1
-			if (m_pSkin != nullptr)
-				m_pSkin->PreventDisplaySleep(true);
-#else
-			if (!m_fPowerOffActiveOriginal) {
-				if (!SystemParametersInfo(
-							SPI_GETPOWEROFFACTIVE, 0,
-							&m_fPowerOffActiveOriginal, 0))
-					m_fPowerOffActiveOriginal = FALSE;
-				if (m_fPowerOffActiveOriginal) {
-					SystemParametersInfo(
-						SPI_SETPOWEROFFACTIVE, FALSE, nullptr,
-						SPIF_UPDATEINIFILE | SPIF_SENDWININICHANGE);
-				}
-			}
-			if (!m_fLowPowerActiveOriginal) {
-				if (!SystemParametersInfo(
-							SPI_GETLOWPOWERACTIVE, 0,
-							&m_fLowPowerActiveOriginal, 0))
-					m_fLowPowerActiveOriginal = FALSE;
-				if (m_fLowPowerActiveOriginal) {
-					SystemParametersInfo(
-						SPI_SETLOWPOWERACTIVE, FALSE, nullptr,
-						SPIF_UPDATEINIFILE | SPIF_SENDWININICHANGE);
-				}
-			}
-#endif
-		}
+		if (fNoMonitorLowPower && !fNoMonitorLowPowerActiveOnly)
+			SetPowerRequest(true);
 	} else {
-		if (m_pSkin != nullptr)
-			m_pSkin->PreventDisplaySleep(false);
+		SetPowerRequest(false);
+
 		if (m_fScreenSaverActiveOriginal) {
 			::SystemParametersInfo(
 				SPI_SETSCREENSAVEACTIVE, TRUE, nullptr,
 				SPIF_UPDATEINIFILE/* | SPIF_SENDWININICHANGE*/);
 			m_fScreenSaverActiveOriginal = FALSE;
 		}
-#if 0
-		if (m_fPowerOffActiveOriginal) {
-			::SystemParametersInfo(
-				SPI_SETPOWEROFFACTIVE, TRUE, nullptr,
-				SPIF_UPDATEINIFILE | SPIF_SENDWININICHANGE);
-			m_fPowerOffActiveOriginal = FALSE;
-		}
-		if (m_fLowPowerActiveOriginal) {
-			::SystemParametersInfo(
-				SPI_SETLOWPOWERACTIVE, TRUE, nullptr,
-				SPIF_UPDATEINIFILE | SPIF_SENDWININICHANGE);
-			m_fLowPowerActiveOriginal = FALSE;
-		}
-#endif
 	}
+	return true;
+}
+
+
+bool CUICore::SetPowerRequest(bool fSet)
+{
+	if (fSet == m_fPowerRequestSet)
+		return true;
+
+	if (fSet) {
+		if (m_hPowerRequest == INVALID_HANDLE_VALUE) {
+			REASON_CONTEXT ReasonContext;
+			ReasonContext.Version = POWER_REQUEST_CONTEXT_VERSION;
+			ReasonContext.Flags = POWER_REQUEST_CONTEXT_DETAILED_STRING;
+			ReasonContext.Reason.Detailed.LocalizedReasonModule = m_App.GetResourceInstance();
+			ReasonContext.Reason.Detailed.LocalizedReasonId = IDS_POWERREQUEST;
+			ReasonContext.Reason.Detailed.ReasonStringCount = 0;
+			ReasonContext.Reason.Detailed.ReasonStrings = nullptr;
+			m_hPowerRequest = ::PowerCreateRequest(&ReasonContext);
+			if (m_hPowerRequest == INVALID_HANDLE_VALUE)
+				return false;
+		}
+
+		if (!::PowerSetRequest(m_hPowerRequest, PowerRequestDisplayRequired))
+			return false;
+		m_fPowerRequestSet = true;
+	} else {
+		::PowerClearRequest(m_hPowerRequest, PowerRequestDisplayRequired);
+		m_fPowerRequestSet = false;
+	}
+
 	return true;
 }
 
@@ -1012,7 +968,7 @@ void CUICore::PopupMenu(const POINT *pPos, PopupMenuFlag Flags)
 		m_App.MenuOptions.GetMenuItemList(&ItemList);
 
 	const int OldDPI = m_PopupMenuDPI;
-	HMONITOR hMonitor = ::MonitorFromPoint(pt, MONITOR_DEFAULTTONULL);
+	const HMONITOR hMonitor = ::MonitorFromPoint(pt, MONITOR_DEFAULTTONULL);
 	if (hMonitor != nullptr)
 		m_PopupMenuDPI = GetMonitorDPI(hMonitor);
 
@@ -1034,7 +990,7 @@ void CUICore::PopupSubMenu(int SubMenu, const POINT *pPos, UINT Flags, const REC
 		::GetCursorPos(&pt);
 
 	const int OldDPI = m_PopupMenuDPI;
-	HMONITOR hMonitor = ::MonitorFromPoint(pt, MONITOR_DEFAULTTONULL);
+	const HMONITOR hMonitor = ::MonitorFromPoint(pt, MONITOR_DEFAULTTONULL);
 	if (hMonitor != nullptr)
 		m_PopupMenuDPI = GetMonitorDPI(hMonitor);
 
@@ -1067,7 +1023,7 @@ bool CUICore::ShowSpecialMenu(MenuType Menu, const POINT *pPos, UINT Flags, cons
 			Menu.CheckItem(CM_RECORDEVENT, m_App.RecordManager.GetStopOnEventEnd());
 			Menu.EnableItem(CM_RECORD_PAUSE, m_App.RecordManager.IsRecording());
 			Menu.CheckItem(CM_RECORD_PAUSE, m_App.RecordManager.IsPaused());
-			bool fTimeShift = m_App.RecordOptions.IsTimeShiftRecordingEnabled();
+			const bool fTimeShift = m_App.RecordOptions.IsTimeShiftRecordingEnabled();
 			Menu.EnableItem(CM_TIMESHIFTRECORDING, fTimeShift && !m_App.RecordManager.IsRecording());
 			Menu.CheckItem(CM_ENABLETIMESHIFTRECORDING, fTimeShift);
 			Menu.EnableItem(
@@ -1157,14 +1113,14 @@ void CUICore::InitChannelMenu(HMENU hmenu)
 			pList, m_App.ChannelManager.GetCurrentChannel(),
 			CM_CHANNEL_FIRST, CM_CHANNEL_LAST, hmenu, GetMainWindow());
 	} else {
-		bool fControlKeyID = pList->HasRemoteControlKeyID();
+		const bool fControlKeyID = pList->HasRemoteControlKeyID();
 		for (int i = 0, j = 0; i < pList->NumChannels(); i++) {
 			const CChannelInfo *pChInfo = pList->GetChannelInfo(i);
 			TCHAR szText[MAX_CHANNEL_NAME + 4];
 
 			if (pChInfo->IsEnabled()) {
-				StringPrintf(
-					szText, TEXT("%d: %s"),
+				StringFormat(
+					szText, TEXT("{}: {}"),
 					fControlKeyID ? pChInfo->GetChannelNo() : i + 1, pChInfo->GetName());
 				::AppendMenu(
 					hmenu,
@@ -1196,31 +1152,27 @@ void CUICore::InitTunerMenu(HMENU hmenu)
 
 	const bool fIsTunerOpen = m_App.CoreEngine.IsTunerOpen();
 	TCHAR szText[256];
-	int Length;
 
 	// 各チューニング空間のメニューを追加する
 	// 実際のメニューの設定は WM_INITMENUPOPUP で行っている
 	if (fIsTunerOpen && m_App.ChannelManager.NumSpaces() > 0) {
-		HMENU hmenuSpace;
-		LPCTSTR pszName;
-
 		if (m_App.ChannelManager.NumSpaces() > 1) {
-			hmenuSpace = ::CreatePopupMenu();
+			HMENU hmenuSpace = ::CreatePopupMenu();
 			Menu.Append(hmenuSpace, TEXT("&A: すべて"));
 		}
-		for (int i = 0; i < m_App.ChannelManager.NumSpaces(); i++) {
-			const CChannelList *pChannelList = m_App.ChannelManager.GetChannelList(i);
 
-			hmenuSpace = ::CreatePopupMenu();
-			Length = StringPrintf(szText, TEXT("&%d: "), i);
-			pszName = m_App.ChannelManager.GetTuningSpaceName(i);
+		for (int i = 0; i < m_App.ChannelManager.NumSpaces(); i++) {
+			HMENU hmenuSpace = ::CreatePopupMenu();
+			const size_t Length = StringFormat(szText, TEXT("&{}: "), i);
+			LPCTSTR pszName = m_App.ChannelManager.GetTuningSpaceName(i);
 			if (pszName != nullptr) {
-				CopyToMenuText(pszName, szText + Length, lengthof(szText) - Length);
+				CopyToMenuText(pszName, szText + Length, static_cast<int>(lengthof(szText) - Length));
 			} else {
-				StringPrintf(
+				StringFormat(
 					szText + Length, lengthof(szText) - Length,
-					TEXT("チューニング空間%d"), i);
+					TEXT("チューニング空間{}"), i);
 			}
+			const CChannelList *pChannelList = m_App.ChannelManager.GetChannelList(i);
 			Menu.Append(
 				hmenuSpace, szText,
 				pChannelList != nullptr && pChannelList->NumEnableChannels() > 0 ? MF_ENABLED : MF_GRAYED);
@@ -1351,7 +1303,7 @@ bool CUICore::DoCommand(LPCTSTR pszCommand)
 {
 	if (pszCommand == nullptr)
 		return false;
-	int Command = m_App.CommandManager.ParseIDText(pszCommand);
+	const int Command = m_App.CommandManager.ParseIDText(pszCommand);
 	if (Command == 0)
 		return false;
 	return DoCommand(Command);
@@ -1371,7 +1323,7 @@ bool CUICore::DoCommandAsync(LPCTSTR pszCommand)
 {
 	if (pszCommand == nullptr)
 		return false;
-	int Command = m_App.CommandManager.ParseIDText(pszCommand);
+	const int Command = m_App.CommandManager.ParseIDText(pszCommand);
 	if (Command == 0)
 		return false;
 	return DoCommandAsync(Command);
@@ -1451,7 +1403,7 @@ bool CUICore::UpdateIcon()
 		}
 	}
 
-	HWND hwnd = GetMainWindow();
+	const HWND hwnd = GetMainWindow();
 	if (hwnd != nullptr) {
 		::SendMessage(
 			hwnd, WM_SETICON, ICON_BIG,
@@ -1487,7 +1439,7 @@ static void RemoveMultipleSpaces(String &Str)
 
 bool CUICore::UpdateTitle()
 {
-	HWND hwnd = GetMainWindow();
+	const HWND hwnd = GetMainWindow();
 
 	if (hwnd == nullptr)
 		return false;
@@ -1555,7 +1507,7 @@ bool CUICore::SetLogo(LPCTSTR pszFileName)
 		StringCopy(szFileName, pszFileName);
 	}
 
-	HBITMAP hbm = static_cast<HBITMAP>(
+	const HBITMAP hbm = static_cast<HBITMAP>(
 		::LoadImage(
 			nullptr, szFileName, IMAGE_BITMAP,
 			0, 0, LR_LOADFROMFILE | LR_CREATEDIBSECTION));
@@ -1575,7 +1527,7 @@ bool CUICore::RegisterModelessDialog(CBasicDialog *pDialog)
 {
 	if (pDialog == nullptr)
 		return false;
-	if (std::find(m_ModelessDialogList.begin(), m_ModelessDialogList.end(), pDialog) != m_ModelessDialogList.end())
+	if (std::ranges::find(m_ModelessDialogList, pDialog) != m_ModelessDialogList.end())
 		return false;
 	m_ModelessDialogList.push_back(pDialog);
 	return true;
@@ -1584,7 +1536,7 @@ bool CUICore::RegisterModelessDialog(CBasicDialog *pDialog)
 
 bool CUICore::UnregisterModelessDialog(CBasicDialog *pDialog)
 {
-	auto itr = std::find(m_ModelessDialogList.begin(), m_ModelessDialogList.end(), pDialog);
+	auto itr = std::ranges::find(m_ModelessDialogList, pDialog);
 	if (itr == m_ModelessDialogList.end())
 		return false;
 	m_ModelessDialogList.erase(itr);
@@ -1619,7 +1571,7 @@ const CColorScheme *CUICore::GetCurrentColorScheme() const
 // 配色を適用する
 bool CUICore::ApplyColorScheme(const CColorScheme *pColorScheme)
 {
-	Theme::CThemeManager ThemeManager(pColorScheme);
+	const Theme::CThemeManager ThemeManager(pColorScheme);
 
 	m_pColorScheme = pColorScheme;
 
@@ -1704,7 +1656,7 @@ bool CUICore::CreateChannelMenu(
 bool CUICore::InitChannelMenuPopup(HMENU hmenuParent, HMENU hmenu)
 {
 	bool fChannelMenu = false;
-	int Count = ::GetMenuItemCount(hmenuParent);
+	const int Count = ::GetMenuItemCount(hmenuParent);
 	int i;
 	for (i = 0; i < Count; i++) {
 		if (::GetSubMenu(hmenuParent, i) == hmenu) {
@@ -1719,10 +1671,9 @@ bool CUICore::InitChannelMenuPopup(HMENU hmenuParent, HMENU hmenu)
 		return false;
 
 	const CChannelManager &ChannelManager = m_App.ChannelManager;
-	const CChannelList *pChannelList;
+	const CChannelList *pChannelList = ChannelManager.GetAllChannelList();
 	int Command = CM_SPACE_CHANNEL_FIRST;
 
-	pChannelList = ChannelManager.GetAllChannelList();
 	if (ChannelManager.NumSpaces() > 1) {
 		if (i == 0) {
 			CreateChannelMenu(
@@ -1736,7 +1687,7 @@ bool CUICore::InitChannelMenuPopup(HMENU hmenuParent, HMENU hmenu)
 		i--;
 	}
 	if (i >= ChannelManager.NumSpaces()) {
-		TRACE(TEXT("CUICore::InitChannelMenuPopup() : Invalid space %d\n"), i);
+		TRACE(TEXT("CUICore::InitChannelMenuPopup() : Invalid space {}\n"), i);
 		ClearMenu(hmenu);
 		return true;
 	}
@@ -1856,31 +1807,26 @@ bool CUICore::CTunerSelectMenu::Create(HWND hwnd)
 
 	const CChannelManager &ChannelManager = m_UICore.m_App.ChannelManager;
 	const bool fIsTunerOpen = m_UICore.m_App.CoreEngine.IsTunerOpen();
-	HMENU hmenuSpace;
 	const CChannelList *pChannelList;
-	int Command;
-	LPCTSTR pszName;
+	int Command = CM_SPACE_CHANNEL_FIRST;
 	TCHAR szText[MAX_PATH * 2];
-	int Length;
-
-	Command = CM_SPACE_CHANNEL_FIRST;
 
 	if (fIsTunerOpen) {
 		pChannelList = ChannelManager.GetAllChannelList();
 		if (ChannelManager.NumSpaces() > 1) {
-			hmenuSpace = ::CreatePopupMenu();
+			HMENU hmenuSpace = ::CreatePopupMenu();
 			m_Menu.Append(hmenuSpace, TEXT("&A: すべて"));
 		}
 		Command += pChannelList->NumChannels();
 		for (int i = 0; i < ChannelManager.NumSpaces(); i++) {
 			pChannelList = ChannelManager.GetChannelList(i);
-			hmenuSpace = ::CreatePopupMenu();
-			Length = StringPrintf(szText, TEXT("&%d: "), i);
-			pszName = ChannelManager.GetTuningSpaceName(i);
+			HMENU hmenuSpace = ::CreatePopupMenu();
+			const size_t Length = StringFormat(szText, TEXT("&{}: "), i);
+			LPCTSTR pszName = ChannelManager.GetTuningSpaceName(i);
 			if (!IsStringEmpty(pszName))
-				CopyToMenuText(pszName, szText + Length, lengthof(szText) - Length);
+				CopyToMenuText(pszName, szText + Length, static_cast<int>(lengthof(szText) - Length));
 			else
-				StringPrintf(szText + Length, lengthof(szText) - Length, TEXT("チューニング空間%d"), i);
+				StringFormat(szText + Length, lengthof(szText) - Length, TEXT("チューニング空間{}"), i);
 			m_Menu.Append(
 				hmenuSpace, szText,
 				pChannelList != nullptr && pChannelList->NumEnableChannels() > 0 ? MF_ENABLED : MF_GRAYED);
@@ -1909,7 +1855,7 @@ bool CUICore::CTunerSelectMenu::Create(HWND hwnd)
 		const CTuningSpaceList *pTuningSpaceList;
 		if (pDriverInfo->LoadTuningSpaceList(CDriverInfo::LoadTuningSpaceListMode::NoLoadDriver)
 				&& (pTuningSpaceList = pDriverInfo->GetAvailableTuningSpaceList()) != nullptr) {
-			HMENU hmenuDriver = ::CreatePopupMenu();
+			const HMENU hmenuDriver = ::CreatePopupMenu();
 
 			for (int j = 0; j < pTuningSpaceList->NumSpaces(); j++) {
 				pChannelList = pTuningSpaceList->GetChannelList(j);
@@ -1919,6 +1865,7 @@ bool CUICore::CTunerSelectMenu::Create(HWND hwnd)
 					Command += pChannelList->NumChannels();
 					continue;
 				}
+				HMENU hmenuSpace;
 				if (pTuningSpaceList->NumSpaces() > 1)
 					hmenuSpace = ::CreatePopupMenu();
 				else
@@ -1931,14 +1878,14 @@ bool CUICore::CTunerSelectMenu::Create(HWND hwnd)
 				::SetMenuInfo(hmenuSpace, &mi);
 				Command += pChannelList->NumChannels();
 				if (hmenuSpace != hmenuDriver) {
-					pszName = pTuningSpaceList->GetTuningSpaceName(j);
-					Length = StringPrintf(szText, TEXT("&%d: "), j);
+					LPCTSTR pszName = pTuningSpaceList->GetTuningSpaceName(j);
+					const size_t Length = StringFormat(szText, TEXT("&{}: "), j);
 					if (!IsStringEmpty(pszName)) {
-						CopyToMenuText(pszName, szText + Length, lengthof(szText) - Length);
+						CopyToMenuText(pszName, szText + Length, static_cast<int>(lengthof(szText) - Length));
 					} else {
-						StringPrintf(
+						StringFormat(
 							szText + Length, lengthof(szText) - Length,
-							TEXT("チューニング空間%d"), j);
+							TEXT("チューニング空間{}"), j);
 					}
 					::AppendMenu(
 						hmenuDriver, MF_POPUP | MF_ENABLED,
@@ -1948,8 +1895,8 @@ bool CUICore::CTunerSelectMenu::Create(HWND hwnd)
 			if (!IsStringEmpty(pDriverInfo->GetTunerName())) {
 				TCHAR szTemp[lengthof(szText)];
 
-				StringPrintf(
-					szTemp, TEXT("%s [%s]"),
+				StringFormat(
+					szTemp, TEXT("{} [{}]"),
 					pDriverInfo->GetTunerName(),
 					szFileName);
 				CopyToMenuText(szTemp, szText, lengthof(szText));
@@ -1991,7 +1938,7 @@ bool CUICore::CTunerSelectMenu::OnInitMenuPopup(HMENU hmenu)
 		return true;
 
 	bool fChannelMenu = false;
-	int Count = m_Menu.GetItemCount();
+	const int Count = m_Menu.GetItemCount();
 	int i = 0;
 	if (m_UICore.m_App.CoreEngine.IsTunerOpen()) {
 		i = m_UICore.m_App.ChannelManager.NumSpaces();
@@ -1999,8 +1946,8 @@ bool CUICore::CTunerSelectMenu::OnInitMenuPopup(HMENU hmenu)
 			i++;
 	}
 	for (i++; i < Count; i++) {
-		HMENU hmenuChannel = m_Menu.GetSubMenu(i);
-		int Items = ::GetMenuItemCount(hmenuChannel);
+		const HMENU hmenuChannel = m_Menu.GetSubMenu(i);
+		const int Items = ::GetMenuItemCount(hmenuChannel);
 
 		if (hmenuChannel == hmenu) {
 			if (Items > 0)

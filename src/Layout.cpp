@@ -32,11 +32,8 @@ namespace Layout
 
 
 CContainer::CContainer(int ID)
-	: m_pBase(nullptr)
-	, m_ID(ID)
-	, m_fVisible(false)
+	: m_ID(ID)
 {
-	::SetRectEmpty(&m_Position);
 }
 
 
@@ -82,15 +79,6 @@ CContainer *CContainer::GetChildContainer(int Index) const
 
 CWindowContainer::CWindowContainer(int ID)
 	: CContainer(ID)
-	, m_pWindow(nullptr)
-	, m_pUIBase(nullptr)
-	, m_MinWidth(0)
-	, m_MinHeight(0)
-{
-}
-
-
-CWindowContainer::~CWindowContainer()
 {
 }
 
@@ -150,10 +138,6 @@ bool CWindowContainer::SetMinSize(int Width, int Height)
 
 CSplitter::CSplitter(int ID)
 	: CContainer(ID)
-	, m_Style(StyleFlag::None)
-	, m_AdjustPane(0)
-	, m_BarPos(0)
-	, m_BarWidth(4)
 {
 }
 
@@ -250,13 +234,12 @@ CContainer *CSplitter::GetChildContainer(int Index) const
 
 void CSplitter::OnLButtonDown(int x, int y)
 {
-	POINT pt = {x, y};
 	RECT rc;
 
 	if (!(m_Style & StyleFlag::Fixed)
 			&& m_PaneList[0].pContainer != nullptr && m_PaneList[0].pContainer->GetVisible()
 			&& m_PaneList[1].pContainer != nullptr && m_PaneList[1].pContainer->GetVisible()
-			&& GetBarRect(&rc) && ::PtInRect(&rc, pt))
+			&& GetBarRect(&rc) && ::PtInRect(&rc, POINT{x, y}))
 		::SetCapture(m_pBase->GetHandle());
 }
 
@@ -270,8 +253,7 @@ void CSplitter::OnLButtonUp(int x, int y)
 
 void CSplitter::OnMouseMove(int x, int y)
 {
-	POINT pt = {x, y};
-	RECT rc;
+	const POINT pt = {x, y};
 	LPCTSTR pszCursor;
 
 	if (::GetCapture() == m_pBase->GetHandle()) {
@@ -299,6 +281,7 @@ void CSplitter::OnMouseMove(int x, int y)
 		}
 		pszCursor = !!(m_Style & StyleFlag::Vert) ? IDC_SIZENS : IDC_SIZEWE;
 	} else {
+		RECT rc;
 		if (!(m_Style & StyleFlag::Fixed)
 				&& m_PaneList[0].pContainer != nullptr && m_PaneList[0].pContainer->GetVisible()
 				&& m_PaneList[1].pContainer != nullptr && m_PaneList[1].pContainer->GetVisible()
@@ -345,7 +328,7 @@ CContainer *CSplitter::GetPane(int Index) const
 
 CContainer *CSplitter::GetPaneByID(int ID) const
 {
-	int Index = IDToIndex(ID);
+	const int Index = IDToIndex(ID);
 
 	if (Index < 0)
 		return nullptr;
@@ -355,9 +338,7 @@ CContainer *CSplitter::GetPaneByID(int ID) const
 
 void CSplitter::SwapPane()
 {
-	PaneInfo Temp;
-
-	Temp = m_PaneList[0];
+	const PaneInfo Temp = m_PaneList[0];
 	m_PaneList[0] = m_PaneList[1];
 	m_PaneList[1] = Temp;
 	if (!(m_Style & StyleFlag::Vert))
@@ -372,7 +353,7 @@ void CSplitter::SwapPane()
 
 bool CSplitter::SetPaneSize(int ID, int Size)
 {
-	int Index = IDToIndex(ID);
+	const int Index = IDToIndex(ID);
 
 	if (Index < 0)
 		return false;
@@ -405,7 +386,7 @@ bool CSplitter::SetPaneSize(int ID, int Size)
 
 int CSplitter::GetPaneSize(int ID)
 {
-	int Index = IDToIndex(ID);
+	const int Index = IDToIndex(ID);
 
 	if (Index < 0)
 		return 0;
@@ -513,14 +494,13 @@ bool CSplitter::GetBarRect(RECT *pRect) const
 			|| m_PaneList[1].pContainer == nullptr || !m_PaneList[1].pContainer->GetVisible())
 		return false;
 
-	int BarPos;
 	SIZE MinSize1, MinSize2;
-	RECT rc;
-
-	BarPos = m_BarPos;
 	m_PaneList[0].pContainer->GetMinSize(&MinSize1);
 	m_PaneList[1].pContainer->GetMinSize(&MinSize2);
-	rc = m_Position;
+
+	RECT rc = m_Position;
+	int BarPos = m_BarPos;
+
 	if (!(m_Style & StyleFlag::Vert)) {
 		int Width;
 
@@ -612,16 +592,6 @@ bool CLayoutBase::Initialize(HINSTANCE hinst)
 }
 
 
-CLayoutBase::CLayoutBase()
-	: m_pEventHandler(nullptr)
-	, m_pContainer(nullptr)
-	, m_pFocusContainer(nullptr)
-	, m_BackColor(::GetSysColor(COLOR_3DFACE))
-	, m_fLockLayout(false)
-{
-}
-
-
 CLayoutBase::~CLayoutBase()
 {
 	if (m_pEventHandler != nullptr)
@@ -672,7 +642,7 @@ LRESULT CLayoutBase::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 
 	case WM_LBUTTONDOWN:
 		if (m_pContainer != nullptr) {
-			int x = GET_X_LPARAM(lParam), y = GET_Y_LPARAM(lParam);
+			const int x = GET_X_LPARAM(lParam), y = GET_Y_LPARAM(lParam);
 			CContainer *pContainer = GetContainerFromPoint(x, y);
 
 			if (pContainer != nullptr)
@@ -683,7 +653,7 @@ LRESULT CLayoutBase::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 
 	case WM_LBUTTONUP:
 		if (m_pFocusContainer != nullptr) {
-			int x = GET_X_LPARAM(lParam), y = GET_Y_LPARAM(lParam);
+			const int x = GET_X_LPARAM(lParam), y = GET_Y_LPARAM(lParam);
 
 			m_pFocusContainer->OnLButtonUp(x, y);
 			m_pFocusContainer = nullptr;
@@ -692,7 +662,7 @@ LRESULT CLayoutBase::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 
 	case WM_MOUSEMOVE:
 		{
-			int x = GET_X_LPARAM(lParam), y = GET_Y_LPARAM(lParam);
+			const int x = GET_X_LPARAM(lParam), y = GET_Y_LPARAM(lParam);
 
 			if (m_pFocusContainer != nullptr) {
 				m_pFocusContainer->OnMouseMove(x, y);
@@ -736,7 +706,7 @@ bool CLayoutBase::SetTopContainer(CContainer *pContainer)
 
 void CLayoutBase::SetBasePointer(CContainer *pContainer, CLayoutBase *pBase)
 {
-	int NumChildren = pContainer->NumChildContainers();
+	const int NumChildren = pContainer->NumChildContainers();
 
 	pContainer->m_pBase = pBase;
 	for (int i = 0; i < NumChildren; i++) {
@@ -760,7 +730,7 @@ CContainer *CLayoutBase::GetContainerByID(int ID) const
 
 CContainer *CLayoutBase::GetChildContainerByID(const CContainer *pContainer, int ID) const
 {
-	int NumChildren = pContainer->NumChildContainers();
+	const int NumChildren = pContainer->NumChildContainers();
 
 	for (int i = 0; i < NumChildren; i++) {
 		CContainer *pChild = pContainer->GetChildContainer(i);
@@ -790,15 +760,14 @@ CContainer *CLayoutBase::GetChildContainerFromPoint(const CContainer *pContainer
 	if (pContainer == nullptr || !pContainer->GetVisible())
 		return nullptr;
 
-	POINT pt = {x, y};
-	RECT rc;
+	const POINT pt = {x, y};
+	RECT rc = pContainer->GetPosition();
 
-	rc = pContainer->GetPosition();
 	if (::PtInRect(&rc, pt)) {
-		int NumChildren = pContainer->NumChildContainers();
+		const int NumChildren = pContainer->NumChildContainers();
 
 		for (int i = 0; i < NumChildren; i++) {
-			CContainer *pChild = pContainer->GetChildContainer(i);
+			const CContainer *pChild = pContainer->GetChildContainer(i);
 
 			if (pChild != nullptr) {
 				rc = pChild->GetPosition();
@@ -908,12 +877,6 @@ HBRUSH CLayoutBase::GetBackBrush()
 }
 
 
-
-
-CLayoutBase::CEventHandler::CEventHandler()
-	: m_pBase(nullptr)
-{
-}
 
 
 CLayoutBase::CEventHandler::~CEventHandler()

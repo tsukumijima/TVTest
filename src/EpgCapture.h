@@ -36,18 +36,21 @@ namespace TVTest
 			None    = 0x0000U,
 			NoUI    = 0x0001U,
 			Standby = 0x0002U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 		enum class BeginStatus : unsigned int {
 			None               = 0x0000U,
 			Standby            = 0x0001U,
 			TunerAlreadyOpened = 0x0002U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 		enum class EndFlag : unsigned int  {
 			None       = 0x0000U,
 			CloseTuner = 0x0001U,
 			Resume     = 0x0002U,
+			TVTEST_ENUM_FLAGS_TRAILER,
 			Default    = CloseTuner | Resume,
 		};
 
@@ -60,9 +63,6 @@ namespace TVTest
 			virtual void OnChannelEnd(bool fComplete) {}
 		};
 
-		CEpgCaptureManager();
-		~CEpgCaptureManager();
-
 		bool BeginCapture(
 			LPCTSTR pszTuner = nullptr,
 			const CChannelList *pChannelList = nullptr,
@@ -71,7 +71,7 @@ namespace TVTest
 		bool IsCapturing() const { return m_fCapturing; }
 		bool ProcessCapture();
 		void SetEventHandler(CEventHandler *pEventHandler);
-		int GetChannelCount() const { return (int)m_ChannelList.size(); }
+		int GetChannelCount() const { return static_cast<int>(m_ChannelList.size()); }
 		int GetCurChannel() const { return m_CurChannel; }
 		DWORD GetRemainingTime() const;
 		bool IsChannelChanging() const { return m_fChannelChanging; }
@@ -87,17 +87,13 @@ namespace TVTest
 			CChannelList ChannelList;
 		};
 
-		bool m_fCapturing;
-		int m_CurChannel;
+		bool m_fCapturing = false;
+		int m_CurChannel = -1;
 		std::vector<ChannelGroup> m_ChannelList;
 		Util::CClock m_AccumulateClock;
-		bool m_fChannelChanging;
-		CEventHandler *m_pEventHandler;
+		bool m_fChannelChanging = false;
+		CEventHandler *m_pEventHandler = nullptr;
 	};
-
-	TVTEST_ENUM_FLAGS(CEpgCaptureManager::BeginFlag)
-	TVTEST_ENUM_FLAGS(CEpgCaptureManager::BeginStatus)
-	TVTEST_ENUM_FLAGS(CEpgCaptureManager::EndFlag)
 
 }	// namespace TVTest
 

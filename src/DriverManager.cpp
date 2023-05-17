@@ -32,13 +32,6 @@ namespace TVTest
 
 CDriverInfo::CDriverInfo(LPCTSTR pszFileName)
 	: m_FileName(pszFileName)
-	, m_fChannelFileLoaded(false)
-	, m_fDriverSpaceLoaded(false)
-{
-}
-
-
-CDriverInfo::~CDriverInfo()
 {
 }
 
@@ -101,7 +94,7 @@ bool CDriverInfo::LoadTuningSpaceList(LoadTuningSpaceListMode Mode)
 			FilePath = pszFileName;
 		}
 
-		HMODULE hLib = ::GetModuleHandle(FilePath.c_str());
+		const HMODULE hLib = ::GetModuleHandle(FilePath.c_str());
 		if (hLib != nullptr) {
 			String CurDriverPath;
 
@@ -166,9 +159,8 @@ const CTuningSpaceList *CDriverInfo::GetAvailableTuningSpaceList() const
 
 const CChannelList *CDriverInfo::GetChannelList(int Space) const
 {
-	const CChannelList *pChannelList;
+	const CChannelList *pChannelList = m_TuningSpaceList.GetChannelList(Space);
 
-	pChannelList = m_TuningSpaceList.GetChannelList(Space);
 	if (pChannelList == nullptr) {
 		pChannelList = m_DriverSpaceList.GetChannelList(Space);
 	} else if (pChannelList->NumChannels() == 0) {
@@ -197,11 +189,10 @@ bool CDriverManager::Find(LPCTSTR pszDirectory)
 	Clear();
 
 	TCHAR szMask[MAX_PATH];
-	HANDLE hFind;
 	WIN32_FIND_DATA wfd;
 
 	::PathCombine(szMask, pszDirectory, TEXT("BonDriver*.dll"));
-	hFind = ::FindFirstFileEx(szMask, FindExInfoBasic, &wfd, FindExSearchNameMatch, nullptr, 0);
+	const HANDLE hFind = ::FindFirstFileEx(szMask, FindExInfoBasic, &wfd, FindExSearchNameMatch, nullptr, 0);
 	if (hFind != INVALID_HANDLE_VALUE) {
 		do {
 			if ((wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
@@ -212,8 +203,8 @@ bool CDriverManager::Find(LPCTSTR pszDirectory)
 	}
 
 	if (m_DriverList.size() > 1) {
-		std::sort(
-			m_DriverList.begin(), m_DriverList.end(),
+		std::ranges::sort(
+			m_DriverList,
 			[](const std::unique_ptr<CDriverInfo> &Driver1,
 			   const std::unique_ptr<CDriverInfo> &Driver2) {
 				return ::lstrcmpi(Driver1->GetFileName(), Driver2->GetFileName()) < 0;
@@ -228,7 +219,7 @@ bool CDriverManager::Find(LPCTSTR pszDirectory)
 
 CDriverInfo *CDriverManager::GetDriverInfo(int Index)
 {
-	if (Index < 0 || (size_t)Index >= m_DriverList.size())
+	if (Index < 0 || static_cast<size_t>(Index) >= m_DriverList.size())
 		return nullptr;
 	return m_DriverList[Index].get();
 }
@@ -236,7 +227,7 @@ CDriverInfo *CDriverManager::GetDriverInfo(int Index)
 
 const CDriverInfo *CDriverManager::GetDriverInfo(int Index) const
 {
-	if (Index < 0 || (size_t)Index >= m_DriverList.size())
+	if (Index < 0 || static_cast<size_t>(Index) >= m_DriverList.size())
 		return nullptr;
 	return m_DriverList[Index].get();
 }
@@ -248,7 +239,7 @@ int CDriverManager::FindByFileName(LPCTSTR pszFileName) const
 		return -1;
 	for (size_t i = 0; i < m_DriverList.size(); i++) {
 		if (IsEqualFileName(m_DriverList[i]->GetFileName(), pszFileName))
-			return (int)i;
+			return static_cast<int>(i);
 	}
 	return -1;
 }
@@ -262,8 +253,8 @@ bool CDriverManager::GetAllServiceList(CChannelList *pList) const
 	pList->Clear();
 
 	for (const auto &e : m_DriverList) {
-		LPCTSTR pszFileName = e->GetFileName();
-		LPCTSTR pszExtension = ::PathFindExtension(pszFileName);
+		const LPCTSTR pszFileName = e->GetFileName();
+		const LPCTSTR pszExtension = ::PathFindExtension(pszFileName);
 		if (pszExtension > pszFileName
 				&& *(pszExtension - 1) >= _T('1') && *(pszExtension - 1) <= _T('9')) {
 			TCHAR szFirstFile[MAX_PATH];
@@ -329,11 +320,11 @@ bool CDriverManager::LoadTunerSpec(LPCTSTR pszFileName)
 				{TEXT("volatile"),        TunerSpec::Flag::Volatile},
 				{TEXT("no-enum-channel"), TunerSpec::Flag::NoEnumChannel},
 			};
-			for (int i = 0; i < lengthof(FlagList); i++) {
-				for (auto itAttr = Attributes.begin(); itAttr != Attributes.end(); ++itAttr) {
-					StringUtility::Trim(*itAttr);
-					if (StringUtility::CompareNoCase(*itAttr, FlagList[i].pszName) == 0) {
-						Info.Spec.Flags |= FlagList[i].Flag;
+			for (String Attribute : Attributes) {
+				StringUtility::Trim(Attribute);
+				for (auto &Map : FlagList) {
+					if (StringUtility::CompareNoCase(Attribute, Map.pszName) == 0) {
+						Info.Spec.Flags |= Map.Flag;
 						break;
 					}
 				}
@@ -352,7 +343,7 @@ bool CDriverManager::GetTunerSpec(LPCTSTR pszTunerName, TunerSpec *pSpec) const
 	if (IsStringEmpty(pszTunerName) || pSpec == nullptr)
 		return false;
 
-	LPCTSTR pszName = ::PathFindFileName(pszTunerName);
+	const LPCTSTR pszName = ::PathFindFileName(pszTunerName);
 	if (pszName[0] == _T('\0'))
 		return false;
 

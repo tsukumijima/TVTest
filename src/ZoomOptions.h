@@ -69,7 +69,6 @@ namespace TVTest
 		static constexpr int MAX_RATE = 1000;
 
 		CZoomOptions();
-		~CZoomOptions();
 
 	//CBasicDialog
 		bool Show(HWND hwndOwner) override;
@@ -93,7 +92,7 @@ namespace TVTest
 		ZoomInfo m_ZoomList[NUM_ZOOM_COMMANDS];
 
 		int m_Order[NUM_ZOOM_COMMANDS];
-		bool m_fChanging;
+		bool m_fChanging = false;
 		ZoomInfo m_ZoomSettingList[NUM_ZOOM_COMMANDS];
 		CListView m_ItemListView;
 

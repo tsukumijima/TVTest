@@ -29,30 +29,10 @@ namespace TVTest
 {
 
 
-CChannelInfo::CChannelInfo()
-	: m_Space(-1)
-	, m_ChannelIndex(-1)
-	, m_ChannelNo(0)
-	, m_PhysicalChannel(0)
-	, m_NetworkID(0)
-	, m_TransportStreamID(0)
-	, m_ServiceID(0)
-	, m_ServiceType(0)
-	, m_fEnabled(true)
-{
-}
-
-
 CChannelInfo::CChannelInfo(int Space, int ChannelIndex, int No, LPCTSTR pszName)
 	: m_Space(Space)
 	, m_ChannelIndex(ChannelIndex)
 	, m_ChannelNo(No)
-	, m_PhysicalChannel(0)
-	, m_NetworkID(0)
-	, m_TransportStreamID(0)
-	, m_ServiceID(0)
-	, m_ServiceType(0)
-	, m_fEnabled(true)
 {
 	if (pszName != nullptr)
 		m_Name = pszName;
@@ -122,11 +102,6 @@ void CChannelInfo::SetServiceType(BYTE ServiceType)
 
 
 
-CTunerChannelInfo::CTunerChannelInfo()
-{
-}
-
-
 CTunerChannelInfo::CTunerChannelInfo(const CChannelInfo &ChannelInfo, LPCTSTR pszTunerName)
 	: CChannelInfo(ChannelInfo)
 {
@@ -151,20 +126,9 @@ void CTunerChannelInfo::SetTunerName(LPCTSTR pszName)
 
 
 
-CChannelList::CChannelList()
-{
-}
-
-
 CChannelList::CChannelList(const CChannelList &Src)
 {
 	*this = Src;
-}
-
-
-CChannelList::~CChannelList()
-{
-	Clear();
 }
 
 
@@ -213,8 +177,8 @@ bool CChannelList::AddChannel(CChannelInfo *pInfo)
 
 bool CChannelList::InsertChannel(int Index, const CChannelInfo &Info)
 {
-	if (Index < 0 || (size_t)Index > m_ChannelList.size()) {
-		TRACE(TEXT("CChannelList::InsertChannel() : Out of range [%d]\n"), Index);
+	if (Index < 0 || static_cast<size_t>(Index) > m_ChannelList.size()) {
+		TRACE(TEXT("CChannelList::InsertChannel() : Out of range [{}]\n"), Index);
 		return false;
 	}
 
@@ -229,8 +193,8 @@ bool CChannelList::InsertChannel(int Index, const CChannelInfo &Info)
 
 CChannelInfo *CChannelList::GetChannelInfo(int Index)
 {
-	if (Index < 0 || (size_t)Index >= m_ChannelList.size()) {
-		//TRACE(TEXT("CChannelList::GetChannelInfo Out of range %d\n"), Index);
+	if (Index < 0 || static_cast<size_t>(Index) >= m_ChannelList.size()) {
+		//TRACE(TEXT("CChannelList::GetChannelInfo Out of range {}\n"), Index);
 		return nullptr;
 	}
 	return m_ChannelList[Index].get();
@@ -239,8 +203,8 @@ CChannelInfo *CChannelList::GetChannelInfo(int Index)
 
 const CChannelInfo *CChannelList::GetChannelInfo(int Index) const
 {
-	if (Index < 0 || (size_t)Index >= m_ChannelList.size()) {
-		//TRACE(TEXT("CChannelList::GetChannelInfo Out of range %d\n"), Index);
+	if (Index < 0 || static_cast<size_t>(Index) >= m_ChannelList.size()) {
+		//TRACE(TEXT("CChannelList::GetChannelInfo Out of range {}\n"), Index);
 		return nullptr;
 	}
 	return m_ChannelList[Index].get();
@@ -249,7 +213,7 @@ const CChannelInfo *CChannelList::GetChannelInfo(int Index) const
 
 int CChannelList::GetSpace(int Index) const
 {
-	if (Index < 0 || (size_t)Index >= m_ChannelList.size())
+	if (Index < 0 || static_cast<size_t>(Index) >= m_ChannelList.size())
 		return -1;
 	return m_ChannelList[Index]->GetSpace();
 }
@@ -257,7 +221,7 @@ int CChannelList::GetSpace(int Index) const
 
 int CChannelList::GetChannelIndex(int Index) const
 {
-	if (Index < 0 || (size_t)Index >= m_ChannelList.size())
+	if (Index < 0 || static_cast<size_t>(Index) >= m_ChannelList.size())
 		return -1;
 	return m_ChannelList[Index]->GetChannelIndex();
 }
@@ -265,7 +229,7 @@ int CChannelList::GetChannelIndex(int Index) const
 
 int CChannelList::GetChannelNo(int Index) const
 {
-	if (Index < 0 || (size_t)Index >= m_ChannelList.size())
+	if (Index < 0 || static_cast<size_t>(Index) >= m_ChannelList.size())
 		return -1;
 	return m_ChannelList[Index]->GetChannelNo();
 }
@@ -273,7 +237,7 @@ int CChannelList::GetChannelNo(int Index) const
 
 int CChannelList::GetPhysicalChannel(int Index) const
 {
-	if (Index < 0 || (size_t)Index >= m_ChannelList.size())
+	if (Index < 0 || static_cast<size_t>(Index) >= m_ChannelList.size())
 		return -1;
 	return m_ChannelList[Index]->GetPhysicalChannel();
 }
@@ -281,7 +245,7 @@ int CChannelList::GetPhysicalChannel(int Index) const
 
 LPCTSTR CChannelList::GetName(int Index) const
 {
-	if (Index < 0 || (size_t)Index >= m_ChannelList.size())
+	if (Index < 0 || static_cast<size_t>(Index) >= m_ChannelList.size())
 		//return nullptr;
 		return TEXT("");
 	return m_ChannelList[Index]->GetName();
@@ -290,7 +254,7 @@ LPCTSTR CChannelList::GetName(int Index) const
 
 bool CChannelList::IsEnabled(int Index) const
 {
-	if (Index < 0 || (size_t)Index >= m_ChannelList.size())
+	if (Index < 0 || static_cast<size_t>(Index) >= m_ChannelList.size())
 		return false;
 	return m_ChannelList[Index]->IsEnabled();
 }
@@ -298,7 +262,7 @@ bool CChannelList::IsEnabled(int Index) const
 
 bool CChannelList::DeleteChannel(int Index)
 {
-	if (Index < 0 || (size_t)Index >= m_ChannelList.size())
+	if (Index < 0 || static_cast<size_t>(Index) >= m_ChannelList.size())
 		return false;
 
 	auto itr = m_ChannelList.begin();
@@ -320,7 +284,7 @@ int CChannelList::Find(const CChannelInfo *pInfo) const
 {
 	for (size_t i = 0; i < m_ChannelList.size(); i++) {
 		if (m_ChannelList[i].get() == pInfo)
-			return (int)i;
+			return static_cast<int>(i);
 	}
 	return -1;
 }
@@ -346,7 +310,7 @@ int CChannelList::Find(const CChannelInfo &Info, bool fEnabledOnly) const
 					|| pChInfo->GetTransportStreamID() == Info.GetTransportStreamID())
 				&& (Info.GetServiceID() == 0
 					|| pChInfo->GetServiceID() == Info.GetServiceID()))
-			return (int)i;
+			return static_cast<int>(i);
 	}
 	return -1;
 }
@@ -361,7 +325,7 @@ int CChannelList::FindByIndex(int Space, int ChannelIndex, int ServiceID, bool f
 				&& (Space < 0 || pChInfo->GetSpace() == Space)
 				&& (ChannelIndex < 0 || pChInfo->GetChannelIndex() == ChannelIndex)
 				&& (ServiceID <= 0 || pChInfo->GetServiceID() == ServiceID))
-			return (int)i;
+			return static_cast<int>(i);
 	}
 	return -1;
 }
@@ -371,7 +335,7 @@ int CChannelList::FindPhysicalChannel(int Channel) const
 {
 	for (size_t i = 0; i < m_ChannelList.size(); i++) {
 		if (m_ChannelList[i]->GetPhysicalChannel() == Channel)
-			return (int)i;
+			return static_cast<int>(i);
 	}
 	return -1;
 }
@@ -383,7 +347,7 @@ int CChannelList::FindChannelNo(int No, bool fEnabledOnly) const
 		const CChannelInfo *pChInfo = m_ChannelList[i].get();
 		if (pChInfo->GetChannelNo() == No
 				&& (!fEnabledOnly || pChInfo->IsEnabled()))
-			return (int)i;
+			return static_cast<int>(i);
 	}
 	return -1;
 }
@@ -393,7 +357,7 @@ int CChannelList::FindServiceID(WORD ServiceID) const
 {
 	for (size_t i = 0; i < m_ChannelList.size(); i++) {
 		if (m_ChannelList[i]->GetServiceID() == ServiceID)
-			return (int)i;
+			return static_cast<int>(i);
 	}
 	return -1;
 }
@@ -407,7 +371,7 @@ int CChannelList::FindByIDs(WORD NetworkID, WORD TransportStreamID, WORD Service
 				&& (NetworkID == 0 || pChannelInfo->GetNetworkID() == NetworkID)
 				&& (TransportStreamID == 0 || pChannelInfo->GetTransportStreamID() == TransportStreamID)
 				&& (ServiceID == 0 || pChannelInfo->GetServiceID() == ServiceID))
-			return (int)i;
+			return static_cast<int>(i);
 	}
 	return -1;
 }
@@ -419,7 +383,7 @@ int CChannelList::FindByName(LPCTSTR pszName) const
 		return -1;
 	for (size_t i = 0; i < m_ChannelList.size(); i++) {
 		if (::lstrcmp(m_ChannelList[i]->GetName(), pszName) == 0)
-			return (int)i;
+			return static_cast<int>(i);
 	}
 	return -1;
 }
@@ -427,27 +391,23 @@ int CChannelList::FindByName(LPCTSTR pszName) const
 
 int CChannelList::GetNextChannel(int Index, bool fWrap) const
 {
-	if (Index < 0 || (size_t)Index >= m_ChannelList.size())
+	if (Index < 0 || static_cast<size_t>(Index) >= m_ChannelList.size())
 		return -1;
 
 	const int ChannelNo = GetChannelNo(Index);
 
-	for (int i = Index + 1; i < (int)m_ChannelList.size(); i++) {
+	for (int i = Index + 1; i < static_cast<int>(m_ChannelList.size()); i++) {
 		const CChannelInfo *pChInfo = m_ChannelList[i].get();
 
 		if (pChInfo->IsEnabled() && pChInfo->GetChannelNo() == ChannelNo)
 			return i;
 	}
 
-	int Channel, Min, No;
+	int Channel = INT_MAX, Min = INT_MAX;
 
-	Channel = INT_MAX;
-	Min = INT_MAX;
-	for (auto i = m_ChannelList.begin(); i != m_ChannelList.end(); ++i) {
-		const CChannelInfo *pChInfo = i->get();
-
-		if (pChInfo->IsEnabled()) {
-			No = pChInfo->GetChannelNo();
+	for (const auto &ChInfo : m_ChannelList) {
+		if (ChInfo->IsEnabled()) {
+			const int No = ChInfo->GetChannelNo();
 			if (No != 0) {
 				if (No > ChannelNo && No < Channel)
 					Channel = No;
@@ -467,7 +427,7 @@ int CChannelList::GetNextChannel(int Index, bool fWrap) const
 
 int CChannelList::GetPrevChannel(int Index, bool fWrap) const
 {
-	if (Index < 0 || (size_t)Index >= m_ChannelList.size())
+	if (Index < 0 || static_cast<size_t>(Index) >= m_ChannelList.size())
 		return -1;
 
 	const int ChannelNo = GetChannelNo(Index);
@@ -479,15 +439,11 @@ int CChannelList::GetPrevChannel(int Index, bool fWrap) const
 			return i;
 	}
 
-	int Channel, Max, No;
+	int Channel = 0, Max = 0;
 
-	Channel = 0;
-	Max = 0;
-	for (auto i = m_ChannelList.begin(); i != m_ChannelList.end(); ++i) {
-		const CChannelInfo *pChInfo = i->get();
-
-		if (pChInfo->IsEnabled()) {
-			No = pChInfo->GetChannelNo();
+	for (const auto &ChInfo : m_ChannelList) {
+		if (ChInfo->IsEnabled()) {
+			const int No = ChInfo->GetChannelNo();
 			if (No != 0) {
 				if (No < ChannelNo && No > Channel)
 					Channel = No;
@@ -502,7 +458,7 @@ int CChannelList::GetPrevChannel(int Index, bool fWrap) const
 		Channel = Max;
 	}
 
-	for (int i = (int)m_ChannelList.size() - 1; i >= 0; i--) {
+	for (int i = static_cast<int>(m_ChannelList.size()) - 1; i >= 0; i--) {
 		const CChannelInfo *pChInfo = m_ChannelList[i].get();
 
 		if (pChInfo->IsEnabled() && pChInfo->GetChannelNo() == Channel)
@@ -515,11 +471,10 @@ int CChannelList::GetPrevChannel(int Index, bool fWrap) const
 
 int CChannelList::GetMaxChannelNo() const
 {
-	int Max, No;
+	int Max = 0;
 
-	Max = 0;
-	for (auto i = m_ChannelList.begin(); i != m_ChannelList.end(); i++) {
-		No = (*i)->GetChannelNo();
+	for (const auto &ChInfo : m_ChannelList) {
+		const int No = ChInfo->GetChannelNo();
 		if (No > Max)
 			Max = No;
 	}
@@ -575,17 +530,13 @@ bool CChannelList::Sort(SortType Type, bool fDescending)
 				case SortType::ServiceID:
 					Cmp = Channel1->GetServiceID() - Channel2->GetServiceID();
 					break;
-				default:
-					__assume(0);
 				}
 
 				return m_fDescending ? Cmp > 0 : Cmp < 0;
 			}
 		};
 
-		std::stable_sort(
-			m_ChannelList.begin(), m_ChannelList.end(),
-			CPredicator(Type, fDescending));
+		std::ranges::stable_sort(m_ChannelList, CPredicator(Type, fDescending));
 	}
 
 	return true;
@@ -594,8 +545,8 @@ bool CChannelList::Sort(SortType Type, bool fDescending)
 
 bool CChannelList::HasRemoteControlKeyID() const
 {
-	for (auto i = m_ChannelList.begin(); i != m_ChannelList.end(); i++) {
-		if ((*i)->GetChannelNo() != 0)
+	for (const auto &ChInfo : m_ChannelList) {
+		if (ChInfo->GetChannelNo() != 0)
 			return true;
 	}
 	return false;
@@ -622,14 +573,7 @@ bool CChannelList::HasMultiService() const
 
 
 
-CTuningSpaceInfo::CTuningSpaceInfo()
-	: m_Space(TuningSpaceType::Unknown)
-{
-}
-
-
 CTuningSpaceInfo::CTuningSpaceInfo(const CTuningSpaceInfo &Info)
-	: m_Space(TuningSpaceType::Unknown)
 {
 	Create(Info.m_ChannelList.get(), Info.m_Name.c_str());
 }
@@ -704,11 +648,6 @@ int CTuningSpaceInfo::NumChannels() const
 
 
 
-CTuningSpaceList::CTuningSpaceList()
-{
-}
-
-
 CTuningSpaceList::CTuningSpaceList(const CTuningSpaceList &List)
 {
 	*this = List;
@@ -781,10 +720,8 @@ CTuningSpaceInfo::TuningSpaceType CTuningSpaceList::GetTuningSpaceType(int Space
 
 bool CTuningSpaceList::MakeTuningSpaceList(const CChannelList *pList, int Spaces)
 {
-	int Space;
-
 	for (int i = 0; i < pList->NumChannels(); i++) {
-		Space = pList->GetSpace(i);
+		const int Space = pList->GetSpace(i);
 		if (Space + 1 > Spaces)
 			Spaces = Space + 1;
 	}
@@ -856,11 +793,11 @@ bool CTuningSpaceList::MakeAllChannelList()
 }
 
 
-static const UINT CP_SHIFT_JIS = 932;
+static constexpr UINT CP_SHIFT_JIS = 932;
 
 bool CTuningSpaceList::SaveToFile(LPCTSTR pszFileName) const
 {
-	TRACE(TEXT("CTuningSpaceList::SaveToFile() : \"%s\"\n"), pszFileName);
+	TRACE(TEXT("CTuningSpaceList::SaveToFile() : \"{}\"\n"), pszFileName);
 
 	String Buffer;
 
@@ -876,7 +813,7 @@ bool CTuningSpaceList::SaveToFile(LPCTSTR pszFileName) const
 			continue;
 
 		if (GetTuningSpaceName(i) != nullptr) {
-			StringPrintf(szText, TEXT(";#SPACE(%d,%s)\r\n"), i, GetTuningSpaceName(i));
+			StringFormat(szText, TEXT(";#SPACE({},{})\r\n"), i, GetTuningSpaceName(i));
 			Buffer += szText;
 		}
 
@@ -914,31 +851,31 @@ bool CTuningSpaceList::SaveToFile(LPCTSTR pszFileName) const
 				Name += _T('"');
 			}
 
-			StringPrintf(
+			StringFormat(
 				szText,
-				TEXT("%s,%d,%d,%d,"),
+				TEXT("{},{},{},{},"),
 				Name.empty() ? pszName : Name.c_str(),
 				pChInfo->GetSpace(),
 				pChInfo->GetChannelIndex(),
 				pChInfo->GetChannelNo());
 			Buffer += szText;
 			if (pChInfo->GetServiceType() != 0) {
-				StringPrintf(szText, TEXT("%d"), pChInfo->GetServiceType());
+				StringFormat(szText, TEXT("{}"), pChInfo->GetServiceType());
 				Buffer += szText;
 			}
 			Buffer += _T(',');
 			if (pChInfo->GetServiceID() != 0) {
-				StringPrintf(szText, TEXT("%d"), pChInfo->GetServiceID());
+				StringFormat(szText, TEXT("{}"), pChInfo->GetServiceID());
 				Buffer += szText;
 			}
 			Buffer += _T(',');
 			if (pChInfo->GetNetworkID() != 0) {
-				StringPrintf(szText, TEXT("%d"), pChInfo->GetNetworkID());
+				StringFormat(szText, TEXT("{}"), pChInfo->GetNetworkID());
 				Buffer += szText;
 			}
 			Buffer += _T(',');
 			if (pChInfo->GetTransportStreamID() != 0) {
-				StringPrintf(szText, TEXT("%d"), pChInfo->GetTransportStreamID());
+				StringFormat(szText, TEXT("{}"), pChInfo->GetTransportStreamID());
 				Buffer += szText;
 			}
 			Buffer += _T(',');
@@ -947,14 +884,13 @@ bool CTuningSpaceList::SaveToFile(LPCTSTR pszFileName) const
 		}
 	}
 
-	HANDLE hFile;
-	DWORD Write;
-
-	hFile = ::CreateFile(
+	const HANDLE hFile = ::CreateFile(
 		pszFileName, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
 		FILE_ATTRIBUTE_NORMAL, nullptr);
 	if (hFile == INVALID_HANDLE_VALUE)
 		return false;
+
+	DWORD Write;
 
 #ifdef UNICODE
 	bool fUnicode = true;
@@ -966,19 +902,17 @@ bool CTuningSpaceList::SaveToFile(LPCTSTR pszFileName) const
 			Buffer.data(), static_cast<int>(Buffer.length()),
 			nullptr, 0, nullptr, &fUsedDefaultChar);
 		if (Length > 0 && !fUsedDefaultChar) {
-			char *pMBCSBuffer = new char[Length];
+			std::string MBCSBuffer(Length, '\0');
 			Length = ::WideCharToMultiByte(
 				CP_SHIFT_JIS, 0,
 				Buffer.data(), static_cast<int>(Buffer.length()),
-				pMBCSBuffer, Length, nullptr, nullptr);
+				MBCSBuffer.data(), Length, nullptr, nullptr);
 			if (Length < 1
-					|| !::WriteFile(hFile, pMBCSBuffer, Length, &Write, nullptr)
+					|| !::WriteFile(hFile, MBCSBuffer.data(), Length, &Write, nullptr)
 					|| Write != static_cast<DWORD>(Length)) {
-				delete [] pMBCSBuffer;
 				::CloseHandle(hFile);
 				return false;
 			}
-			delete [] pMBCSBuffer;
 			fUnicode = false;
 		}
 	}
@@ -1008,16 +942,16 @@ bool CTuningSpaceList::SaveToFile(LPCTSTR pszFileName) const
 }
 
 
-static void SkipSpaces(LPTSTR *ppText)
+static void SkipSpaces(LPCTSTR *ppText)
 {
-	LPTSTR p = *ppText;
+	LPCTSTR p = *ppText;
 	p += ::StrSpn(p, TEXT(" \t"));
 	*ppText = p;
 }
 
-static bool NextToken(LPTSTR *ppText)
+static bool NextToken(LPCTSTR *ppText)
 {
-	LPTSTR p = *ppText;
+	LPCTSTR p = *ppText;
 
 	SkipSpaces(&p);
 	if (*p != _T(','))
@@ -1033,25 +967,24 @@ bool inline IsDigit(TCHAR c)
 	return c >= _T('0') && c <= _T('9');
 }
 
-static int ParseDigits(LPTSTR *ppText)
+static int ParseDigits(LPCTSTR *ppText)
 {
 	LPTSTR pEnd;
-	int Value = std::_tcstol(*ppText, &pEnd, 10);
+	const int Value = std::_tcstol(*ppText, &pEnd, 10);
 	*ppText = pEnd;
 	return Value;
 }
 
 bool CTuningSpaceList::LoadFromFile(LPCTSTR pszFileName)
 {
-	TRACE(TEXT("CTuningSpaceList::LoadFromFile() : \"%s\"\n"), pszFileName);
+	TRACE(TEXT("CTuningSpaceList::LoadFromFile() : \"{}\"\n"), pszFileName);
 
-	static const LONGLONG MAX_FILE_SIZE = 8LL * 1024 * 1024;
+	static constexpr LONGLONG MAX_FILE_SIZE = 8LL * 1024 * 1024;
 
-	HANDLE hFile;
 	LARGE_INTEGER FileSize;
 	DWORD Read;
 
-	hFile = ::CreateFile(
+	const HANDLE hFile = ::CreateFile(
 		pszFileName, GENERIC_READ, FILE_SHARE_READ, nullptr,
 		OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr);
 	if (hFile == INVALID_HANDLE_VALUE)
@@ -1062,55 +995,54 @@ bool CTuningSpaceList::LoadFromFile(LPCTSTR pszFileName)
 		::CloseHandle(hFile);
 		return false;
 	}
-	BYTE *pFileBuffer = new BYTE[FileSize.LowPart + sizeof(TCHAR)];
-	if (!::ReadFile(hFile, pFileBuffer, FileSize.LowPart, &Read, nullptr) || Read != FileSize.LowPart) {
-		delete [] pFileBuffer;
+	std::unique_ptr<BYTE[]> FileBuffer(new BYTE[FileSize.LowPart + sizeof(TCHAR)]);
+	if (!::ReadFile(hFile, FileBuffer.get(), FileSize.LowPart, &Read, nullptr) || Read != FileSize.LowPart) {
 		::CloseHandle(hFile);
 		return false;
 	}
 	::CloseHandle(hFile);
-	LPTSTR pszBuffer = nullptr, p;
-	if (FileSize.LowPart >= 2 && *reinterpret_cast<LPWSTR>(pFileBuffer) == 0xFEFF) {
+
+	String Buffer;
+	LPCTSTR p;
+	if (FileSize.LowPart >= 2 && *reinterpret_cast<LPWSTR>(FileBuffer.get()) == 0xFEFF) {
 #ifdef UNICODE
-		p = reinterpret_cast<LPWSTR>(pFileBuffer) + 1;
-		p[FileSize.LowPart / 2 - 1] = L'\0';
+		LPWSTR pszBuffer = reinterpret_cast<LPWSTR>(FileBuffer.get()) + 1;
+		pszBuffer[FileSize.LowPart / 2 - 1] = L'\0';
+		p = pszBuffer;
 #else
-		int Length = ::WideCharToMultiByte(
+		const int Length = ::WideCharToMultiByte(
 			CP_ACP, 0,
-			reinterpret_cast<LPCSTR>(pFileBuffer), FileSize.LowPart,
+			reinterpret_cast<LPCSTR>(FileBuffer.get()), FileSize.LowPart,
 			nullptr, 0, nullptr, nullptr);
 		if (Length < 1) {
-			delete [] pFileBuffer;
 			return false;
 		}
-		pszBuffer = new char[Length + 1];
-		Length = ::WideCharToMultiByte(
+		Buffer.resize(Length);
+		::WideCharToMultiByte(
 			CP_ACP, 0,
-			reinterpret_cast<LPCWTR>(pFileBuffer) + 1, FileSize.LowPart / 2 - 1,
-			pszBuffer, Length, nullptr, nullptr);
-		pszBuffer[Length] = '\0';
-		p = pszBuffer;
+			reinterpret_cast<LPCWTR>(FileBuffer.get()) + 1, FileSize.LowPart / 2 - 1,
+			Buffer.data(), Length, nullptr, nullptr);
+		p = Buffer.c_str();
 #endif
 	} else {
 #ifdef UNICODE
 		int Length = ::MultiByteToWideChar(
 			CP_SHIFT_JIS, 0,
-			reinterpret_cast<LPCSTR>(pFileBuffer), FileSize.LowPart,
+			reinterpret_cast<LPCSTR>(FileBuffer.get()), FileSize.LowPart,
 			nullptr, 0);
 		if (Length < 1) {
-			delete [] pFileBuffer;
 			return false;
 		}
-		pszBuffer = new WCHAR[Length + 1];
+		Buffer.resize(Length);
 		Length = ::MultiByteToWideChar(
 			CP_SHIFT_JIS, 0,
-			reinterpret_cast<LPCSTR>(pFileBuffer), FileSize.LowPart,
-			pszBuffer, Length);
-		pszBuffer[Length] = L'\0';
-		p = pszBuffer;
+			reinterpret_cast<LPCSTR>(FileBuffer.get()), FileSize.LowPart,
+			Buffer.data(), Length);
+		p = Buffer.c_str();
 #else
-		p = reinterpret_cast<LPSTR>(pFileBuffer);
-		p[FileSize.LowPart] = '\0';
+		LPSTR pszBuffer = reinterpret_cast<LPSTR>(FileBuffer.get());
+		pszBuffer[FileSize.LowPart] = '\0';
+		p = pszBuffer;
 #endif
 	}
 
@@ -1130,14 +1062,14 @@ bool CTuningSpaceList::LoadFromFile(LPCTSTR pszFileName)
 					p += 6;
 					SkipSpaces(&p);
 					if (IsDigit(*p)) {
-						int Space = ParseDigits(&p);
+						const int Space = ParseDigits(&p);
 						if (Space >= 0 && Space < 100 && NextToken(&p)) {
 							int Length = ::StrCSpn(p, TEXT(")\r\n"));
 							if (p[Length] == _T(')') && p[Length + 1] == _T(')'))
 								Length++;
 							if (Length > 0) {
-								StringCopy(szName, p, std::min(Length + 1, (int)lengthof(szName)));
-								if ((int)m_TuningSpaceList.size() <= Space) {
+								StringCopy(szName, p, std::min<size_t>(Length + 1, lengthof(szName)));
+								if (static_cast<int>(m_TuningSpaceList.size()) <= Space) {
 									Reserve(Space + 1);
 									m_TuningSpaceList[Space]->SetName(szName);
 								}
@@ -1217,7 +1149,7 @@ bool CTuningSpaceList::LoadFromFile(LPCTSTR pszFileName)
 								if (NextToken(&p)) {
 									// 状態(オプション)
 									if (IsDigit(*p)) {
-										int Flags = ParseDigits(&p);
+										const int Flags = ParseDigits(&p);
 										ChInfo.Enable((Flags & 1) != 0);
 									}
 								}
@@ -1233,9 +1165,6 @@ bool CTuningSpaceList::LoadFromFile(LPCTSTR pszFileName)
 Next:
 		p += ::StrCSpn(p, TEXT("\r\n"));
 	} while (*p != _T('\0'));
-
-	delete [] pszBuffer;
-	delete [] pFileBuffer;
 
 	return MakeTuningSpaceList(&m_AllChannelList);
 }

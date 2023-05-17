@@ -11,14 +11,26 @@
 */
 
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include <windows.h>
 #include <tchar.h>
-#include <gdiplus.h>
+#include <objbase.h>
 #include <shlwapi.h>
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <deque>
 #include <strsafe.h>
+
+// Windows SDK version 2104 (10.0.20348.0) より前は Gdiplus に min / max の宣言が必要
+namespace Gdiplus {
+	using std::min;
+	using std::max;
+}
+#include <gdiplus.h>
+
 #define TVTEST_PLUGIN_CLASS_IMPLEMENT // クラスとして実装
 #include "TVTestPlugin.h"
 #include "resource.h"
@@ -27,58 +39,55 @@
 #pragma comment(lib, "shlwapi.lib")
 
 
-// グラフの大きさ
-#define GRAPH_WIDTH  300
-#define GRAPH_HEIGHT 200
-
-
 // プラグインクラス
 class CSignalGraph : public TVTest::CTVTestPlugin
 {
 public:
-	CSignalGraph();
-	virtual bool GetPluginInfo(TVTest::PluginInfo *pInfo);
-	virtual bool Initialize();
-	virtual bool Finalize();
+	bool GetPluginInfo(TVTest::PluginInfo *pInfo) override;
+	bool Initialize() override;
+	bool Finalize() override;
 
 private:
 	struct Position
 	{
-		int Left, Top, Width, Height;
-		Position() : Left(0), Top(0), Width(0), Height(0) {}
+		int Left = 0, Top = 0, Width = 0, Height = 0;
 	};
 
 	struct SignalInfo
 	{
-		float SignalLevel;
-		DWORD BitRate;
+		float SignalLevel = 0.0f;
+		DWORD BitRate = 0;
 
-		SignalInfo() : SignalLevel(0.0f), BitRate(0) {}
+		SignalInfo() = default;
 		SignalInfo(float level, DWORD rate) : SignalLevel(level), BitRate(rate) {}
 	};
 
-	bool m_fInitialized;
+	bool m_fInitialized = false;
 	std::deque<SignalInfo> m_List;
-	HWND m_hwnd;
+	HWND m_hwnd = nullptr;
 	Position m_WindowPosition;
 	int m_DPI;
-	Gdiplus::Color m_BackColor;
-	Gdiplus::Color m_SignalLevelColor;
-	Gdiplus::Color m_BitRateColor;
-	Gdiplus::Color m_GridColor;
-	Gdiplus::Pen *m_pGridPen;
-	Gdiplus::Pen *m_pSignalLevelPen;
-	Gdiplus::Pen *m_pBitRatePen;
-	Gdiplus::SolidBrush *m_pBrush;
+	Gdiplus::Color m_BackColor{255, 0, 0, 0};
+	Gdiplus::Color m_SignalLevelColor{255, 0, 255, 128};
+	Gdiplus::Color m_BitRateColor{192, 0, 160, 255};
+	Gdiplus::Color m_GridColor{255, 64, 64, 64};
+	Gdiplus::Pen *m_pGridPen = nullptr;
+	Gdiplus::Pen *m_pSignalLevelPen = nullptr;
+	Gdiplus::Pen *m_pBitRatePen = nullptr;
+	Gdiplus::SolidBrush *m_pBrush = nullptr;
 	LOGFONT m_Font;
-	Gdiplus::Font *m_pFont;
-	Gdiplus::Graphics *m_pOffscreen;
-	Gdiplus::Bitmap *m_pOffscreenImage;
-	float m_SignalLevelScale;
+	Gdiplus::Font *m_pFont = nullptr;
+	Gdiplus::Graphics *m_pOffscreen = nullptr;
+	Gdiplus::Bitmap *m_pOffscreenImage = nullptr;
+	float m_SignalLevelScale = 80.0f;
 	float m_ActualSignalLevelScale;
-	DWORD m_BitRateScale;
+	DWORD m_BitRateScale = 40 * 1000 * 1000;
 
 	static const LPCTSTR WINDOW_CLASS_NAME;
+
+	// グラフの大きさ
+	static constexpr int GRAPH_WIDTH  = 300;
+	static constexpr int GRAPH_HEIGHT = 200;
 
 	bool EnablePlugin(bool fEnable);
 	void DrawGraph(Gdiplus::Graphics &Graphics, int Width, int Height);
@@ -103,26 +112,6 @@ private:
 
 // ウィンドウクラス名
 const LPCTSTR CSignalGraph::WINDOW_CLASS_NAME = TEXT("TVTest Signal Graph Window");
-
-
-CSignalGraph::CSignalGraph()
-	: m_fInitialized(false)
-	, m_hwnd(nullptr)
-	, m_BackColor(255, 0, 0, 0)
-	, m_SignalLevelColor(255, 0, 255, 128)
-	, m_BitRateColor(192, 0, 160, 255)
-	, m_GridColor(255, 64, 64, 64)
-	, m_pGridPen(nullptr)
-	, m_pSignalLevelPen(nullptr)
-	, m_pBitRatePen(nullptr)
-	, m_pBrush(nullptr)
-	, m_pFont(nullptr)
-	, m_pOffscreen(nullptr)
-	, m_pOffscreenImage(nullptr)
-	, m_SignalLevelScale(80.0f)
-	, m_BitRateScale(40 * 1000 * 1000)
-{
-}
 
 
 // プラグインの情報を返す
@@ -226,8 +215,8 @@ bool CSignalGraph::EnablePlugin(bool fEnable)
 		}
 
 		if (m_hwnd == nullptr) {
-			static const DWORD Style = WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME;
-			static const DWORD ExStyle = WS_EX_TOOLWINDOW;
+			constexpr DWORD Style = WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME;
+			constexpr DWORD ExStyle = WS_EX_TOOLWINDOW;
 
 			// プライマリモニタの DPI を取得
 			m_DPI = m_pApp->GetDPIFromPoint(0, 0);
@@ -300,7 +289,7 @@ void CSignalGraph::DrawGraph(Gdiplus::Graphics &Graphics, int Width, int Height)
 	}
 
 	const int ListSize = (int)m_List.size();
-	const int NumPoints = min(ListSize, GRAPH_WIDTH);
+	const int NumPoints = std::min(ListSize, GRAPH_WIDTH);
 	Gdiplus::PointF *pPoints = new Gdiplus::PointF[NumPoints + 3];
 	const float XScale = (float)Width / (float)GRAPH_WIDTH;
 	const float YScale = (float)(Height - 1);
@@ -316,7 +305,7 @@ void CSignalGraph::DrawGraph(Gdiplus::Graphics &Graphics, int Width, int Height)
 	}
 	const float BitRateScale = YScale / (float)m_BitRateScale;
 	for (int j = 0; i < ListSize; i++, j++) {
-		float y = (float)min(m_List[i].BitRate, m_BitRateScale) * BitRateScale;
+		float y = (float)std::min(m_List[i].BitRate, m_BitRateScale) * BitRateScale;
 		pPoints[j].X = (float)x * XScale;
 		if (j == 0) {
 			pPoints[0].Y = (float)Height;
@@ -357,7 +346,7 @@ void CSignalGraph::DrawGraph(Gdiplus::Graphics &Graphics, int Width, int Height)
 	}
 	const float SignalLevelScale = YScale / m_ActualSignalLevelScale;
 	for (int j = 0; i < ListSize; i++, j++) {
-		float y = min(m_List[i].SignalLevel, m_ActualSignalLevelScale) * SignalLevelScale;
+		float y = std::min(m_List[i].SignalLevel, m_ActualSignalLevelScale) * SignalLevelScale;
 		pPoints[j].X = (float)x * XScale;
 		pPoints[j].Y = YScale - y;
 		x++;

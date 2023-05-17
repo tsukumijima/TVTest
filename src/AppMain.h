@@ -123,28 +123,28 @@ namespace TVTest
 	class CAppMain
 	{
 	public:
-		static const UINT WM_INTERPROCESS = WM_COPYDATA;
-		static const UINT PROCESS_MESSAGE_EXECUTE = 0x54565400;
+		static constexpr UINT WM_INTERPROCESS = WM_COPYDATA;
+		static constexpr UINT PROCESS_MESSAGE_EXECUTE = 0x54565400;
 
 #ifndef _DEBUG
 		static CDebugHelper DebugHelper;
 #endif
 
-		CAppCore Core;
+		CAppCore Core{*this};
 		CAppEventManager AppEventManager;
 		CCoreEngine CoreEngine;
-		CUICore UICore;
+		CUICore UICore{*this};
 		CLogger Logger;
 		Graphics::CGraphicsCore GraphicsCore;
 		Style::CStyleManager StyleManager;
 		CDirectWriteSystem DirectWriteSystem;
 		CMainMenu MainMenu;
 		CCommandManager CommandManager;
-		CAppCommand AppCommand;
+		CAppCommand AppCommand{*this};
 		CCommandLineOptions CmdLineOptions;
 		CPluginManager PluginManager;
 		LibISDB::EPGDatabase EPGDatabase;
-		CMainWindow MainWindow;
+		CMainWindow MainWindow{*this};
 		CStatusView StatusView;
 		CSideBar SideBar;
 		CMainPanel Panel;
@@ -232,8 +232,32 @@ namespace TVTest
 		bool GetAppDirectory(LPTSTR pszDirectory) const;
 		LPCTSTR GetIniFileName() const { return m_IniFileName.c_str(); }
 		LPCTSTR GetFavoritesFileName() const { return m_FavoritesFileName.c_str(); }
-		void AddLog(CLogItem::LogType Type, LPCTSTR pszText, ...);
-		void AddLog(LPCTSTR pszText, ...);
+
+		template<typename... TArgs> void AddLog(CLogItem::LogType Type, StringView Format, const TArgs&... Args)
+		{
+			Logger.AddLog(Type, Format, Args...);
+		}
+		template<typename... TArgs> void AddLog(StringView Format, const TArgs&... Args)
+		{
+			Logger.AddLog(CLogItem::LogType::Information, Format, Args...);
+		}
+		void AddLogV(CLogItem::LogType Type, StringView Format, FormatArgs Args)
+		{
+			Logger.AddLogV(Type, Format, Args);
+		}
+		void AddLogV(StringView Format, FormatArgs Args)
+		{
+			Logger.AddLogV(CLogItem::LogType::Information, Format, Args);
+		}
+		void AddLogRaw(CLogItem::LogType Type, StringView Text)
+		{
+			Logger.AddLogRaw(Type, Text);
+		}
+		void AddLogRaw(StringView Text)
+		{
+			Logger.AddLogRaw(CLogItem::LogType::Information, Text);
+		}
+
 		bool IsFirstExecute() const;
 		int Main(HINSTANCE hInstance, LPCTSTR pszCmdLine, int nCmdShow);
 		void Initialize();
@@ -244,6 +268,7 @@ namespace TVTest
 			None    = 0x0000U,
 			Status  = 0x0001U,
 			Options = 0x0002U,
+			TVTEST_ENUM_FLAGS_TRAILER,
 			All     = Status | Options,
 		};
 		bool SaveSettings(SaveSettingsFlag Flags);
@@ -331,19 +356,19 @@ namespace TVTest
 			bool fFocus;
 		};
 
-		HINSTANCE m_hInst;
+		HINSTANCE m_hInst = nullptr;
 		CFilePath m_IniFileName;
 		CFilePath m_FavoritesFileName;
 		CSettings m_Settings;
-		bool m_fFirstExecute;
-		bool m_fInitialSettings;
-		CEngineEventListener m_EngineEventListener;
-		CStreamInfoEventHandler m_StreamInfoEventHandler;
-		CCaptureWindowEventHandler m_CaptureWindowEventHandler;
+		bool m_fFirstExecute = false;
+		bool m_fInitialSettings = false;
+		CEngineEventListener m_EngineEventListener{*this};
+		CStreamInfoEventHandler m_StreamInfoEventHandler{*this};
+		CCaptureWindowEventHandler m_CaptureWindowEventHandler{*this};
 		COptionDialog m_OptionDialog;
-		unsigned int m_ExitTimeout;
-		bool m_fEnablePlaybackOnStart;
-		bool m_fIncrementNetworkPort;
+		unsigned int m_ExitTimeout = 60000;
+		bool m_fEnablePlaybackOnStart = true;
+		bool m_fIncrementNetworkPort = true;
 
 		static HICON m_hicoApp;
 		static HICON m_hicoAppSmall;
@@ -355,8 +380,6 @@ namespace TVTest
 		void ShowProgramGuideByCommandLine(const CCommandLineOptions &CmdLine);
 		static BOOL CALLBACK ControllerFocusCallback(HWND hwnd, LPARAM Param);
 	};
-
-	TVTEST_ENUM_FLAGS(CAppMain::SaveSettingsFlag)
 
 
 	CAppMain &GetAppClass();

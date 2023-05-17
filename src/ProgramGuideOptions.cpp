@@ -46,24 +46,12 @@ const LPCTSTR IEPG_ASSOCIATE_COMMAND = TEXT("iEpgAssociate");
 CProgramGuideOptions::CProgramGuideOptions(CProgramGuide *pProgramGuide, CPluginManager *pPluginManager)
 	: m_pProgramGuide(pProgramGuide)
 	, m_pPluginManager(pPluginManager)
-	, m_fOnScreen(false)
-	, m_fScrollToCurChannel(false)
-	, m_BeginHour(-1)
-	, m_ViewHours(26)
 	, m_ItemWidth(pProgramGuide->GetItemWidth())
 	, m_LinesPerHour(pProgramGuide->GetLinesPerHour())
-	, m_fUseDirectWrite(false)
-	, m_fUseARIBSymbol(false)
 	, m_VisibleEventIcons(m_pProgramGuide->GetVisibleEventIcons())
 	, m_WheelScrollLines(pProgramGuide->GetWheelScrollLines())
 {
 	m_pProgramGuide->GetFont(&m_Font);
-
-	m_DirectWriteRenderingParams.Gamma = 2.2f;
-	m_DirectWriteRenderingParams.EnhancedContrast = 0.5f;
-	m_DirectWriteRenderingParams.ClearTypeLevel = 0.5f;
-	m_DirectWriteRenderingParams.PixelGeometry = DWRITE_PIXEL_GEOMETRY_RGB;
-	m_DirectWriteRenderingParams.RenderingMode = DWRITE_RENDERING_MODE_DEFAULT;
 }
 
 
@@ -154,7 +142,7 @@ bool CProgramGuideOptions::LoadSettings(CSettings &Settings)
 		if (Settings.Read(TEXT("DragScroll"), &fDragScroll))
 			m_pProgramGuide->SetDragScroll(fDragScroll);
 
-		unsigned int Filter;
+		CProgramGuide::FilterFlag Filter;
 		if (Settings.Read(TEXT("Filter"), &Filter))
 			m_pProgramGuide->SetFilter(Filter);
 
@@ -169,6 +157,10 @@ bool CProgramGuideOptions::LoadSettings(CSettings &Settings)
 		bool fExcludeNoEvent;
 		if (Settings.Read(TEXT("ExcludeNoEventServices"), &fExcludeNoEvent))
 			m_pProgramGuide->SetExcludeNoEventServices(fExcludeNoEvent);
+
+		bool fAutoRefresh;
+		if (Settings.Read(TEXT("AutoRefresh"), &fAutoRefresh))
+			m_pProgramGuide->SetAutoRefresh(fAutoRefresh);
 
 		int Width, Height;
 		m_pProgramGuide->GetInfoPopupSize(&Width, &Height);
@@ -187,7 +179,7 @@ bool CProgramGuideOptions::LoadSettings(CSettings &Settings)
 			for (int i = 0; i < NumSearchKeywords; i++) {
 				TCHAR szName[32];
 
-				StringPrintf(szName, TEXT("SearchKeyword%d"), i);
+				StringFormat(szName, TEXT("SearchKeyword{}"), i);
 				if (Settings.Read(szName, &Keywords[j]) && !Keywords[j].empty())
 					j++;
 			}
@@ -202,7 +194,7 @@ bool CProgramGuideOptions::LoadSettings(CSettings &Settings)
 		for (int i = 0; i < CProgramSearchDialog::NUM_COLUMNS; i++) {
 			TCHAR szName[32];
 
-			StringPrintf(szName, TEXT("SearchColumn%d_Width"), i);
+			StringFormat(szName, TEXT("SearchColumn{}_Width"), i);
 			if (Settings.Read(szName, &Value))
 				pProgramSearch->SetColumnWidth(i, Value);
 		}
@@ -233,10 +225,10 @@ bool CProgramGuideOptions::LoadSettings(CSettings &Settings)
 			for (unsigned int i = 0; i < NumTools; i++) {
 				TCHAR szName[32];
 
-				StringPrintf(szName, TEXT("Tool%u_Name"), i);
+				StringFormat(szName, TEXT("Tool{}_Name"), i);
 				if (!Settings.Read(szName, &ToolName) || ToolName.empty())
 					break;
-				StringPrintf(szName, TEXT("Tool%u_Command"), i);
+				StringFormat(szName, TEXT("Tool{}_Command"), i);
 				if (!Settings.Read(szName, &Command) || Command.empty())
 					break;
 				pToolList->Add(new CProgramGuideTool(ToolName, Command));
@@ -250,19 +242,19 @@ bool CProgramGuideOptions::LoadSettings(CSettings &Settings)
 			for (int i = 0; i < ServiceCount; i++) {
 				TCHAR szName[32], szText[64];
 
-				StringPrintf(szName, TEXT("ExcludeService%d"), i);
+				StringFormat(szName, TEXT("ExcludeService{}"), i);
 				if (!Settings.Read(szName, szText, lengthof(szText))
 						|| szText[0] == _T('\0'))
 					break;
 
 				LPTSTR p = szText;
-				WORD NetworkID = (WORD)_tcstoul(p, &p, 0);
+				const WORD NetworkID = static_cast<WORD>(std::_tcstoul(p, &p, 0));
 				if (!CSVNextValue(&p))
 					continue;
-				WORD TransportStreamID = (WORD)_tcstoul(p, &p, 0);
+				const WORD TransportStreamID = static_cast<WORD>(std::_tcstoul(p, &p, 0));
 				if (!CSVNextValue(&p))
 					continue;
-				WORD ServiceID = (WORD)_tcstoul(p, &p, 0);
+				const WORD ServiceID = static_cast<WORD>(std::_tcstoul(p, &p, 0));
 				if (ServiceID == 0)
 					continue;
 
@@ -285,20 +277,20 @@ bool CProgramGuideOptions::LoadSettings(CSettings &Settings)
 				for (int i = 0; i < FavoritesCount; i++) {
 					TCHAR szName[32];
 
-					StringPrintf(szName, TEXT("Favorite%d_Name"), i);
+					StringFormat(szName, TEXT("Favorite{}_Name"), i);
 					if (!Settings.Read(szName, &FavoriteInfo.Name)
 							|| FavoriteInfo.Name.empty())
 						break;
-					StringPrintf(szName, TEXT("Favorite%d_Group"), i);
+					StringFormat(szName, TEXT("Favorite{}_Group"), i);
 					if (!Settings.Read(szName, &FavoriteInfo.GroupID))
 						break;
-					StringPrintf(szName, TEXT("Favorite%d_Label"), i);
+					StringFormat(szName, TEXT("Favorite{}_Label"), i);
 					if (!Settings.Read(szName, &FavoriteInfo.Label))
 						break;
 					FavoriteInfo.SetDefaultColors();
-					StringPrintf(szName, TEXT("Favorite%d_BackColor"), i);
+					StringFormat(szName, TEXT("Favorite{}_BackColor"), i);
 					Settings.ReadColor(szName, &FavoriteInfo.BackColor);
-					StringPrintf(szName, TEXT("Favorite%d_TextColor"), i);
+					StringFormat(szName, TEXT("Favorite{}_TextColor"), i);
 					Settings.ReadColor(szName, &FavoriteInfo.TextColor);
 
 					pFavorites->Add(FavoriteInfo);
@@ -365,18 +357,19 @@ bool CProgramGuideOptions::SaveSettings(CSettings &Settings)
 		Settings.Write(TEXT("KeepTimePos"), m_pProgramGuide->GetKeepTimePos());
 		Settings.Write(TEXT("ShowFeaturedMark"), m_pProgramGuide->GetShowFeaturedMark());
 		Settings.Write(TEXT("ExcludeNoEventServices"), m_pProgramGuide->GetExcludeNoEventServices());
+		Settings.Write(TEXT("AutoRefresh"), m_pProgramGuide->GetAutoRefresh());
 
 		int Width, Height;
 		m_pProgramGuide->GetInfoPopupSize(&Width, &Height);
 		Settings.Write(TEXT("InfoPopupWidth"), Width);
 		Settings.Write(TEXT("InfoPopupHeight"), Height);
 
-		int NumSearchKeywords = pProgramSearch->GetOptions().GetKeywordHistoryCount();
+		const int NumSearchKeywords = pProgramSearch->GetOptions().GetKeywordHistoryCount();
 		Settings.Write(TEXT("NumSearchKeywords"), NumSearchKeywords);
 		for (int i = 0; i < NumSearchKeywords; i++) {
 			TCHAR szName[32];
 
-			StringPrintf(szName, TEXT("SearchKeyword%d"), i);
+			StringFormat(szName, TEXT("SearchKeyword{}"), i);
 			Settings.Write(szName, pProgramSearch->GetOptions().GetKeywordHistory(i));
 		}
 
@@ -385,7 +378,7 @@ bool CProgramGuideOptions::SaveSettings(CSettings &Settings)
 		for (int i = 0; i < CProgramSearchDialog::NUM_COLUMNS; i++) {
 			TCHAR szName[32];
 
-			StringPrintf(szName, TEXT("SearchColumn%d_Width"), i);
+			StringFormat(szName, TEXT("SearchColumn{}_Width"), i);
 			Settings.Write(szName, pProgramSearch->GetColumnWidth(i));
 		}
 
@@ -406,14 +399,14 @@ bool CProgramGuideOptions::SaveSettings(CSettings &Settings)
 		const CProgramGuideToolList *pToolList = m_pProgramGuide->GetToolList();
 
 		Settings.Clear();
-		Settings.Write(TEXT("ToolCount"), (unsigned int)pToolList->NumTools());
+		Settings.Write(TEXT("ToolCount"), static_cast<unsigned int>(pToolList->NumTools()));
 		for (size_t i = 0; i < pToolList->NumTools(); i++) {
 			const CProgramGuideTool *pTool = pToolList->GetTool(i);
 			TCHAR szName[32];
 
-			StringPrintf(szName, TEXT("Tool%u_Name"), (UINT)i);
+			StringFormat(szName, TEXT("Tool{}_Name"), i);
 			Settings.Write(szName, pTool->GetName());
-			StringPrintf(szName, TEXT("Tool%u_Command"), (UINT)i);
+			StringFormat(szName, TEXT("Tool{}_Command"), i);
 			Settings.Write(szName, pTool->GetCommand());
 		}
 	}
@@ -423,12 +416,12 @@ bool CProgramGuideOptions::SaveSettings(CSettings &Settings)
 
 		if (m_pProgramGuide->GetExcludeServiceList(&ExcludeServiceList)) {
 			Settings.Clear();
-			Settings.Write(TEXT("ExcludeServiceCount"), (unsigned int)ExcludeServiceList.size());
+			Settings.Write(TEXT("ExcludeServiceCount"), static_cast<unsigned int>(ExcludeServiceList.size()));
 			for (size_t i = 0; i < ExcludeServiceList.size(); i++) {
 				TCHAR szName[32], szText[64];
-				StringPrintf(szName, TEXT("ExcludeService%u"), (unsigned int)i);
-				StringPrintf(
-					szText, TEXT("%u,%u,%u"),
+				StringFormat(szName, TEXT("ExcludeService{}"), (unsigned int)i);
+				StringFormat(
+					szText, TEXT("{},{},{}"),
 					ExcludeServiceList[i].NetworkID,
 					ExcludeServiceList[i].TransportStreamID,
 					ExcludeServiceList[i].ServiceID);
@@ -439,7 +432,7 @@ bool CProgramGuideOptions::SaveSettings(CSettings &Settings)
 
 	if (Settings.SetSection(TEXT("ProgramGuideFavorites"))) {
 		const CProgramGuideFavorites *pFavorites = m_pProgramGuide->GetFavorites();
-		const int FavoritesCount = (int)pFavorites->GetCount();
+		const int FavoritesCount = static_cast<int>(pFavorites->GetCount());
 
 		Settings.Clear();
 		Settings.Write(TEXT("FavoritesCount"), FavoritesCount);
@@ -447,15 +440,15 @@ bool CProgramGuideOptions::SaveSettings(CSettings &Settings)
 			const CProgramGuideFavorites::FavoriteInfo *pFavoriteInfo = pFavorites->Get(i);
 			TCHAR szName[32];
 
-			StringPrintf(szName, TEXT("Favorite%d_Name"), i);
+			StringFormat(szName, TEXT("Favorite{}_Name"), i);
 			Settings.Write(szName, pFavoriteInfo->Name);
-			StringPrintf(szName, TEXT("Favorite%d_Group"), i);
+			StringFormat(szName, TEXT("Favorite{}_Group"), i);
 			Settings.Write(szName, pFavoriteInfo->GroupID);
-			StringPrintf(szName, TEXT("Favorite%d_Label"), i);
+			StringFormat(szName, TEXT("Favorite{}_Label"), i);
 			Settings.Write(szName, pFavoriteInfo->Label);
-			StringPrintf(szName, TEXT("Favorite%d_BackColor"), i);
+			StringFormat(szName, TEXT("Favorite{}_BackColor"), i);
 			Settings.WriteColor(szName, pFavoriteInfo->BackColor);
-			StringPrintf(szName, TEXT("Favorite%d_TextColor"), i);
+			StringFormat(szName, TEXT("Favorite{}_TextColor"), i);
 			Settings.WriteColor(szName, pFavoriteInfo->TextColor);
 		}
 
@@ -509,7 +502,7 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 			DlgComboBox_AddString(hDlg, IDC_PROGRAMGUIDEOPTIONS_BEGINHOUR, TEXT("現在時"));
 			for (int i = 0; i <= 23; i++) {
 				TCHAR szText[8];
-				StringPrintf(szText, TEXT("%d時"), i);
+				StringFormat(szText, TEXT("{}時"), i);
 				DlgComboBox_AddString(hDlg, IDC_PROGRAMGUIDEOPTIONS_BEGINHOUR, szText);
 			}
 			DlgComboBox_SetCurSel(hDlg, IDC_PROGRAMGUIDEOPTIONS_BEGINHOUR, m_BeginHour + 1);
@@ -539,8 +532,8 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 			m_Tooltip.SetFont(GetWindowFont(hDlg));
 
 			{
-				HDC hdc = ::GetDC(hDlg);
-				HDC hdcMem = ::CreateCompatibleDC(hdc);
+				const HDC hdc = ::GetDC(hDlg);
+				const HDC hdcMem = ::CreateCompatibleDC(hdc);
 				RECT rc;
 				::GetClientRect(::GetDlgItem(hDlg, IDC_PROGRAMGUIDEOPTIONS_ICON_FIRST), &rc);
 				int IconSize;
@@ -555,8 +548,8 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 					DlgCheckBox_Check(
 						hDlg, IDC_PROGRAMGUIDEOPTIONS_ICON_FIRST + i,
 						(m_VisibleEventIcons & CEpgIcons::IconFlag(i)) != 0);
-					HBITMAP hbm = ::CreateCompatibleBitmap(hdc, IconSize, IconSize);
-					HGDIOBJ hOldBmp = ::SelectObject(hdcMem, hbm);
+					const HBITMAP hbm = ::CreateCompatibleBitmap(hdc, IconSize, IconSize);
+					const HGDIOBJ hOldBmp = ::SelectObject(hdcMem, hbm);
 					EpgIcons.DrawIcon(hdcMem, 0, 0, IconSize, IconSize, i);
 					::SelectObject(hdcMem, hOldBmp);
 					::SendDlgItemMessage(
@@ -590,11 +583,11 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 					if (CommandInfo.Type == PROGRAMGUIDE_COMMAND_TYPE_PROGRAM) {
 						TCHAR szCommand[512];
 
-						StringPrintf(
-							szCommand, TEXT("%s:%s"),
+						StringFormat(
+							szCommand, TEXT("{}:{}"),
 							::PathFindFileName(pPlugin->GetFileName()),
 							CommandInfo.pszText);
-						LRESULT Index = DlgComboBox_AddString(
+						const LRESULT Index = DlgComboBox_AddString(
 							hDlg, IDC_PROGRAMGUIDEOPTIONS_PROGRAMLDOUBLECLICK,
 							CommandInfo.pszName);
 						DlgComboBox_SetItemData(
@@ -602,7 +595,7 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 							Index, reinterpret_cast<LPARAM>(DuplicateString(szCommand)));
 						if (Sel < 0 && !m_ProgramLDoubleClickCommand.empty()
 								&& StringUtility::CompareNoCase(m_ProgramLDoubleClickCommand, szCommand) == 0)
-							Sel = (int)Index;
+							Sel = static_cast<int>(Index);
 					}
 				}
 			}
@@ -610,13 +603,13 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 				DlgComboBox_SetCurSel(hDlg, IDC_PROGRAMGUIDEOPTIONS_PROGRAMLDOUBLECLICK, Sel);
 
 			CProgramGuideToolList *pToolList = m_pProgramGuide->GetToolList();
-			HWND hwndList = GetDlgItem(hDlg, IDC_PROGRAMGUIDETOOL_LIST);
-			HIMAGELIST himl = ::ImageList_Create(
+			const HWND hwndList = GetDlgItem(hDlg, IDC_PROGRAMGUIDETOOL_LIST);
+			const HIMAGELIST himl = ::ImageList_Create(
 				GetSystemMetricsWithDPI(SM_CXSMICON, m_CurrentDPI),
 				GetSystemMetricsWithDPI(SM_CYSMICON, m_CurrentDPI),
 				ILC_COLOR32 | ILC_MASK, 1, 4);
 			RECT rc;
-			LV_COLUMN lvc;
+			LVCOLUMN lvc;
 
 			ListView_SetImageList(hwndList, himl, LVSIL_SMALL);
 			ListView_SetExtendedListViewStyle(hwndList, LVS_EX_FULLROWSELECT | LVS_EX_LABELTIP);
@@ -636,10 +629,10 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 				ListView_SetItemCount(hwndList, pToolList->NumTools());
 				for (size_t i = 0; i < pToolList->NumTools(); i++) {
 					CProgramGuideTool *pTool = new CProgramGuideTool(*pToolList->GetTool(i));
-					LV_ITEM lvi;
+					LVITEM lvi;
 
 					lvi.mask = LVIF_TEXT | LVIF_PARAM;
-					lvi.iItem = (int)i;
+					lvi.iItem = static_cast<int>(i);
 					lvi.iSubItem = 0;
 					lvi.pszText = const_cast<LPTSTR>(pTool->GetName());
 					lvi.lParam = reinterpret_cast<LPARAM>(pTool);
@@ -692,8 +685,6 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 						: m_pProgramGuide(pProgramGuide)
 						, m_OldParams(Params)
 						, m_Font(Font)
-						, m_fApplied(false)
-						, m_fFontChanged(false)
 					{
 					}
 
@@ -736,8 +727,8 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 					CDirectWriteRenderer::RenderingParams m_OldParams;
 					Style::Font m_Font;
 					Style::Font m_OldFont;
-					bool m_fApplied;
-					bool m_fFontChanged;
+					bool m_fApplied = false;
+					bool m_fFontChanged = false;
 					CTextDrawClient::TextDrawEngine m_OldEngine;
 				};
 
@@ -774,12 +765,11 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 
 		case IDC_PROGRAMGUIDETOOL_ADD:
 			{
-				CProgramGuideTool *pTool;
+				CProgramGuideTool *pTool = new CProgramGuideTool;
 
-				pTool = new CProgramGuideTool;
 				if (pTool->ShowDialog(hDlg)) {
-					HWND hwndList = GetDlgItem(hDlg, IDC_PROGRAMGUIDETOOL_LIST);
-					LV_ITEM lvi;
+					const HWND hwndList = GetDlgItem(hDlg, IDC_PROGRAMGUIDETOOL_LIST);
+					LVITEM lvi;
 
 					lvi.mask = LVIF_STATE | LVIF_TEXT | LVIF_PARAM;
 					lvi.iItem = ListView_GetItemCount(hwndList);
@@ -807,16 +797,15 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 
 		case IDC_PROGRAMGUIDETOOL_EDIT:
 			{
-				HWND hwndList = GetDlgItem(hDlg, IDC_PROGRAMGUIDETOOL_LIST);
-				LV_ITEM lvi;
-				CProgramGuideTool *pTool;
+				const HWND hwndList = GetDlgItem(hDlg, IDC_PROGRAMGUIDETOOL_LIST);
+				LVITEM lvi;
 
 				lvi.mask = LVIF_PARAM;
 				lvi.iItem = ListView_GetNextItem(hwndList, -1, LVNI_SELECTED);
 				lvi.iSubItem = 0;
 				if (!ListView_GetItem(hwndList, &lvi))
 					return TRUE;
-				pTool = reinterpret_cast<CProgramGuideTool*>(lvi.lParam);
+				CProgramGuideTool *pTool = reinterpret_cast<CProgramGuideTool*>(lvi.lParam);
 				if (pTool->ShowDialog(hDlg)) {
 					lvi.mask = LVIF_TEXT;
 					lvi.pszText = const_cast<LPTSTR>(pTool->GetName());
@@ -835,9 +824,8 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 
 		case IDC_PROGRAMGUIDETOOL_UP:
 			{
-				HWND hwndList = GetDlgItem(hDlg, IDC_PROGRAMGUIDETOOL_LIST);
-				LV_ITEM lvi;
-				CProgramGuideTool *pTool;
+				const HWND hwndList = GetDlgItem(hDlg, IDC_PROGRAMGUIDETOOL_LIST);
+				LVITEM lvi;
 
 				lvi.mask = LVIF_IMAGE | LVIF_PARAM;
 				lvi.iItem = ListView_GetNextItem(hwndList, -1, LVNI_SELECTED);
@@ -845,7 +833,7 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 					return TRUE;
 				lvi.iSubItem = 0;
 				ListView_GetItem(hwndList, &lvi);
-				pTool = reinterpret_cast<CProgramGuideTool*>(lvi.lParam);
+				const CProgramGuideTool *pTool = reinterpret_cast<const CProgramGuideTool*>(lvi.lParam);
 				ListView_DeleteItem(hwndList, lvi.iItem);
 				lvi.mask = LVIF_STATE | LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM;
 				lvi.iItem--;
@@ -863,9 +851,8 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 
 		case IDC_PROGRAMGUIDETOOL_DOWN:
 			{
-				HWND hwndList = GetDlgItem(hDlg, IDC_PROGRAMGUIDETOOL_LIST);
-				LV_ITEM lvi;
-				CProgramGuideTool *pTool;
+				const HWND hwndList = GetDlgItem(hDlg, IDC_PROGRAMGUIDETOOL_LIST);
+				LVITEM lvi;
 
 				lvi.mask = LVIF_IMAGE | LVIF_PARAM;
 				lvi.iItem = ListView_GetNextItem(hwndList, -1, LVNI_SELECTED);
@@ -874,7 +861,7 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 					return TRUE;
 				lvi.iSubItem = 0;
 				ListView_GetItem(hwndList, &lvi);
-				pTool = reinterpret_cast<CProgramGuideTool*>(lvi.lParam);
+				const CProgramGuideTool *pTool = reinterpret_cast<const CProgramGuideTool*>(lvi.lParam);
 				ListView_DeleteItem(hwndList, lvi.iItem);
 				lvi.mask = LVIF_STATE | LVIF_TEXT | LVIF_IMAGE | LVIF_PARAM;
 				lvi.iItem++;
@@ -892,17 +879,15 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 
 		case IDC_PROGRAMGUIDETOOL_REMOVE:
 			{
-				HWND hwndList = GetDlgItem(hDlg, IDC_PROGRAMGUIDETOOL_LIST);
-				LV_ITEM lvi;
+				const HWND hwndList = GetDlgItem(hDlg, IDC_PROGRAMGUIDETOOL_LIST);
+				LVITEM lvi;
 
 				lvi.mask = LVIF_PARAM;
 				lvi.iItem = ListView_GetNextItem(hwndList, -1, LVNI_SELECTED);
 				lvi.iSubItem = 0;
 				if (ListView_GetItem(hwndList, &lvi)) {
-					CProgramGuideTool *pTool;
-
 					ListView_DeleteItem(hwndList, lvi.iItem);
-					pTool = reinterpret_cast<CProgramGuideTool*>(lvi.lParam);
+					CProgramGuideTool *pTool = reinterpret_cast<CProgramGuideTool*>(lvi.lParam);
 					delete pTool;
 				}
 			}
@@ -910,7 +895,7 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 
 		case IDC_PROGRAMGUIDETOOL_REMOVEALL:
 			{
-				HWND hwndList = GetDlgItem(hDlg, IDC_PROGRAMGUIDETOOL_LIST);
+				const HWND hwndList = GetDlgItem(hDlg, IDC_PROGRAMGUIDETOOL_LIST);
 
 				DeleteAllTools();
 				ListView_DeleteAllItems(hwndList);
@@ -928,8 +913,8 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 
 		case NM_RCLICK:
 			{
-				LPNMITEMACTIVATE pnmia = (LPNMITEMACTIVATE)lParam;
-				HWND hwndList = GetDlgItem(hDlg, IDC_PROGRAMGUIDETOOL_LIST);
+				const NMITEMACTIVATE *pnmia = reinterpret_cast<const NMITEMACTIVATE*>(lParam);
+				const HWND hwndList = GetDlgItem(hDlg, IDC_PROGRAMGUIDETOOL_LIST);
 
 				if (pnmia->hdr.hwndFrom == hwndList
 						&& ListView_GetNextItem(hwndList, -1, LVNI_SELECTED) >= 0) {
@@ -956,7 +941,7 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 					DlgCheckBox_IsChecked(hDlg, IDC_PROGRAMGUIDEOPTIONS_ONSCREEN);
 				m_fScrollToCurChannel =
 					DlgCheckBox_IsChecked(hDlg, IDC_PROGRAMGUIDEOPTIONS_SCROLLTOCURCHANNEL);
-				Value = (int)DlgComboBox_GetCurSel(hDlg, IDC_PROGRAMGUIDEOPTIONS_BEGINHOUR) - 1;
+				Value = static_cast<int>(DlgComboBox_GetCurSel(hDlg, IDC_PROGRAMGUIDEOPTIONS_BEGINHOUR)) - 1;
 				if (m_BeginHour != Value) {
 					m_BeginHour = Value;
 					m_pProgramGuide->SetBeginHour(Value);
@@ -987,7 +972,7 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 					m_pProgramGuide->SetFont(m_Font);
 				}
 
-				bool fUseDirectWrite =
+				const bool fUseDirectWrite =
 					DlgCheckBox_IsChecked(hDlg, IDC_PROGRAMGUIDEOPTIONS_USEDIRECTWRITE);
 				if (m_fUseDirectWrite != fUseDirectWrite) {
 					m_fUseDirectWrite = fUseDirectWrite;
@@ -997,7 +982,7 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 							CTextDrawClient::TextDrawEngine::GDI);
 				}
 
-				bool fUseARIBSymbol =
+				const bool fUseARIBSymbol =
 					DlgCheckBox_IsChecked(hDlg, IDC_PROGRAMGUIDEOPTIONS_USEARIBSYMBOL);
 				if (m_fUseARIBSymbol != fUseARIBSymbol) {
 					m_fUseARIBSymbol = fUseARIBSymbol;
@@ -1019,7 +1004,7 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 				m_WheelScrollLines = ::GetDlgItemInt(hDlg, IDC_PROGRAMGUIDEOPTIONS_WHEELSCROLLLINES, nullptr, TRUE);
 				m_pProgramGuide->SetWheelScrollLines(m_WheelScrollLines);
 
-				LRESULT Sel = DlgComboBox_GetCurSel(hDlg, IDC_PROGRAMGUIDEOPTIONS_PROGRAMLDOUBLECLICK);
+				const LRESULT Sel = DlgComboBox_GetCurSel(hDlg, IDC_PROGRAMGUIDEOPTIONS_PROGRAMLDOUBLECLICK);
 				if (Sel >= 0) {
 					if (Sel == 0) {
 						m_ProgramLDoubleClickCommand.clear();
@@ -1033,17 +1018,16 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 				}
 
 				CProgramGuideToolList *pToolList = m_pProgramGuide->GetToolList();
-				HWND hwndList = GetDlgItem(hDlg, IDC_PROGRAMGUIDETOOL_LIST);
-				int Items, i;
+				const HWND hwndList = GetDlgItem(hDlg, IDC_PROGRAMGUIDETOOL_LIST);
+				const int Items = ListView_GetItemCount(hwndList);
 
 				pToolList->Clear();
-				Items = ListView_GetItemCount(hwndList);
 				if (Items > 0) {
-					LV_ITEM lvi;
+					LVITEM lvi;
 
 					lvi.mask = LVIF_PARAM;
 					lvi.iSubItem = 0;
-					for (i = 0; i < Items; i++) {
+					for (int i = 0; i < Items; i++) {
 						lvi.iItem = i;
 						ListView_GetItem(hwndList, &lvi);
 						pToolList->Add(reinterpret_cast<CProgramGuideTool*>(lvi.lParam));
@@ -1068,11 +1052,11 @@ INT_PTR CProgramGuideOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARA
 			}
 
 			for (int i = 0; i <= CEpgIcons::ICON_LAST; i++) {
-				HBITMAP hbm = reinterpret_cast<HBITMAP>(
+				const HBITMAP hbm = reinterpret_cast<HBITMAP>(
 					::SendDlgItemMessage(
 						hDlg, IDC_PROGRAMGUIDEOPTIONS_ICON_FIRST + i,
 						BM_SETIMAGE, IMAGE_BITMAP,
-						reinterpret_cast<LPARAM>((HBITMAP)nullptr)));
+						reinterpret_cast<LPARAM>(nullptr)));
 				if (hbm != nullptr)
 					::DeleteObject(hbm);
 			}
@@ -1095,11 +1079,10 @@ void CProgramGuideOptions::RealizeStyle()
 
 void CProgramGuideOptions::SetDlgItemState()
 {
-	HWND hwndList = ::GetDlgItem(m_hDlg, IDC_PROGRAMGUIDETOOL_LIST);
-	int Items, Sel;
+	const HWND hwndList = ::GetDlgItem(m_hDlg, IDC_PROGRAMGUIDETOOL_LIST);
+	const int Items = ListView_GetItemCount(hwndList);
+	const int Sel = ListView_GetNextItem(hwndList, -1, LVNI_SELECTED);
 
-	Items = ListView_GetItemCount(hwndList);
-	Sel = ListView_GetNextItem(hwndList, -1, LVNI_SELECTED);
 	EnableDlgItem(m_hDlg, IDC_PROGRAMGUIDETOOL_EDIT, Sel >= 0);
 	EnableDlgItem(m_hDlg, IDC_PROGRAMGUIDETOOL_UP, Sel > 0);
 	EnableDlgItem(m_hDlg, IDC_PROGRAMGUIDETOOL_DOWN, Sel >= 0 && Sel + 1 < Items);
@@ -1110,12 +1093,11 @@ void CProgramGuideOptions::SetDlgItemState()
 
 void CProgramGuideOptions::DeleteAllTools()
 {
-	HWND hwndList = ::GetDlgItem(m_hDlg, IDC_PROGRAMGUIDETOOL_LIST);
-	int Items;
+	const HWND hwndList = ::GetDlgItem(m_hDlg, IDC_PROGRAMGUIDETOOL_LIST);
+	const int Items = ListView_GetItemCount(hwndList);
 
-	Items = ListView_GetItemCount(hwndList);
 	if (Items > 0) {
-		LV_ITEM lvi;
+		LVITEM lvi;
 		CProgramGuideTool *pTool;
 
 		lvi.mask = LVIF_PARAM;

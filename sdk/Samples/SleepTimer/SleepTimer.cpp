@@ -10,11 +10,15 @@
 */
 
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include <windows.h>
 #include <tchar.h>
 #include <commctrl.h>
 #include <shlwapi.h>
 #include <Powrprof.h>
+
 #define TVTEST_PLUGIN_CLASS_IMPLEMENT
 #include "TVTestPlugin.h"
 #include "resource.h"
@@ -25,10 +29,10 @@
 
 
 // FILETIME の単位
-static const LONGLONG FILETIME_MS   = 10000LL;
-static const LONGLONG FILETIME_SEC  = 1000LL * FILETIME_MS;
-static const LONGLONG FILETIME_MIN  = 60LL * FILETIME_SEC;
-static const LONGLONG FILETIME_HOUR = 60LL * FILETIME_MIN;
+static constexpr LONGLONG FILETIME_MS   = 10000LL;
+static constexpr LONGLONG FILETIME_SEC  = 1000LL * FILETIME_MS;
+static constexpr LONGLONG FILETIME_MIN  = 60LL * FILETIME_SEC;
+static constexpr LONGLONG FILETIME_HOUR = 60LL * FILETIME_MIN;
 
 // FILETIME の時間差を求める
 static LONGLONG DiffFileTime(const FILETIME &ft1, const FILETIME &ft2)
@@ -55,27 +59,23 @@ static LONGLONG DiffSystemTime(const SYSTEMTIME &st1, const SYSTEMTIME &st2)
 }
 
 
-// ウィンドウクラス名
-#define SLEEPTIMER_WINDOW_CLASS TEXT("TVTest SleepTimer Window")
-
-
 // プラグインクラス
 class CSleepTimer : public TVTest::CTVTestPlugin
 {
 	// スリープ条件
-	enum SleepCondition {
-		CONDITION_DURATION, // 時間経過
-		CONDITION_DATETIME, // 指定時刻
-		CONDITION_EVENTEND  // 番組終了
+	enum class SleepCondition {
+		Duration, // 時間経過
+		DateTime, // 指定時刻
+		EventEnd, // 番組終了
 	};
 
 	// スリープ方法
-	enum SleepMode {
-		MODE_EXIT,          // TVTest終了
-		MODE_POWEROFF,      // 電源オフ
-		MODE_LOGOFF,        // ログオフ
-		MODE_SUSPEND,       // サスペンド
-		MODE_HIBERNATE      // ハイバネート
+	enum class SleepMode {
+		Exit,      // TVTest終了
+		PowerOff,  // 電源オフ
+		LogOff,    // ログオフ
+		Suspend,   // サスペンド
+		Hibernate, // ハイバネート
 	};
 
 	enum {
@@ -83,25 +83,27 @@ class CSleepTimer : public TVTest::CTVTestPlugin
 		TIMER_ID_QUERY
 	};
 
-	static const int DEFAULT_POS = INT_MIN;
+	static const LPCTSTR SLEEPTIMER_WINDOW_CLASS;        // ウィンドウクラス名
 
-	bool m_fInitialized;             // 初期化済みか?
-	TCHAR m_szIniFileName[MAX_PATH]; // INIファイルのパス
-	SleepCondition m_Condition;      // スリープする条件
-	DWORD m_SleepDuration;           // スリープまでの時間(秒単位)
-	SYSTEMTIME m_SleepDateTime;      // スリープする時刻
-	WORD m_EventID;                  // 現在の番組の event_id
-	SleepMode m_Mode;                // スリープ時の動作
-	bool m_fForce;                   // 強制
-	bool m_fMonitorOff;              // モニタをOFFにする
-	bool m_fIgnoreRecStatus;         // 録画中でもスリープする
-	bool m_fConfirm;                 // 確認を取る
-	int m_ConfirmTimeout;            // 確認のタイムアウト時間(秒単位)
-	bool m_fShowSettings;            // プラグイン有効時に設定表示
-	POINT m_SettingsDialogPos;       // 設定ダイアログの位置
-	HWND m_hwnd;                     // ウィンドウハンドル
-	bool m_fEnabled;                 // プラグインが有効か?
-	int m_ConfirmTimerCount;         // 確認のタイマー
+	static constexpr int DEFAULT_POS = INT_MIN;
+
+	bool m_fInitialized = false;                           // 初期化済みか?
+	TCHAR m_szIniFileName[MAX_PATH];                       // INIファイルのパス
+	SleepCondition m_Condition = SleepCondition::Duration; // スリープする条件
+	DWORD m_SleepDuration = 30 * 60;                       // スリープまでの時間(秒単位)
+	SYSTEMTIME m_SleepDateTime;                            // スリープする時刻
+	WORD m_EventID = 0;                                    // 現在の番組の event_id
+	SleepMode m_Mode = SleepMode::Exit;                    // スリープ時の動作
+	bool m_fForce = false;                                 // 強制
+	bool m_fMonitorOff = false;                            // モニタをOFFにする
+	bool m_fIgnoreRecStatus = false;                       // 録画中でもスリープする
+	bool m_fConfirm = true;                                // 確認を取る
+	int m_ConfirmTimeout = 10;                             // 確認のタイムアウト時間(秒単位)
+	bool m_fShowSettings = true;                           // プラグイン有効時に設定表示
+	POINT m_SettingsDialogPos{DEFAULT_POS, DEFAULT_POS};   // 設定ダイアログの位置
+	HWND m_hwnd = nullptr;                                 // ウィンドウハンドル
+	bool m_fEnabled = false;                               // プラグインが有効か?
+	int m_ConfirmTimerCount;                               // 確認のタイマー
 
 	static const LPCTSTR m_ModeTextList[];
 
@@ -120,12 +122,13 @@ class CSleepTimer : public TVTest::CTVTestPlugin
 	static INT_PTR CALLBACK ConfirmDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam, void *pClientData);
 
 public:
-	CSleepTimer();
-	virtual bool GetPluginInfo(TVTest::PluginInfo *pInfo);
-	virtual bool Initialize();
-	virtual bool Finalize();
+	bool GetPluginInfo(TVTest::PluginInfo *pInfo) override;
+	bool Initialize() override;
+	bool Finalize() override;
 };
 
+
+const LPCTSTR CSleepTimer::SLEEPTIMER_WINDOW_CLASS = TEXT("TVTest SleepTimer Window");
 
 const LPCTSTR CSleepTimer::m_ModeTextList[] = {
 	TEXT("TVTest を終了"),
@@ -134,26 +137,6 @@ const LPCTSTR CSleepTimer::m_ModeTextList[] = {
 	TEXT("サスペンド"),
 	TEXT("ハイバネート"),
 };
-
-
-CSleepTimer::CSleepTimer()
-	: m_fInitialized(false)
-	, m_Condition(CONDITION_DURATION)
-	, m_SleepDuration(30 * 60)
-	, m_EventID(0)
-	, m_Mode(MODE_EXIT)
-	, m_fForce(false)
-	, m_fMonitorOff(false)
-	, m_fIgnoreRecStatus(false)
-	, m_fConfirm(true)
-	, m_ConfirmTimeout(10)
-	, m_fShowSettings(true)
-	, m_hwnd(nullptr)
-	, m_fEnabled(false)
-{
-	m_SettingsDialogPos.x = DEFAULT_POS;
-	m_SettingsDialogPos.y = DEFAULT_POS;
-}
 
 
 bool CSleepTimer::GetPluginInfo(TVTest::PluginInfo *pInfo)
@@ -283,7 +266,7 @@ bool CSleepTimer::OnEnablePlugin(bool fEnable)
 {
 	InitializePlugin();
 
-	if (fEnable && (m_fShowSettings || m_Condition == CONDITION_DATETIME)) {
+	if (fEnable && (m_fShowSettings || m_Condition == SleepCondition::DateTime)) {
 		if (!ShowSettingsDialog(m_pApp->GetAppWindow()))
 			return false;
 	}
@@ -345,7 +328,7 @@ bool CSleepTimer::BeginSleep()
 // スリープ実行
 bool CSleepTimer::DoSleep()
 {
-	if (m_Mode!=MODE_EXIT && m_Mode!=MODE_LOGOFF) {
+	if (m_Mode != SleepMode::Exit && m_Mode != SleepMode::LogOff) {
 		// 権限設定
 		HANDLE hToken;
 
@@ -367,7 +350,7 @@ bool CSleepTimer::DoSleep()
 	}
 
 	switch (m_Mode) {
-	case MODE_EXIT:
+	case SleepMode::Exit:
 		if (!m_pApp->Close(m_fForce ? TVTest::CLOSE_EXIT : 0))
 			return false;
 		if (m_fMonitorOff) {
@@ -378,22 +361,22 @@ bool CSleepTimer::DoSleep()
 		}
 		break;
 
-	case MODE_POWEROFF:
+	case SleepMode::PowerOff:
 		if (!::ExitWindowsEx((m_fForce ? EWX_FORCE : 0) | EWX_POWEROFF, 0))
 			return false;
 		break;
 
-	case MODE_LOGOFF:
+	case SleepMode::LogOff:
 		if (!::ExitWindowsEx((m_fForce ? EWX_FORCE : 0) | EWX_LOGOFF, 0))
 			return false;
 		break;
 
-	case MODE_SUSPEND:
+	case SleepMode::Suspend:
 		if (!::SetSuspendState(FALSE, m_fForce, FALSE))
 			return false;
 		break;
 
-	case MODE_HIBERNATE:
+	case SleepMode::Hibernate:
 		if (!::SetSuspendState(TRUE, m_fForce, FALSE))
 			return false;
 		break;
@@ -412,12 +395,12 @@ bool CSleepTimer::BeginTimer()
 	UINT_PTR Result;
 	WCHAR szLog[256];
 
-	if (m_Condition == CONDITION_DURATION) {
+	if (m_Condition == SleepCondition::Duration) {
 		::wsprintfW(szLog, L"%lu 秒後にスリープします。", (unsigned long)m_SleepDuration);
 		m_pApp->AddLog(szLog);
 		Result = ::SetTimer(m_hwnd, TIMER_ID_SLEEP, m_SleepDuration * 1000, nullptr);
-	} else if (m_Condition == CONDITION_DATETIME || m_Condition == CONDITION_EVENTEND) {
-		if (m_Condition == CONDITION_DATETIME) {
+	} else if (m_Condition == SleepCondition::DateTime || m_Condition == SleepCondition::EventEnd) {
+		if (m_Condition == SleepCondition::DateTime) {
 			::wsprintfW(
 				szLog, L"%d/%d/%d %02d:%02d:%02d (UTC) にスリープします。",
 				m_SleepDateTime.wYear, m_SleepDateTime.wMonth, m_SleepDateTime.wDay,
@@ -513,7 +496,7 @@ LRESULT CALLBACK CSleepTimer::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARA
 				// 指定時間が経過したのでスリープ開始
 				pThis->BeginSleep();
 			} else if (wParam == TIMER_ID_QUERY) {
-				if (pThis->m_Condition == CONDITION_DATETIME) {
+				if (pThis->m_Condition == SleepCondition::DateTime) {
 					SYSTEMTIME st;
 
 					::GetSystemTime(&st);
@@ -521,7 +504,7 @@ LRESULT CALLBACK CSleepTimer::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARA
 						// 指定時刻が来たのでスリープ開始
 						pThis->BeginSleep();
 					}
-				} else if (pThis->m_Condition == CONDITION_EVENTEND) {
+				} else if (pThis->m_Condition == SleepCondition::EventEnd) {
 					TVTest::ProgramInfo Info = {};
 					WCHAR szEventName[128];
 
@@ -596,9 +579,9 @@ INT_PTR CALLBACK CSleepTimer::SettingsDlgProc(HWND hDlg, UINT uMsg, WPARAM wPara
 				IDC_SETTINGS_CONDITION_DURATION + (int)pThis->m_Condition);
 			EnableDlgItems(
 				hDlg, IDC_SETTINGS_DURATION_HOURS, IDC_SETTINGS_DURATION_SECONDS_UD,
-				pThis->m_Condition == CONDITION_DURATION);
+				pThis->m_Condition == SleepCondition::Duration);
 			EnableDlgItem(
-				hDlg, IDC_SETTINGS_DATETIME, pThis->m_Condition == CONDITION_DATETIME);
+				hDlg, IDC_SETTINGS_DATETIME, pThis->m_Condition == SleepCondition::DateTime);
 
 			::SetDlgItemInt(hDlg, IDC_SETTINGS_DURATION_HOURS, pThis->m_SleepDuration / (60 * 60), FALSE);
 			::SendDlgItemMessage(hDlg, IDC_SETTINGS_DURATION_HOURS_UD, UDM_SETRANGE32, 0, 24 * 24);
@@ -657,11 +640,11 @@ INT_PTR CALLBACK CSleepTimer::SettingsDlgProc(HWND hDlg, UINT uMsg, WPARAM wPara
 				SleepCondition Condition;
 
 				if (::IsDlgButtonChecked(hDlg, IDC_SETTINGS_CONDITION_DURATION)) {
-					Condition = CONDITION_DURATION;
+					Condition = SleepCondition::Duration;
 				} else if (::IsDlgButtonChecked(hDlg, IDC_SETTINGS_CONDITION_DATETIME)) {
-					Condition = CONDITION_DATETIME;
+					Condition = SleepCondition::DateTime;
 				} else if (::IsDlgButtonChecked(hDlg, IDC_SETTINGS_CONDITION_EVENTEND)) {
-					Condition = CONDITION_EVENTEND;
+					Condition = SleepCondition::EventEnd;
 				} else {
 					::MessageBox(hDlg, TEXT("スリープする条件を選択してください。"), nullptr, MB_OK | MB_ICONEXCLAMATION);
 					return TRUE;
@@ -671,7 +654,7 @@ INT_PTR CALLBACK CSleepTimer::SettingsDlgProc(HWND hDlg, UINT uMsg, WPARAM wPara
 					(ULONGLONG)::GetDlgItemInt(hDlg, IDC_SETTINGS_DURATION_HOURS, nullptr, FALSE) * (60 * 60) +
 					(ULONGLONG)::GetDlgItemInt(hDlg, IDC_SETTINGS_DURATION_MINUTES, nullptr, FALSE) * 60 +
 					(ULONGLONG)::GetDlgItemInt(hDlg, IDC_SETTINGS_DURATION_SECONDS, nullptr, FALSE);
-				if (Condition == CONDITION_DURATION) {
+				if (Condition == SleepCondition::Duration) {
 					if (Duration * 1000 > USER_TIMER_MAXIMUM) {
 						::MessageBox(hDlg, TEXT("スリープまでの時間が長すぎます。"), nullptr, MB_OK | MB_ICONEXCLAMATION);
 						return TRUE;
@@ -684,7 +667,7 @@ INT_PTR CALLBACK CSleepTimer::SettingsDlgProc(HWND hDlg, UINT uMsg, WPARAM wPara
 
 				SYSTEMTIME DateTime;
 				DWORD Result = DateTime_GetSystemtime(::GetDlgItem(hDlg, IDC_SETTINGS_DATETIME), &DateTime);
-				if (Condition == CONDITION_DATETIME) {
+				if (Condition == SleepCondition::DateTime) {
 					if (Result != GDT_VALID) {
 						::MessageBox(hDlg, TEXT("時刻を指定してください。"), nullptr, MB_OK | MB_ICONEXCLAMATION);
 						return TRUE;
@@ -752,7 +735,7 @@ INT_PTR CALLBACK CSleepTimer::ConfirmDlgProc(HWND hDlg, UINT uMsg, WPARAM wParam
 			CSleepTimer *pThis = static_cast<CSleepTimer *>(pClientData);
 
 			TCHAR szText[64];
-			::wsprintf(szText, TEXT("%sしますか？"), m_ModeTextList[pThis->m_Mode]);
+			::wsprintf(szText, TEXT("%sしますか？"), m_ModeTextList[static_cast<int>(pThis->m_Mode)]);
 			::SetDlgItemText(hDlg, IDC_CONFIRM_MODE, szText);
 
 			if (pThis->m_ConfirmTimeout > 0) {

@@ -31,25 +31,6 @@ namespace TVTest
 {
 
 
-CPlaybackOptions::CPlaybackOptions()
-	: m_fRestoreMute(false)
-	, m_fMute(false)
-	, m_fRestorePlayStatus(false)
-	, m_fRestore1SegMode(false)
-	, m_f1SegMode(false)
-	, m_fUseAudioRendererClock(true)
-	, m_fEnablePTSSync(true)
-	, m_fAdjustAudioStreamTime(true)
-	, m_fMinTimerResolution(true)
-	, m_fPacketBuffering(false)
-	, m_PacketBufferLength(40000)
-	, m_PacketBufferPoolPercentage(50)
-	, m_StreamThreadPriority(THREAD_PRIORITY_NORMAL)
-	, m_fAdjust1SegFrameRate(true)
-{
-}
-
-
 CPlaybackOptions::~CPlaybackOptions()
 {
 	Destroy();
@@ -195,7 +176,7 @@ INT_PTR CPlaybackOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 				TEXT("高め"),
 				TEXT("最高 (録画優先)"),
 			};
-			for (LPCTSTR pszText : ThreadPriorityList)
+			for (const LPCTSTR pszText : ThreadPriorityList)
 				DlgComboBox_AddString(hDlg, IDC_OPTIONS_STREAMTHREADPRIORITY, pszText);
 			DlgComboBox_SetCurSel(hDlg, IDC_OPTIONS_STREAMTHREADPRIORITY, m_StreamThreadPriority);
 
@@ -216,7 +197,7 @@ INT_PTR CPlaybackOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 		return TRUE;
 
 	case WM_NOTIFY:
-		switch (((LPNMHDR)lParam)->code) {
+		switch (reinterpret_cast<LPNMHDR>(lParam)->code) {
 		case PSN_APPLY:
 			{
 				m_fRestoreMute =
@@ -257,7 +238,7 @@ INT_PTR CPlaybackOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 
 				DWORD BufferLength = ::GetDlgItemInt(hDlg, IDC_OPTIONS_BUFFERSIZE, nullptr, FALSE);
 				BufferLength = std::clamp(BufferLength, (DWORD)0, MAX_PACKET_BUFFER_LENGTH);
-				bool fBuffering = DlgCheckBox_IsChecked(hDlg, IDC_OPTIONS_ENABLEBUFFERING);
+				const bool fBuffering = DlgCheckBox_IsChecked(hDlg, IDC_OPTIONS_ENABLEBUFFERING);
 				int PoolPercentage = ::GetDlgItemInt(hDlg, IDC_OPTIONS_BUFFERPOOLPERCENTAGE, nullptr, TRUE);
 				PoolPercentage = std::clamp(PoolPercentage, 0, 100);
 				if (BufferLength != m_PacketBufferLength
@@ -268,7 +249,7 @@ INT_PTR CPlaybackOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lP
 				m_fPacketBuffering = fBuffering;
 				m_PacketBufferPoolPercentage = PoolPercentage;
 
-				int Priority = (int)DlgComboBox_GetCurSel(hDlg, IDC_OPTIONS_STREAMTHREADPRIORITY);
+				const int Priority = static_cast<int>(DlgComboBox_GetCurSel(hDlg, IDC_OPTIONS_STREAMTHREADPRIORITY));
 				if (Priority >= 0 && Priority != m_StreamThreadPriority) {
 					m_StreamThreadPriority = Priority;
 					SetUpdateFlag(UPDATE_STREAMTHREADPRIORITY);

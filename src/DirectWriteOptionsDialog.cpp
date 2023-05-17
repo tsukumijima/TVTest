@@ -36,7 +36,6 @@ CDirectWriteOptionsDialog::CDirectWriteOptionsDialog(
 	const LOGFONT &Font)
 	: m_pParams(pParams)
 	, m_Font(Font)
-	, m_pRenderingTester(nullptr)
 {
 }
 
@@ -297,7 +296,7 @@ void CDirectWriteOptionsDialog::SetItemFloatValue(int ID, float Value)
 {
 	TCHAR szText[64];
 
-	StringPrintf(szText, TEXT("%.2f"), Value);
+	StringFormat(szText, TEXT("{:.2f}"), Value);
 	::SetDlgItemText(m_hDlg, ID, szText);
 }
 
@@ -307,7 +306,7 @@ float CDirectWriteOptionsDialog::GetItemFloatValue(int ID)
 	TCHAR szText[64];
 
 	::GetDlgItemText(m_hDlg, ID, szText, lengthof(szText));
-	return static_cast<float>(std::_tcstod(szText, nullptr));
+	return std::_tcstof(szText, nullptr);
 }
 
 

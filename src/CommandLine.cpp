@@ -32,8 +32,8 @@ namespace TVTest
 class CArgsParser
 {
 	LPWSTR *m_ppszArgList;
-	int m_Args;
-	int m_CurPos;
+	int m_Args = 0;
+	int m_CurPos = 0;
 
 public:
 	CArgsParser(LPCWSTR pszCmdLine);
@@ -61,9 +61,8 @@ public:
 CArgsParser::CArgsParser(LPCWSTR pszCmdLine)
 {
 	m_ppszArgList = ::CommandLineToArgvW(pszCmdLine, &m_Args);
-	if (m_ppszArgList == 0)
+	if (m_ppszArgList == nullptr)
 		m_Args = 0;
-	m_CurPos = 0;
 }
 
 
@@ -234,11 +233,11 @@ bool CArgsParser::GetValue(SYSTEMTIME *pValue) const
 			if (*p == L'/' || *p == L'-' || *p == L'T') {
 				if (DateCount == 3)
 					return false;
-				Date[DateCount++] = (WORD)Value;
+				Date[DateCount++] = static_cast<WORD>(Value);
 			} else if (*p == L':' || *p == L'\0') {
 				if (TimeCount == 3)
 					return false;
-				TimeValue[TimeCount++] = (WORD)Value;
+				TimeValue[TimeCount++] = static_cast<WORD>(Value);
 				if (*p == L'\0')
 					break;
 			}
@@ -309,9 +308,9 @@ bool CArgsParser::GetValue(SYSTEMTIME *pValue) const
 
 	OffsetSystemTime(
 		&st,
-		(LONGLONG)Time.wHour * TimeConsts::SYSTEMTIME_HOUR +
-		(LONGLONG)Time.wMinute * TimeConsts::SYSTEMTIME_MINUTE +
-		(LONGLONG)Time.wSecond * TimeConsts::SYSTEMTIME_SECOND);
+		static_cast<LONGLONG>(Time.wHour) * TimeConsts::SYSTEMTIME_HOUR +
+		static_cast<LONGLONG>(Time.wMinute) * TimeConsts::SYSTEMTIME_MINUTE +
+		static_cast<LONGLONG>(Time.wSecond) * TimeConsts::SYSTEMTIME_SECOND);
 
 	*pValue = st;
 
@@ -331,9 +330,11 @@ bool CArgsParser::GetDurationValue(int *pValue) const
 
 	while (*p != L'\0') {
 		if (*p == L'-' || (*p >= L'0' && *p <= L'9')) {
-			Duration = wcstol(p, (wchar_t**)&p, 10);
+			wchar_t *pEnd;
+			Duration = wcstol(p, &pEnd, 10);
 			if (Duration == LONG_MAX || Duration == LONG_MIN)
 				return false;
+			p = pEnd;
 		} else {
 			switch (*p) {
 			case L'h': case L'H':
@@ -383,67 +384,6 @@ static bool GetIniEntry(LPCWSTR pszText, CCommandLineOptions::IniEntry *pEntry)
 
 
 
-CCommandLineOptions::CCommandLineOptions()
-	: m_fNoDriver(false)
-	, m_fNoTSProcessor(false)
-	, m_fSingleTask(false)
-	, m_fStandby(false)
-	, m_fNoView(false)
-	, m_fNoDirectShow(false)
-	, m_fMpeg2(false)
-	, m_fH264(false)
-	, m_fH265(false)
-	, m_fSilent(false)
-	, m_fInitialSettings(false)
-	, m_fSaveLog(false)
-	, m_fNoEpg(false)
-	, m_f1Seg(false)
-	, m_fJumpList(false)
-	, m_TvRockDID(-1)
-
-	, m_Channel(0)
-	, m_ControllerChannel(0)
-	, m_ChannelIndex(-1)
-	, m_TuningSpace(-1)
-	, m_ServiceID(0)
-	, m_NetworkID(0)
-	, m_TransportStreamID(0)
-
-	, m_fUseNetworkRemocon(false)
-	, m_UDPPort(1234)
-
-	, m_fRecord(false)
-	, m_fRecordStop(false)
-	, m_RecordStartTime()
-	, m_RecordDelay(0)
-	, m_RecordDuration(0)
-	, m_fRecordCurServiceOnly(false)
-	, m_fExitOnRecordEnd(false)
-	, m_fRecordOnly(false)
-
-	, m_fFullscreen(false)
-	, m_fMinimize(false)
-	, m_fMaximize(false)
-	, m_fTray(false)
-	, m_WindowLeft(INVALID_WINDOW_POS)
-	, m_WindowTop(INVALID_WINDOW_POS)
-	, m_WindowWidth(0)
-	, m_WindowHeight(0)
-
-	, m_Volume(-1)
-	, m_fMute(false)
-
-	, m_fNoPlugin(false)
-
-	, m_fShowProgramGuide(false)
-	, m_fProgramGuideOnly(false)
-
-	, m_fHomeDisplay(false)
-	, m_fChannelDisplay(false)
-{
-}
-
-
 /*
 	利用可能なコマンドラインオプション
 
@@ -474,7 +414,6 @@ CCommandLineOptions::CCommandLineOptions()
 	/h264           H.264を有効
 	/h265           H.265を有効
 	/1seg           ワンセグモード
-	/nr             ネットワークリモコンを使用する
 	/p /port        UDP のポート番号 (e.g. /p 1234)
 	/plugin-        指定されたプラグインを読み込まない
 	/plugindir      プラグインのフォルダ
@@ -544,7 +483,6 @@ void CCommandLineOptions::Parse(LPCWSTR pszCmdLine)
 					&& !Args.GetOption(TEXT("noepg"), &m_fNoEpg)
 					&& !Args.GetOption(TEXT("noplugin"), &m_fNoPlugin)
 					&& !Args.GetOption(TEXT("noview"), &m_fNoView)
-					&& !Args.GetOption(TEXT("nr"), &m_fUseNetworkRemocon)
 					&& !Args.GetOption(TEXT("nid"), &m_NetworkID)
 					&& !Args.GetOption(TEXT("p"), &m_UDPPort)
 					&& !Args.GetOption(TEXT("port"), &m_UDPPort)
@@ -595,9 +533,9 @@ void CCommandLineOptions::Parse(LPCWSTR pszCmdLine)
 				}
 #ifdef _DEBUG
 				else {
-					TRACE(TEXT("Unknown command line option %s\n"), Args.GetText());
+					TRACE(TEXT("Unknown command line option {}\n"), Args.GetText());
 					// プラグインで解釈するオプションもあるので…
-					//GetAppClass().AddLong(TEXT("不明なコマンドラインオプション %s を無視します。"), Args.GetText());
+					//GetAppClass().AddLong(TEXT("不明なコマンドラインオプション {} を無視します。"), Args.GetText());
 				}
 #endif
 			}
@@ -622,11 +560,11 @@ void CCommandLineOptions::Parse(LPCWSTR pszCmdLine)
 				SYSTEMTIME Time;
 				if (Args.GetDurationOption(L"d", &Duration)) {
 					TRACE(
-						L"Commandline parse test : \"%s\" %d\n",
+						L"Commandline parse test : \"{}\" {}\n",
 						Args.GetText(), Duration);
 				} else if (Args.GetOption(L"t", &Time)) {
 					TRACE(
-						L"Commandline parse test : \"%s\" %d/%d/%d %d:%d:%d\n",
+						L"Commandline parse test : \"{}\" {}/{}/{} {}:{}:{}\n",
 						Args.GetText(),
 						Time.wYear, Time.wMonth, Time.wDay, Time.wHour, Time.wMinute, Time.wSecond);
 				}

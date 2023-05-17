@@ -11,10 +11,14 @@
 */
 
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include <windows.h>
 #include <shlwapi.h>
 #include <shlobj.h>
 #include <tchar.h>
+
 #define TVTEST_PLUGIN_CLASS_IMPLEMENT
 #include "TVTestPlugin.h"
 #include "resource.h"
@@ -23,28 +27,27 @@
 #pragma comment(lib, "shell32.lib")
 
 
-// 予備のフォルダの数
-#define NUM_SPARE_FOLDERS 3
-
-// ウィンドウクラス名
-#define DISKRELAY_WINDOW_CLASS TEXT("TVTest DiskRelay Window")
-
-// 空き容量を監視するタイマーの識別子
-#define WATCH_TIMER_ID 1
-// 空き容量を監視する間隔(ms)
-#define WATCH_INTERVAL 2000
-
-
 // プラグインクラス
 class CDiskRelay : public TVTest::CTVTestPlugin
 {
-	bool m_fInitialized;                // 初期化済みか?
-	TCHAR m_szIniFileName[MAX_PATH];    // INIファイルのパス
+	// 予備のフォルダの数
+	static constexpr int NUM_SPARE_FOLDERS = 3;
+
+	// ウィンドウクラス名
+	static const LPCTSTR DISKRELAY_WINDOW_CLASS;
+
+	// 空き容量を監視するタイマーの識別子
+	static constexpr UINT WATCH_TIMER_ID = 1;
+	// 空き容量を監視する間隔(ms)
+	static constexpr DWORD WATCH_INTERVAL = 2000;
+
+	bool m_fInitialized = false;                        // 初期化済みか?
+	TCHAR m_szIniFileName[MAX_PATH];                    // INIファイルのパス
 	TCHAR m_szSpareFolder[NUM_SPARE_FOLDERS][MAX_PATH]; // 予備のフォルダ
-	UINT m_LowFreeSpace;                // 空き容量が少ないと判定する閾値
-	HWND m_hwnd;                        // ウィンドウハンドル
-	bool m_fRecording;                  // 録画中か?
-	int m_NextFolder;                   // 次の録画先フォルダ
+	UINT m_LowFreeSpace = 64;                           // 空き容量が少ないと判定する閾値
+	HWND m_hwnd = nullptr;                              // ウィンドウハンドル
+	bool m_fRecording = false;                          // 録画中か?
+	int m_NextFolder = 0;                               // 次の録画先フォルダ
 
 	bool InitializePlugin();
 	bool CheckFreeSpace();
@@ -57,17 +60,16 @@ class CDiskRelay : public TVTest::CTVTestPlugin
 
 public:
 	CDiskRelay();
-	virtual bool GetPluginInfo(TVTest::PluginInfo *pInfo);
-	virtual bool Initialize();
-	virtual bool Finalize();
+	bool GetPluginInfo(TVTest::PluginInfo *pInfo) override;
+	bool Initialize() override;
+	bool Finalize() override;
 };
 
 
+const LPCTSTR CDiskRelay::DISKRELAY_WINDOW_CLASS = TEXT("TVTest DiskRelay Window");
+
+
 CDiskRelay::CDiskRelay()
-	: m_fInitialized(false)
-	, m_LowFreeSpace(64)
-	, m_hwnd(nullptr)
-	, m_fRecording(false)
 {
 	for (int i = 0; i < NUM_SPARE_FOLDERS; i++)
 		m_szSpareFolder[i][0] = '\0';

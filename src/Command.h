@@ -42,11 +42,13 @@ namespace TVTest
 			None     = 0x00_u8,
 			Disabled = 0x01_u8,
 			Checked  = 0x02_u8,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 		enum class InvokeFlag : unsigned int {
 			None  = 0x0000U,
 			Mouse = 0x0001U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 		struct InvokeParameters
@@ -72,8 +74,8 @@ namespace TVTest
 
 		private:
 			const CCommandManager &m_Manager;
-			size_t m_Index;
-			int m_ID;
+			size_t m_Index = 0;
+			int m_ID = 0;
 		};
 
 		class ABSTRACT_CLASS(CEventListener)
@@ -156,9 +158,6 @@ namespace TVTest
 		std::vector<CCommandCustomizer*> m_CustomizerList;
 		std::vector<CEventListener*> m_EventListenerList;
 	};
-
-	TVTEST_ENUM_FLAGS(CCommandManager::CommandState)
-	TVTEST_ENUM_FLAGS(CCommandManager::InvokeFlag)
 
 }	// namespace TVTest
 

@@ -47,9 +47,9 @@ namespace TVTest
 		struct TunerFilterInfo
 			: public FilterInfo
 		{
-			static const WORD NID_INVALID  = 0xFFFF;
-			static const WORD TSID_INVALID = 0xFFFF;
-			static const WORD SID_INVALID  = 0xFFFF;
+			static constexpr WORD NID_INVALID  = 0xFFFF;
+			static constexpr WORD TSID_INVALID = 0xFFFF;
+			static constexpr WORD SID_INVALID  = 0xFFFF;
 
 			bool fEnable = true;
 			bool fEnableProcessing = true;
@@ -74,7 +74,7 @@ namespace TVTest
 			std::vector<TunerFilterInfo> m_TunerFilterMap;
 			PropertyList m_PropertyList;
 			FilterInfo m_LastOpenFilter;
-			bool m_fLastOpenFailed;
+			bool m_fLastOpenFailed = false;
 
 			CTSProcessorSettings(const GUID &guid);
 			const TunerFilterInfo *GetTunerFilterInfo(
@@ -90,6 +90,7 @@ namespace TVTest
 			RetryDialog = 0x0001U,
 			NoUI        = 0x0002U,
 			NotifyError = 0x0004U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 		bool ReadSettings(CSettings &Settings);
@@ -131,8 +132,6 @@ namespace TVTest
 			CTSProcessor *pTSProcessor,
 			Interface::NotifyType Type, LPCWSTR pszMessage) override;
 	};
-
-	TVTEST_ENUM_FLAGS(CTSProcessorManager::FilterOpenFlag)
 
 }	// namespace TVTest
 

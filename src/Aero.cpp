@@ -35,7 +35,7 @@ namespace TVTest
 // コンポジションが有効か取得する
 bool CAeroGlass::IsEnabled()
 {
-	BOOL fEnabled;
+	BOOL fEnabled = FALSE;
 
 	return ::DwmIsCompositionEnabled(&fEnabled) == S_OK && fEnabled;
 }
@@ -61,7 +61,7 @@ bool CAeroGlass::ApplyAeroGlass(HWND hwnd, const RECT *pRect)
 // フレームの描画を無効にする
 bool CAeroGlass::EnableNcRendering(HWND hwnd, bool fEnable)
 {
-	DWMNCRENDERINGPOLICY ncrp = fEnable ? DWMNCRP_USEWINDOWSTYLE : DWMNCRP_DISABLED;
+	const DWMNCRENDERINGPOLICY ncrp = fEnable ? DWMNCRP_USEWINDOWSTYLE : DWMNCRP_DISABLED;
 
 	return ::DwmSetWindowAttribute(hwnd, DWMWA_NCRENDERING_POLICY, &ncrp, sizeof(ncrp)) == S_OK;
 }
@@ -72,11 +72,6 @@ bool CAeroGlass::EnableNcRendering(HWND hwnd, bool fEnable)
 class CBufferedPaintInitializer
 {
 public:
-	CBufferedPaintInitializer()
-		: m_fInitialized(false)
-	{
-	}
-
 	~CBufferedPaintInitializer()
 	{
 		if (m_fInitialized)
@@ -96,16 +91,10 @@ public:
 	bool IsInitialized() const { return m_fInitialized; }
 
 private:
-	bool m_fInitialized;
+	bool m_fInitialized = false;
 };
 
 static CBufferedPaintInitializer BufferedPaintInitializer;
-
-
-CBufferedPaint::CBufferedPaint()
-	: m_hPaintBuffer(nullptr)
-{
-}
 
 
 CBufferedPaint::~CBufferedPaint()
@@ -127,7 +116,7 @@ HDC CBufferedPaint::Begin(HDC hdc, const RECT *pRect, bool fErase)
 	BP_PAINTPARAMS Params = {sizeof(BP_PAINTPARAMS), 0, nullptr, nullptr};
 	if (fErase)
 		Params.dwFlags |= BPPF_ERASE;
-	HDC hdcBuffer;
+	HDC hdcBuffer = nullptr;
 	m_hPaintBuffer = ::BeginBufferedPaint(hdc, pRect, BPBF_TOPDOWNDIB, &Params, &hdcBuffer);
 	if (m_hPaintBuffer == nullptr)
 		return nullptr;
@@ -183,7 +172,7 @@ void CDoubleBufferingDraw::OnPaint(HWND hwnd)
 		CBufferedPaint BufferedPaint;
 		RECT rc;
 		::GetClientRect(hwnd, &rc);
-		HDC hdc = BufferedPaint.Begin(ps.hdc, &rc);
+		const HDC hdc = BufferedPaint.Begin(ps.hdc, &rc);
 		if (hdc != nullptr) {
 			Draw(hdc, ps.rcPaint);
 			BufferedPaint.End();

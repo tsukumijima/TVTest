@@ -32,8 +32,6 @@ namespace TVTest
 CMainPanel::CMainPanel()
 	: m_FrameEventHandler(&Frame)
 	, m_FormEventHandler(&Form)
-	, fShowPanelWindow(false)
-	, m_fEnableProgramListUpdate(true)
 {
 	Frame.SetFloating(false);
 	Frame.SetEventHandler(&m_FrameEventHandler);
@@ -53,11 +51,10 @@ bool CMainPanel::OnOwnerWindowPosChanging(const RECT *pOldRect, const RECT *pNew
 	if (fShowPanelWindow && GetAppClass().PanelOptions.GetAttachToMainWindow()
 			&& IsFloating()) {
 		RECT rc;
-		int XOffset, YOffset;
+		int XOffset = 0, YOffset = 0;
 		bool fAttached = false;
 
 		Frame.GetPosition(&rc);
-		XOffset = YOffset = 0;
 		if (rc.top < pOldRect->bottom && rc.bottom > pOldRect->top) {
 			if (rc.right == pOldRect->left) {
 				XOffset = pNewRect->left - rc.right;
@@ -93,7 +90,7 @@ bool CMainPanel::OnOwnerWindowPosChanging(const RECT *pOldRect, const RECT *pNew
 
 bool CMainPanel::IsAttached()
 {
-	CAppMain &App = GetAppClass();
+	const CAppMain &App = GetAppClass();
 	bool fAttached = false;
 
 	if (fShowPanelWindow && App.PanelOptions.GetAttachToMainWindow()
@@ -154,7 +151,7 @@ void CMainPanel::UpdateInformationPanel()
 
 void CMainPanel::UpdateProgramListPanel()
 {
-	CAppMain &App = GetAppClass();
+	const CAppMain &App = GetAppClass();
 	CChannelInfo ChInfo;
 
 	if (App.Core.GetCurrentStreamChannelInfo(&ChInfo)
@@ -166,7 +163,7 @@ void CMainPanel::UpdateProgramListPanel()
 
 void CMainPanel::UpdateChannelPanel()
 {
-	CAppMain &App = GetAppClass();
+	const CAppMain &App = GetAppClass();
 	Util::CWaitCursor WaitCursor;
 
 	if (ChannelPanel.IsChannelListEmpty()) {
@@ -189,10 +186,8 @@ void CMainPanel::InitControlPanel()
 	const CChannelList *pList = GetAppClass().ChannelManager.GetCurrentChannelList();
 	for (int i = 0; i < 12; i++) {
 		TCHAR szText[4];
-		CControlPanelButton *pItem;
-
-		StringPrintf(szText, TEXT("%d"), i + 1);
-		pItem = new CControlPanelButton(CM_CHANNELNO_FIRST + i, szText, i % 6 == 0, 1);
+		StringFormat(szText, TEXT("{}"), i + 1);
+		CControlPanelButton *pItem = new CControlPanelButton(CM_CHANNELNO_FIRST + i, szText, i % 6 == 0, 1);
 		if (pList == nullptr || pList->FindChannelNo(i + 1) < 0)
 			pItem->SetEnable(false);
 		ControlPanel.AddItem(pItem);
@@ -206,7 +201,7 @@ void CMainPanel::InitControlPanel()
 
 void CMainPanel::UpdateControlPanel()
 {
-	CAppMain &App = GetAppClass();
+	const CAppMain &App = GetAppClass();
 	const CChannelList *pList = App.ChannelManager.GetCurrentChannelList();
 	const CChannelInfo *pCurChannel = App.ChannelManager.GetCurrentChannelInfo();
 
@@ -229,7 +224,6 @@ void CMainPanel::UpdateControlPanel()
 
 CMainPanel::CFrameEventHandler::CFrameEventHandler(CPanelFrame *pFrame)
 	: m_pFrame(pFrame)
-	, m_SnapEdge(EDGE_NONE)
 {
 }
 
@@ -246,9 +240,8 @@ bool CMainPanel::CFrameEventHandler::OnMoving(RECT *pRect)
 	if (!m_pFrame->GetFloating())
 		return false;
 
-	CAppMain &App = GetAppClass();
+	const CAppMain &App = GetAppClass();
 	POINT pt;
-	RECT rc;
 
 	::GetCursorPos(&pt);
 	pt.x = m_ptStartPos.x + (pt.x - m_ptDragStartCursorPos.x);
@@ -256,13 +249,12 @@ bool CMainPanel::CFrameEventHandler::OnMoving(RECT *pRect)
 	::OffsetRect(pRect, pt.x - pRect->left, pt.y - pRect->top);
 	if (App.PanelOptions.GetSnapAtMainWindow()) {
 		// メインウィンドウにスナップさせる
-		int SnapMargin = App.PanelOptions.GetSnapMargin();
-		int XOffset, YOffset;
-		bool fSnap;
+		const int SnapMargin = App.PanelOptions.GetSnapMargin();
+		RECT rc;
+		int XOffset = 0, YOffset = 0;
+		bool fSnap = false;
 
 		App.MainWindow.GetPosition(&rc);
-		XOffset = YOffset = 0;
-		fSnap = false;
 		if (pRect->top < rc.bottom && pRect->bottom > rc.top) {
 			if (pRect->right >= rc.left - SnapMargin && pRect->right <= rc.left + SnapMargin) {
 				XOffset = rc.left - pRect->right;
@@ -336,7 +328,7 @@ void CMainPanel::CFrameEventHandler::OnVisibleChange(bool fVisible)
 	if (!m_pFrame->GetFloating())
 		return;
 
-	CAppMain &App = GetAppClass();
+	const CAppMain &App = GetAppClass();
 
 	if (!fVisible) {
 		m_SnapEdge = EDGE_NONE;

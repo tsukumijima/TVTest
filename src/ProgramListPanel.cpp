@@ -52,14 +52,12 @@ public:
 	bool IsChanged(const CProgramItemInfo *pItem) const;
 
 private:
-	enum {
-		MAX_EVENT_TITLE = 256
-	};
+	static constexpr size_t MAX_EVENT_TITLE = 256;
 
 	LibISDB::EventInfo m_EventInfo;
 	WORD m_EventID;
-	int m_NameLines;
-	int m_TextLines;
+	int m_NameLines = 0;
+	int m_TextLines = 0;
 
 	String GetEventText(bool fUseARIBSymbol) const;
 	void GetEventTitleText(LPTSTR pszText, int MaxLength, bool fUseARIBSymbol) const;
@@ -68,11 +66,9 @@ private:
 
 
 CProgramItemInfo::CProgramItemInfo(const LibISDB::EventInfo &EventInfo)
+	: m_EventInfo(EventInfo)
+	, m_EventID(EventInfo.EventID)
 {
-	m_EventInfo = EventInfo;
-	m_EventID = EventInfo.EventID;
-	m_NameLines = 0;
-	m_TextLines = 0;
 }
 
 
@@ -88,7 +84,7 @@ int CProgramItemInfo::CalcTitleLines(CTextDraw &DrawText, int Width, bool fUseAR
 
 int CProgramItemInfo::CalcTextLines(CTextDraw &DrawText, int Width, bool fUseARIBSymbol)
 {
-	String Text = GetEventText(fUseARIBSymbol);
+	const String Text = GetEventText(fUseARIBSymbol);
 
 	if (!Text.empty())
 		m_TextLines = DrawText.CalcLineCount(Text.c_str(), Width);
@@ -109,7 +105,7 @@ void CProgramItemInfo::DrawTitle(CTextDraw &DrawText, const RECT &Rect, int Line
 
 void CProgramItemInfo::DrawText(CTextDraw &DrawText, const RECT &Rect, int LineHeight, bool fUseARIBSymbol)
 {
-	String Text = GetEventText(fUseARIBSymbol);
+	const String Text = GetEventText(fUseARIBSymbol);
 	if (!Text.empty()) {
 		DrawText.Draw(Text.c_str(), Rect, LineHeight);
 	}
@@ -151,7 +147,7 @@ void CProgramItemInfo::GetEventTitleText(LPTSTR pszText, int MaxLength, bool fUs
 		if (fUseARIBSymbol)
 			EpgUtil::MapARIBSymbol(m_EventInfo.EventName.c_str(), pszText + Length, MaxLength - Length);
 		else
-			StringPrintf(pszText + Length, MaxLength - Length, TEXT("%s"), m_EventInfo.EventName.c_str());
+			StringFormat(pszText + Length, MaxLength - Length, TEXT("{}"), m_EventInfo.EventName);
 	}
 }
 
@@ -168,7 +164,7 @@ int CProgramItemInfo::GetEventTimeText(LPTSTR pszText, int MaxLength) const
 
 CProgramItemInfo *CProgramItemList::GetItem(int Index)
 {
-	if ((unsigned int)Index >= m_ItemList.size())
+	if (static_cast<unsigned int>(Index) >= m_ItemList.size())
 		return nullptr;
 	return m_ItemList[Index].get();
 }
@@ -176,7 +172,7 @@ CProgramItemInfo *CProgramItemList::GetItem(int Index)
 
 const CProgramItemInfo *CProgramItemList::GetItem(int Index) const
 {
-	if ((unsigned int)Index >= m_ItemList.size())
+	if (static_cast<unsigned int>(Index) >= m_ItemList.size())
 		return nullptr;
 	return m_ItemList[Index].get();
 }
@@ -233,19 +229,6 @@ bool CProgramListPanel::Initialize(HINSTANCE hinst)
 
 CProgramListPanel::CProgramListPanel()
 	: m_EventInfoPopupManager(&m_EventInfoPopup)
-	, m_EventInfoPopupHandler(this)
-	, m_pEPGDatabase(nullptr)
-	, m_FontHeight(0)
-	, m_fMouseOverEventInfo(true)
-	, m_fUseEpgColorScheme(false)
-	, m_fShowFeaturedMark(true)
-	, m_fUseARIBSymbol(false)
-	, m_VisibleEventIcons(((1 << (CEpgIcons::ICON_LAST + 1)) - 1) ^ CEpgIcons::IconFlag(CEpgIcons::ICON_PAY))
-	, m_ChannelHeight(0)
-	, m_CurEventID(-1)
-	, m_ScrollPos(0)
-	//, m_hwndToolTip(nullptr)
-	, m_fShowRetrievingMessage(false)
 {
 	GetDefaultFont(&m_StyleFont);
 }
@@ -501,8 +484,8 @@ void CProgramListPanel::GetChannelButtonRect(RECT *pRect) const
 {
 	GetHeaderRect(pRect);
 	Style::Subtract(pRect, m_Style.ChannelPadding);
-	int Width = m_Style.ChannelButtonIconSize.Width + m_Style.ChannelButtonPadding.Horz();
-	int Height = m_Style.ChannelButtonIconSize.Height + m_Style.ChannelButtonPadding.Vert();
+	const int Width = m_Style.ChannelButtonIconSize.Width + m_Style.ChannelButtonPadding.Horz();
+	const int Height = m_Style.ChannelButtonIconSize.Height + m_Style.ChannelButtonPadding.Vert();
 	pRect->left = pRect->right - Width;
 	pRect->top = pRect->top + ((pRect->bottom - pRect->top) - Height) / 2;
 	pRect->bottom = pRect->top + Height;
@@ -520,21 +503,21 @@ void CProgramListPanel::GetProgramListRect(RECT *pRect) const
 
 void CProgramListPanel::CalcChannelHeight()
 {
-	int LabelHeight = m_FontHeight + m_Style.ChannelNameMargin.Vert();
-	int ButtonHeight = m_Style.ChannelButtonIconSize.Height + m_Style.ChannelButtonPadding.Vert();
+	const int LabelHeight = m_FontHeight + m_Style.ChannelNameMargin.Vert();
+	const int ButtonHeight = m_Style.ChannelButtonIconSize.Height + m_Style.ChannelButtonPadding.Vert();
 	m_ChannelHeight = std::max(LabelHeight, ButtonHeight) + m_Style.ChannelPadding.Vert();
 }
 
 
 void CProgramListPanel::CalcDimensions()
 {
-	HDC hdc = ::GetDC(m_hwnd);
+	const HDC hdc = ::GetDC(m_hwnd);
 	CTextDraw DrawText;
 	RECT rc;
 	GetClientRect(&rc);
 	DrawText.Begin(hdc, rc, CTextDraw::Flag::JapaneseHyphnation);
 	GetProgramListRect(&rc);
-	HFONT hfontOld = static_cast<HFONT>(::GetCurrentObject(hdc, OBJ_FONT));
+	const HFONT hfontOld = static_cast<HFONT>(::GetCurrentObject(hdc, OBJ_FONT));
 	m_TotalLines = 0;
 	for (int i = 0; i < m_ItemList.NumItems(); i++) {
 		CProgramItemInfo *pItem = m_ItemList.GetItem(i);
@@ -568,7 +551,7 @@ void CProgramListPanel::SetScrollPos(int Pos)
 			Pos = Max;
 	}
 	if (Pos != m_ScrollPos) {
-		int Offset = Pos - m_ScrollPos;
+		const int Offset = Pos - m_ScrollPos;
 		SCROLLINFO si;
 
 		m_ScrollPos = Pos;
@@ -634,9 +617,7 @@ bool CProgramListPanel::SetEventInfoFont(const Style::Font &Font)
 
 void CProgramListPanel::CalcFontHeight()
 {
-	HDC hdc;
-
-	hdc = ::GetDC(m_hwnd);
+	const HDC hdc = ::GetDC(m_hwnd);
 	if (hdc == nullptr)
 		return;
 	m_FontHeight = m_Font.GetHeight();
@@ -717,7 +698,7 @@ void CProgramListPanel::SetUseARIBSymbol(bool fUseARIBSymbol)
 
 int CProgramListPanel::ItemHitTest(int x, int y) const
 {
-	POINT pt = {x, y};
+	const POINT pt = {x, y};
 	RECT rcHeader;
 	int HotItem = -1;
 
@@ -738,11 +719,9 @@ int CProgramListPanel::ItemHitTest(int x, int y) const
 
 int CProgramListPanel::ProgramHitTest(int x, int y) const
 {
-	POINT pt;
+	const POINT pt = {x, y};
 	RECT rc;
 
-	pt.x = x;
-	pt.y = y;
 	GetProgramListRect(&rc);
 	if (!::PtInRect(&rc, pt))
 		return -1;
@@ -800,7 +779,7 @@ void CProgramListPanel::SetHotItem(int Item)
 
 void CProgramListPanel::ShowChannelListMenu()
 {
-	CAppMain &App = GetAppClass();
+	const CAppMain &App = GetAppClass();
 	const CChannelList *pChannelList = App.ChannelManager.GetCurrentChannelList();
 	if (pChannelList == nullptr)
 		return;
@@ -850,7 +829,7 @@ void CProgramListPanel::ShowChannelListMenu()
 	GetHeaderRect(&rc);
 	MapWindowRect(m_hwnd, nullptr, &rc);
 
-	int Result = m_ChannelMenu.Show(
+	const int Result = m_ChannelMenu.Show(
 		TPM_RIGHTBUTTON | TPM_RETURNCMD | TPM_VERTICAL,
 		rc.left, rc.bottom, &rc);
 	m_ChannelMenu.Destroy();
@@ -964,7 +943,7 @@ LRESULT CProgramListPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
 
 	case WM_MOUSEWHEEL:
 		{
-			int Delta = m_MouseWheel.OnMouseWheel(
+			const int Delta = m_MouseWheel.OnMouseWheel(
 				wParam, (m_FontHeight + m_Style.LineSpacing) * m_MouseWheel.GetDefaultScrollLines());
 
 			if (Delta != 0)
@@ -974,18 +953,17 @@ LRESULT CProgramListPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
 
 	case WM_VSCROLL:
 		{
-			const int LineHeight = m_FontHeight + m_Style.LineSpacing;
-			int Pos, Page, Max;
 			RECT rc;
-
-			Pos = m_ScrollPos;
 			GetProgramListRect(&rc);
-			Page = rc.bottom - rc.top;
-			Max =
+			const int Page = rc.bottom - rc.top;
+			const int LineHeight = m_FontHeight + m_Style.LineSpacing;
+			int Max =
 				m_TotalLines * LineHeight +
 				m_ItemList.NumItems() * (m_Style.TitlePadding.Top + m_Style.TitlePadding.Bottom - m_Style.LineSpacing) - Page;
 			if (Max < 0)
 				Max = 0;
+			int Pos = m_ScrollPos;
+
 			switch (LOWORD(wParam)) {
 			case SB_LINEUP:        Pos -= LineHeight;    break;
 			case SB_LINEDOWN:      Pos += LineHeight;    break;
@@ -1003,7 +981,7 @@ LRESULT CProgramListPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
 
 	case WM_MOUSEMOVE:
 		{
-			int HotItem = ItemHitTest(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+			const int HotItem = ItemHitTest(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 
 			if (HotItem != m_HotItem) {
 				SetHotItem(HotItem);
@@ -1029,8 +1007,8 @@ LRESULT CProgramListPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
 		{
 			::SetFocus(hwnd);
 
-			int x = GET_X_LPARAM(lParam), y = GET_Y_LPARAM(lParam);
-			int HotItem = ItemHitTest(x, y);
+			const int x = GET_X_LPARAM(lParam), y = GET_Y_LPARAM(lParam);
+			const int HotItem = ItemHitTest(x, y);
 			if (HotItem == m_HotItem) {
 				switch (HotItem) {
 				case ITEM_CHANNEL:
@@ -1069,7 +1047,7 @@ LRESULT CProgramListPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
 		return 0;
 
 	case WM_SETCURSOR:
-		if ((HWND)wParam == hwnd) {
+		if (reinterpret_cast<HWND>(wParam) == hwnd) {
 			if (LOWORD(lParam) == HTCLIENT && m_HotItem >= 0)
 				::SetCursor(GetActionCursor());
 			else
@@ -1100,7 +1078,7 @@ LRESULT CProgramListPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
 		case TTN_NEEDTEXT:
 			{
 				LPNMTTDISPINFO pnmtdi = reinterpret_cast<LPNMTTDISPINFO>(lParam);
-				const CProgramItemInfo *pItem = m_ItemList.GetItem((int)pnmtdi->lParam);
+				const CProgramItemInfo *pItem = m_ItemList.GetItem(static_cast<int>(pnmtdi->lParam));
 
 				if (pItem != nullptr) {
 					static TCHAR szText[1024];
@@ -1108,25 +1086,25 @@ LRESULT CProgramListPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
 					TCHAR szEndTime[16];
 					SYSTEMTIME stEnd;
 					if (EventInfo.m_Duration > 0 && EventInfo.GetEndTime(&stEnd)) {
-						StringPrintf(
+						StringFormat(
 							szEndTime,
-							TEXT("～%d:%02d"), stEnd.wHour, stEnd.wMinute);
+							TEXT("～{}:{:02}"), stEnd.wHour, stEnd.wMinute);
 					} else {
 						szEndTime[0] = '\0';
 					}
-					StringPrintf(
+					StringFormat(
 						szText,
-						TEXT("%d/%d(%s) %d:%02d%s\n%s\n\n%s%s%s%s"),
+						TEXT("{}/{}({}) {}:{:02}{}\n{}\n\n{}{}{}{}"),
 						EventInfo.m_StartTime.wMonth,
 						EventInfo.m_StartTime.wDay,
 						GetDayOfWeekText(EventInfo.m_StartTime.wDayOfWeek),
 						EventInfo.m_StartTime.wHour,
 						EventInfo.m_StartTime.wMinute,
 						szEndTime,
-						EventInfo.m_EventName.c_str(),
-						EventInfo.m_EventText.c_str(),
+						EventInfo.m_EventName,
+						EventInfo.m_EventText,
 						!EventInfo.m_EventText.empty() ? TEXT("\n\n") : TEXT(""),
-						EventInfo.m_EventExtendedText.c_str(),
+						EventInfo.m_EventExtendedText,
 						!EventInfo.m_EventExtendedText.empty() ? TEXT("\n\n") : TEXT(""));
 					pnmtdi->lpszText = szText;
 				} else {
@@ -1148,7 +1126,7 @@ LRESULT CProgramListPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
 				::GetWindowRect(pnmh->hwndFrom, &rcTip);
 				::GetCursorPos(&pt);
 				if (::PtInRect(&rcTip, pt)) {
-					HMONITOR hMonitor = ::MonitorFromRect(&rcTip, MONITOR_DEFAULTTONEAREST);
+					const HMONITOR hMonitor = ::MonitorFromRect(&rcTip, MONITOR_DEFAULTTONEAREST);
 					if (hMonitor != nullptr) {
 						MONITORINFO mi;
 
@@ -1238,9 +1216,9 @@ void CProgramListPanel::Draw(HDC hdc, const RECT *prcPaint)
 
 	const int LineHeight = m_FontHeight + m_Style.LineSpacing;
 
-	HFONT hfontOld = static_cast<HFONT>(::GetCurrentObject(hdc, OBJ_FONT));
-	COLORREF crOldTextColor = ::GetTextColor(hdc);
-	int OldBkMode = ::SetBkMode(hdc, TRANSPARENT);
+	const HFONT hfontOld = static_cast<HFONT>(::GetCurrentObject(hdc, OBJ_FONT));
+	const COLORREF crOldTextColor = ::GetTextColor(hdc);
+	const int OldBkMode = ::SetBkMode(hdc, TRANSPARENT);
 
 	const bool fCurChannel =
 		m_CurChannel.GetServiceID() > 0
@@ -1258,12 +1236,12 @@ void CProgramListPanel::Draw(HDC hdc, const RECT *prcPaint)
 		if (!IsStringEmpty(m_SelectedChannel.GetName())) {
 			Style::Subtract(&rc, m_Style.ChannelPadding);
 
-			HBITMAP hbmLogo = GetAppClass().LogoManager.GetAssociatedLogoBitmap(
+			const HBITMAP hbmLogo = GetAppClass().LogoManager.GetAssociatedLogoBitmap(
 				m_SelectedChannel.GetNetworkID(), m_SelectedChannel.GetServiceID(),
 				CLogoManager::LOGOTYPE_SMALL);
 			if (hbmLogo != nullptr) {
-				int LogoHeight = (rc.bottom - rc.top) - m_Style.ChannelLogoMargin.Vert();
-				int LogoWidth = LogoHeight * 16 / 9;
+				const int LogoHeight = (rc.bottom - rc.top) - m_Style.ChannelLogoMargin.Vert();
+				const int LogoWidth = LogoHeight * 16 / 9;
 				rc.left += m_Style.ChannelLogoMargin.Left;
 				DrawUtil::DrawBitmap(
 					hdc,
@@ -1296,7 +1274,7 @@ void CProgramListPanel::Draw(HDC hdc, const RECT *prcPaint)
 		ThemeDraw.Draw(ButtonStyle.Fore, rc, TEXT("6"), DT_CENTER | DT_VCENTER | DT_SINGLELINE);
 	}
 
-	HBRUSH hbr = ::CreateSolidBrush(m_Theme.MarginColor);
+	const HBRUSH hbr = ::CreateSolidBrush(m_Theme.MarginColor);
 
 	GetProgramListRect(&rc);
 
@@ -1307,7 +1285,7 @@ void CProgramListPanel::Draw(HDC hdc, const RECT *prcPaint)
 		Style::Subtract(&rc, m_Style.TitlePadding);
 		DrawText.Draw(TEXT("番組表の取得中です..."), rc, LineHeight);
 	} else {
-		HRGN hrgn = ::CreateRectRgnIndirect(&rc);
+		const HRGN hrgn = ::CreateRectRgnIndirect(&rc);
 		::SelectClipRgn(hdc, hrgn);
 
 		m_EpgIcons.BeginDraw(hdc, m_Style.IconSize.Width, m_Style.IconSize.Height);
@@ -1352,7 +1330,7 @@ void CProgramListPanel::Draw(HDC hdc, const RECT *prcPaint)
 				if (m_fShowFeaturedMark
 						&& m_FeaturedEventsMatcher.IsMatch(pItem->GetEventInfo())) {
 					RECT rcMark;
-					SIZE sz = pItem->GetTimeSize(hdc);
+					const SIZE sz = pItem->GetTimeSize(hdc);
 					if (m_fUseEpgColorScheme) {
 						rcMark.left = rcTitle.left;
 						rcMark.top = rcTitle.top;
@@ -1444,7 +1422,7 @@ CProgramListPanel::CEventInfoPopupHandler::CEventInfoPopupHandler(CProgramListPa
 
 bool CProgramListPanel::CEventInfoPopupHandler::HitTest(int x, int y, LPARAM *pParam)
 {
-	int Program = m_pPanel->ProgramHitTest(x, y);
+	const int Program = m_pPanel->ProgramHitTest(x, y);
 
 	if (Program >= 0) {
 		*pParam = Program;
@@ -1463,16 +1441,14 @@ bool CProgramListPanel::CEventInfoPopupHandler::ShowPopup(LPARAM Param, CEventIn
 
 	int IconWidth, IconHeight;
 	pPopup->GetPreferredIconSize(&IconWidth, &IconHeight);
-	HICON hIcon = GetAppClass().LogoManager.CreateLogoIcon(
+	const HICON hIcon = GetAppClass().LogoManager.CreateLogoIcon(
 		m_pPanel->m_SelectedChannel.GetNetworkID(),
 		m_pPanel->m_SelectedChannel.GetServiceID(),
 		IconWidth, IconHeight);
 
 	RECT rc;
-	POINT pt;
 	m_pPanel->GetItemRect(ItemIndex, &rc);
-	pt.x = rc.left;
-	pt.y = rc.bottom;
+	POINT pt = {rc.left, rc.bottom};
 	::ClientToScreen(m_pPanel->m_hwnd, &pt);
 	pPopup->GetDefaultPopupPosition(&rc);
 	if (rc.top > pt.y) {
@@ -1492,23 +1468,6 @@ bool CProgramListPanel::CEventInfoPopupHandler::ShowPopup(LPARAM Param, CEventIn
 }
 
 
-
-
-CProgramListPanel::ProgramListPanelStyle::ProgramListPanelStyle()
-	: ChannelPadding(3, 3, 3, 3)
-	, ChannelLogoMargin(0, 0, 3, 0)
-	, ChannelNameMargin(0, 2, 0, 2)
-	, ChannelButtonIconSize(12, 12)
-	, ChannelButtonPadding(2)
-	, ChannelButtonMargin(12)
-	, TitlePadding(2)
-	, IconSize(CEpgIcons::DEFAULT_ICON_WIDTH, CEpgIcons::DEFAULT_ICON_HEIGHT)
-	, IconMargin(1)
-	, LineSpacing(1)
-	, FeaturedMarkSize(5, 5)
-	, FeaturedMarkMargin(0)
-{
-}
 
 
 void CProgramListPanel::ProgramListPanelStyle::SetStyle(const Style::CStyleManager *pStyleManager)

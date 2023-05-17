@@ -34,7 +34,7 @@ namespace TVTest
 	public:
 		typedef std::vector<CHARRANGE> CharRangeList;
 
-		CRichEditUtil();
+		CRichEditUtil() = default;
 		~CRichEditUtil();
 
 		CRichEditUtil(const CRichEditUtil &) = delete;
@@ -60,6 +60,7 @@ namespace TVTest
 			None        = 0x0000U,
 			NoLink      = 0x0001U,
 			ToHalfWidth = 0x0002U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 		static bool DetectURL(
 			HWND hwndEdit, const CHARFORMAT *pcf, int FirstLine = 0, int LastLine = -1,
@@ -69,7 +70,7 @@ namespace TVTest
 		static int LinkHitTest(HWND hwndEdit, const POINT &Pos, const CharRangeList &LinkList);
 
 	private:
-		HMODULE m_hLib;
+		HMODULE m_hLib = nullptr;
 
 		static const LPCTSTR m_pszURLChars;
 		static const LPCTSTR m_pszURLFullWidthChars;
@@ -77,8 +78,6 @@ namespace TVTest
 		static bool SearchNextURL(LPCTSTR *ppszText, int *pLength);
 		static bool OpenLink(HWND hwndEdit, const CHARRANGE &Range);
 	};
-
-	TVTEST_ENUM_FLAGS(CRichEditUtil::DetectURLFlag)
 
 	/*
 		リッチエディットの標準のハイパーリンク機能では文字色を変更できないため、

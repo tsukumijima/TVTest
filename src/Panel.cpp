@@ -69,12 +69,6 @@ bool CPanel::Initialize(HINSTANCE hinst)
 
 
 CPanel::CPanel()
-	: m_TitleHeight(0)
-	, m_pContent(nullptr)
-	, m_fShowTitle(false)
-	, m_fEnableFloating(true)
-	, m_pEventHandler(nullptr)
-	, m_HotItem(ItemType::None)
 {
 	GetSystemFont(DrawUtil::FontType::Caption, &m_StyleFont);
 }
@@ -245,8 +239,8 @@ void CPanel::CalcDimensions()
 {
 	m_FontHeight = Style::GetFontHeight(
 		m_hwnd, m_Font.GetHandle(), m_Style.TitleLabelExtraHeight);
-	int LabelHeight = m_FontHeight + m_Style.TitleLabelMargin.Vert();
-	int ButtonHeight =
+	const int LabelHeight = m_FontHeight + m_Style.TitleLabelMargin.Vert();
+	const int ButtonHeight =
 		m_Style.TitleButtonIconSize.Height +
 		m_Style.TitleButtonPadding.Vert();
 	Theme::BorderStyle Border = m_Theme.TitleStyle.Back.Border;
@@ -367,10 +361,8 @@ LRESULT CPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 	case WM_LBUTTONDOWN:
 		{
-			POINT pt;
+			POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
 
-			pt.x = GET_X_LPARAM(lParam);
-			pt.y = GET_Y_LPARAM(lParam);
 			if (m_fShowTitle && pt.y < m_TitleHeight) {
 				RECT rc;
 
@@ -382,8 +374,8 @@ LRESULT CPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				} else {
 					SetHotItem(ItemType::None);
 					if (m_fEnableFloating) {
-						::ClientToScreen(hwnd, &pt);
 						m_fCloseButtonPushed = false;
+						::ClientToScreen(hwnd, &pt);
 						m_ptDragStartPos = pt;
 						::SetCapture(hwnd);
 					}
@@ -394,15 +386,13 @@ LRESULT CPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 	case WM_LBUTTONUP:
 		if (::GetCapture() == hwnd) {
-			bool fCloseButtonPushed = m_fCloseButtonPushed;
+			const bool fCloseButtonPushed = m_fCloseButtonPushed;
 
 			::ReleaseCapture();
 			if (fCloseButtonPushed) {
-				POINT pt;
+				const POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
 				RECT rc;
 
-				pt.x = GET_X_LPARAM(lParam);
-				pt.y = GET_Y_LPARAM(lParam);
 				GetCloseButtonRect(&rc);
 				if (::PtInRect(&rc, pt)) {
 					if (m_pEventHandler != nullptr)
@@ -414,10 +404,7 @@ LRESULT CPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 	case WM_MOUSEMOVE:
 		{
-			POINT pt;
-
-			pt.x = GET_X_LPARAM(lParam);
-			pt.y = GET_Y_LPARAM(lParam);
+			POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
 
 			RECT rc;
 			GetCloseButtonRect(&rc);
@@ -429,8 +416,8 @@ LRESULT CPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			if (::GetCapture() == hwnd) {
 				if (!m_fCloseButtonPushed) {
 					::ClientToScreen(hwnd, &pt);
-					if (abs(pt.x - m_ptDragStartPos.x) >= 4
-							|| abs(pt.y - m_ptDragStartPos.y) >= 4) {
+					if (std::abs(pt.x - m_ptDragStartPos.x) >= 4
+							|| std::abs(pt.y - m_ptDragStartPos.y) >= 4) {
 						::ReleaseCapture();
 						if (m_pEventHandler != nullptr
 								&& m_pEventHandler->OnFloating()) {
@@ -453,7 +440,7 @@ LRESULT CPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		return 0;
 
 	case WM_SETCURSOR:
-		if ((HWND)wParam == hwnd && LOWORD(lParam) == HTCLIENT && m_HotItem != ItemType::None) {
+		if (reinterpret_cast<HWND>(wParam) == hwnd && LOWORD(lParam) == HTCLIENT && m_HotItem != ItemType::None) {
 			::SetCursor(GetActionCursor());
 			return TRUE;
 		}
@@ -468,20 +455,18 @@ LRESULT CPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 	case WM_RBUTTONUP:
 		{
-			POINT pt;
+			POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
 
-			pt.x = GET_X_LPARAM(lParam);
-			pt.y = GET_Y_LPARAM(lParam);
 			if (m_fShowTitle && pt.y < m_TitleHeight
 					&& m_pEventHandler != nullptr) {
-				HMENU hmenu = ::CreatePopupMenu();
+				const HMENU hmenu = ::CreatePopupMenu();
 
 				::AppendMenu(hmenu, MF_STRING | MF_ENABLED, 1, TEXT("閉じる(&C)"));
 				if (m_fEnableFloating)
 					::AppendMenu(hmenu, MF_STRING | MF_ENABLED, 2, TEXT("切り離す(&F)"));
 				m_pEventHandler->OnMenuPopup(hmenu);
 				::ClientToScreen(hwnd, &pt);
-				int Command = ::TrackPopupMenu(
+				const int Command = ::TrackPopupMenu(
 					hmenu, TPM_RIGHTBUTTON | TPM_RETURNCMD, pt.x, pt.y, 0, hwnd, nullptr);
 				switch (Command) {
 				case 0:
@@ -502,7 +487,7 @@ LRESULT CPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 	case WM_KEYDOWN:
 		if (m_pEventHandler != nullptr
-				&& m_pEventHandler->OnKeyDown((UINT)wParam, (UINT)lParam))
+				&& m_pEventHandler->OnKeyDown(static_cast<UINT>(wParam), static_cast<UINT>(lParam)))
 			return 0;
 		break;
 	}
@@ -533,16 +518,6 @@ void CPanel::RealizeStyle()
 		SendSizeMessage();
 		Invalidate();
 	}
-}
-
-
-CPanel::PanelStyle::PanelStyle()
-	: TitlePadding(0, 0, 4, 0)
-	, TitleLabelMargin(4, 2, 4, 2)
-	, TitleLabelExtraHeight(4)
-	, TitleButtonIconSize(12, 12)
-	, TitleButtonPadding(2)
-{
 }
 
 
@@ -598,13 +573,6 @@ bool CPanelFrame::Initialize(HINSTANCE hinst)
 
 
 CPanelFrame::CPanelFrame()
-	: m_fFloating(true)
-	, m_fFloatingTransition(false)
-	, m_DockingWidth(-1)
-	, m_DockingHeight(-1)
-	, m_Opacity(255)
-	, m_DragDockingTarget(DockingPlace::None)
-	, m_pEventHandler(nullptr)
 {
 	m_WindowPosition.Left = 120;
 	m_WindowPosition.Top = 120;
@@ -842,7 +810,7 @@ LRESULT CPanelFrame::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 	case WM_CREATE:
 		{
 			m_fDragMoving = false;
-			HMENU hmenu = GetSystemMenu(hwnd, FALSE);
+			const HMENU hmenu = GetSystemMenu(hwnd, FALSE);
 			InsertMenu(hmenu, 0, MF_BYPOSITION | MF_STRING | MF_ENABLED, SC_DOCKING, TEXT("ドッキング(&D)"));
 			InsertMenu(hmenu, 1, MF_BYPOSITION | MF_SEPARATOR, 0, nullptr);
 		}
@@ -859,7 +827,7 @@ LRESULT CPanelFrame::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 
 	case WM_KEYDOWN:
 		if (m_pEventHandler != nullptr
-				&& m_pEventHandler->OnKeyDown((UINT)wParam, (UINT)lParam))
+				&& m_pEventHandler->OnKeyDown(static_cast<UINT>(wParam), static_cast<UINT>(lParam)))
 			return 0;
 		break;
 
@@ -886,11 +854,10 @@ LRESULT CPanelFrame::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 			const int Margin = m_pStyleScaling->GetScaledSystemMetrics(SM_CYCAPTION);
 			POINT pt;
 			RECT rcTarget, rc;
-			DockingPlace Target;
+			DockingPlace Target = DockingPlace::None;
 
 			::GetCursorPos(&pt);
 			m_pSplitter->GetLayoutBase()->GetScreenPosition(&rcTarget);
-			Target = DockingPlace::None;
 			rc = rcTarget;
 			rc.right = rc.left + Margin;
 			if (::PtInRect(&rc, pt)) {
@@ -1054,7 +1021,7 @@ bool CPanelFrame::OnMenuPopup(HMENU hmenu)
 	::AppendMenu(hmenu, MF_STRING | MF_ENABLED, PANEL_MENU_RIGHT, TEXT("右へ(&R)"));
 	::AppendMenu(hmenu, MF_STRING | MF_ENABLED, PANEL_MENU_TOP, TEXT("上へ(&T)"));
 	::AppendMenu(hmenu, MF_STRING | MF_ENABLED, PANEL_MENU_BOTTOM, TEXT("下へ(&B)"));
-	int Index = m_pSplitter->IDToIndex(m_PanelID);
+	const int Index = m_pSplitter->IDToIndex(m_PanelID);
 	::EnableMenuItem(
 		hmenu,
 		IsDockingVertical() ?
@@ -1111,12 +1078,6 @@ bool CDropHelper::Initialize(HINSTANCE hinst)
 		m_hinst = hinst;
 	}
 	return true;
-}
-
-
-CDropHelper::CDropHelper()
-	: m_Opacity(128)
-{
 }
 
 

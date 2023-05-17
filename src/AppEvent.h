@@ -36,8 +36,8 @@ namespace TVTest
 			None         = 0x0000U,
 			SpaceChanged = 0x0001U,
 			Detected     = 0x0002U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
-		TVTEST_ENUM_FLAGS(ChannelChangeStatus)
 
 		struct RecordingStartInfo
 		{
@@ -91,6 +91,8 @@ namespace TVTest
 		virtual void OnDarkModeChanged(bool fDarkMode) {}
 		virtual void OnMainWindowDarkModeChanged(bool fDarkMode) {}
 		virtual void OnProgramGuideDarkModeChanged(bool fDarkMode) {}
+		virtual void OnEventChanged() {}
+		virtual void OnEventInfoChanged() {}
 	};
 
 	class CAppEventManager
@@ -138,13 +140,22 @@ namespace TVTest
 		void OnDarkModeChanged(bool fDarkMode);
 		void OnMainWindowDarkModeChanged(bool fDarkMode);
 		void OnProgramGuideDarkModeChanged(bool fDarkMode);
+		void OnEventChanged();
+		void OnEventInfoChanged();
 
 	private:
 		std::vector<CAppEventHandler*> m_HandlerList;
 
-		template<typename T> void EnumHandlers(T Pred) {
+		template<typename T> void EnumHandlers(T Pred)
+		{
 			for (auto Handler : m_HandlerList)
 				Pred(Handler);
+		}
+
+		template<typename TMember, typename... TArgs> void CallHandlers(TMember Member, TArgs... Args) const
+		{
+			for (auto Handler : m_HandlerList)
+				(Handler->*Member)(Args...);
 		}
 	};
 

@@ -31,18 +31,6 @@ namespace TVTest
 {
 
 
-CTSPacketInterface::CTSPacketInterface()
-	: m_pData(nullptr)
-	, m_fModified(false)
-{
-}
-
-
-CTSPacketInterface::~CTSPacketInterface()
-{
-}
-
-
 STDMETHODIMP CTSPacketInterface::QueryInterface(REFIID riid, void **ppvObject)
 {
 	if (ppvObject == nullptr)
@@ -117,13 +105,7 @@ STDMETHODIMP CTSPacketInterface::SetDataBuffer(LibISDB::DataBuffer *pData)
 
 CTSProcessor::CTSProcessor(Interface::ITSProcessor *pTSProcessor)
 	: m_pTSProcessor(pTSProcessor)
-	, m_pFilterManager(nullptr)
-	, m_pFilterModule(nullptr)
-	, m_pFilter(nullptr)
 	, m_pTSPacket(new CTSPacketInterface)
-	, m_fSourceProcessor(false)
-	, m_pEventHandler(nullptr)
-	, m_CurDevice(-1)
 {
 	m_pTSProcessor->AddRef();
 	m_pTSProcessor->QueryInterface(IID_PPV_ARGS(&m_pFilterManager));
@@ -146,7 +128,7 @@ bool CTSProcessor::Initialize()
 	if (FAILED(m_pTSProcessor->Initialize(this)))
 		return false;
 	m_pTSProcessor->StartStreaming(this);
-	return S_OK;
+	return true;
 }
 
 
@@ -239,7 +221,7 @@ bool CTSProcessor::LoadProperties(IPropertyBag *pPropBag)
 	if (FAILED(m_pTSProcessor->QueryInterface(IID_PPV_ARGS(&pPersistPropBag))))
 		return false;
 
-	HRESULT hr = pPersistPropBag->Load(pPropBag, nullptr);
+	const HRESULT hr = pPersistPropBag->Load(pPropBag, nullptr);
 
 	pPersistPropBag->Release();
 
@@ -254,7 +236,7 @@ bool CTSProcessor::SaveProperties(IPropertyBag *pPropBag)
 	if (FAILED(m_pTSProcessor->QueryInterface(IID_PPV_ARGS(&pPersistPropBag))))
 		return false;
 
-	HRESULT hr = pPersistPropBag->Save(pPropBag, FALSE, TRUE);
+	const HRESULT hr = pPersistPropBag->Save(pPropBag, FALSE, TRUE);
 
 	pPersistPropBag->Release();
 
@@ -290,19 +272,18 @@ bool CTSProcessor::ShowPropertyPage(HWND hwndOwner, HINSTANCE hinst)
 		if (Pages.cElems > 0) {
 			ISpecifyPropertyPages2 *pSpecifyPropPages2;
 			if (SUCCEEDED(pSpecifyPropPages->QueryInterface(IID_PPV_ARGS(&pSpecifyPropPages2)))) {
-				IPropertyPage **ppPropPages = new IPropertyPage*[Pages.cElems];
+				std::vector<IPropertyPage *> PropPages(Pages.cElems);
 				ULONG PageCount = 0;
 				for (ULONG i = 0; i < Pages.cElems; i++) {
 					IPropertyPage *pPropPage;
 					if (SUCCEEDED(pSpecifyPropPages2->CreatePage(Pages.pElems[i], &pPropPage)))
-						ppPropPages[PageCount++] = pPropPage;
+						PropPages[PageCount++] = pPropPage;
 				}
 				if (PageCount > 0) {
-					hr = ShowPropertyPageFrame(ppPropPages, PageCount, m_pTSProcessor, hwndOwner, hinst);
+					hr = ShowPropertyPageFrame(PropPages.data(), PageCount, m_pTSProcessor, hwndOwner, hinst);
 				}
 				for (ULONG i = 0; i < PageCount; i++)
-					ppPropPages[i]->Release();
-				delete [] ppPropPages;
+					PropPages[i]->Release();
 				pSpecifyPropPages2->Release();
 			} else {
 				IUnknown *pObject;
@@ -356,8 +337,8 @@ bool CTSProcessor::GetModuleList(std::vector<String> *pList) const
 	pEnumModule->Release();
 
 	if (pList->size() > 1) {
-		std::sort(
-			pList->begin(), pList->end(),
+		std::ranges::sort(
+			*pList,
 			[](const String &Lib1, const String &Lib2) {
 				return StringUtility::CompareNoCase(Lib1, Lib2) < 0;
 			});
@@ -542,7 +523,7 @@ bool CTSProcessor::GetDeviceInfo(int Device, FilterDeviceInfo *pInfo) const
 
 		if (SUCCEEDED(m_pFilterModule->GetDevice(Device, &pDevice))) {
 			Interface::FilterDeviceInfo Info;
-			HRESULT hr = pDevice->GetDeviceInfo(&Info);
+			const HRESULT hr = pDevice->GetDeviceInfo(&Info);
 			pDevice->Release();
 			if (SUCCEEDED(hr)) {
 				pInfo->DeviceID = Info.DeviceID;
@@ -585,7 +566,7 @@ bool CTSProcessor::GetDeviceList(std::vector<String> *pList) const
 
 	pList->clear();
 
-	int Count = GetDeviceCount();
+	const int Count = GetDeviceCount();
 
 	for (int i = 0; i < Count; i++) {
 		String Name;
@@ -749,7 +730,7 @@ bool CTSProcessor::OpenFilter(int Device, LPCWSTR pszName)
 
 bool CTSProcessor::OpenFilter(LPCWSTR pszDevice, LPCWSTR pszName)
 {
-	int Device = GetDeviceByName(pszDevice);
+	const int Device = GetDeviceByName(pszDevice);
 	if (Device < 0)
 		return false;
 
@@ -934,7 +915,7 @@ STDMETHODIMP CTSProcessor::OutputPacket(Interface::ITSPacket *pPacket)
 			LibISDB::TSPacket *pPacketData = static_cast<LibISDB::TSPacket *>(pData);
 #else
 			LibISDB::TSPacket *pPacketData = dynamic_cast<LibISDB::TSPacket *>(pData);
-			_ASSERT(pPacketData != nullptr);
+			TVTEST_ASSERT(pPacketData != nullptr);
 #endif
 
 			if (pPacket->GetModified() == S_OK) {

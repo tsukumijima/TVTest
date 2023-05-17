@@ -10,9 +10,13 @@
 */
 
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include <windows.h>
 #include <tchar.h>
 #include <shlwapi.h>
+
 #define TVTEST_PLUGIN_CLASS_IMPLEMENT
 #include "TVTestPlugin.h"
 #include "HDUSRemocon_KeyHook.h"
@@ -20,9 +24,6 @@
 
 #pragma comment(lib, "shlwapi.lib")
 
-
-// コントローラ名
-#define HDUS_REMOCON_NAME L"HDUS Remocon"
 
 // ボタンのリスト
 static const struct {
@@ -74,16 +75,20 @@ static const struct {
 #endif
 };
 
-#define NUM_BUTTONS (sizeof(g_ButtonList) / sizeof(g_ButtonList[0]))
-
 
 // プラグインクラス
 class CHDUSRemocon : public TVTest::CTVTestPlugin
 {
-	bool m_fInitialized;   // 初期化済みか?
-	HMODULE m_hLib;        // フックDLLのハンドル
-	bool m_fHook;          // フックしているか?
-	static UINT m_Message; // フックDLLから送られるメッセージ
+	// コントローラ名
+	static const LPCTSTR HDUS_REMOCON_NAME; 
+
+	// ボタンの数
+	static constexpr int NUM_BUTTONS = sizeof(g_ButtonList) / sizeof(g_ButtonList[0]);
+
+	bool m_fInitialized = false; // 初期化済みか?
+	HMODULE m_hLib = nullptr;    // フックDLLのハンドル
+	bool m_fHook = false;        // フックしているか?
+	static UINT m_Message;       // フックDLLから送られるメッセージ
 
 	bool InitializePlugin();
 	bool BeginHook();
@@ -97,22 +102,15 @@ class CHDUSRemocon : public TVTest::CTVTestPlugin
 	static BOOL CALLBACK TranslateMessageCallback(HWND hwnd, MSG *pMessage, void *pClientData);
 
 public:
-	CHDUSRemocon();
-	virtual bool GetPluginInfo(TVTest::PluginInfo *pInfo);
-	virtual bool Initialize();
-	virtual bool Finalize();
+	bool GetPluginInfo(TVTest::PluginInfo *pInfo) override;
+	bool Initialize() override;
+	bool Finalize() override;
 };
 
 
+const LPCTSTR CHDUSRemocon::HDUS_REMOCON_NAME = L"HDUS Remocon";
+
 UINT CHDUSRemocon::m_Message = 0;
-
-
-CHDUSRemocon::CHDUSRemocon()
-	: m_fInitialized(false)
-	, m_hLib(nullptr)
-	, m_fHook(false)
-{
-}
 
 
 bool CHDUSRemocon::GetPluginInfo(TVTest::PluginInfo *pInfo)

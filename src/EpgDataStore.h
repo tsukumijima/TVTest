@@ -43,6 +43,7 @@ namespace TVTest
 		enum class OpenFlag : unsigned int {
 			None           = 0x0000U,
 			LoadBackground = 0x0001U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 		CEpgDataStore();
@@ -69,14 +70,12 @@ namespace TVTest
 		static unsigned int __stdcall LoadThread(void *pParameter);
 
 		LibISDB::EPGDataFile m_EPGDataFile;
-		OpenFlag m_OpenFlags;
-		HANDLE m_hThread;
-		CEventHandler *m_pEventHandler;
-		uint64_t m_UpdateCount;
-		DWORD m_LockTimeout;
+		OpenFlag m_OpenFlags = OpenFlag::None;
+		HANDLE m_hThread = nullptr;
+		CEventHandler *m_pEventHandler = nullptr;
+		uint64_t m_UpdateCount = 0;
+		DWORD m_LockTimeout = 10000;
 	};
-
-	TVTEST_ENUM_FLAGS(CEpgDataStore::OpenFlag)
 
 }	// namespace TVTest
 

@@ -63,15 +63,9 @@ bool CColorPalette::Initialize(HINSTANCE hinst)
 }
 
 
-CColorPalette::CColorPalette()
-	: m_NumColors(0)
-	, m_BackColor(CLR_INVALID)
-{
-}
-
-
 CColorPalette::~CColorPalette()
 {
+	Destroy();
 }
 
 
@@ -87,7 +81,7 @@ bool CColorPalette::GetPalette(RGBQUAD *pPalette)
 {
 	if (!m_Palette)
 		return false;
-	CopyMemory(pPalette, m_Palette.get(), m_NumColors * sizeof(RGBQUAD));
+	std::memcpy(pPalette, m_Palette.get(), m_NumColors * sizeof(RGBQUAD));
 	return true;
 }
 
@@ -100,7 +94,7 @@ bool CColorPalette::SetPalette(const RGBQUAD *pPalette, int NumColors)
 		m_Palette = std::make_unique<RGBQUAD[]>(NumColors);
 		m_NumColors = NumColors;
 	}
-	CopyMemory(m_Palette.get(), pPalette, NumColors * sizeof(RGBQUAD));
+	std::memcpy(m_Palette.get(), pPalette, NumColors * sizeof(RGBQUAD));
 	m_SelColor = -1;
 	m_HotColor = -1;
 	InvalidateRect(m_hwnd, nullptr, TRUE);
@@ -119,15 +113,17 @@ COLORREF CColorPalette::GetColor(int Index) const
 
 bool CColorPalette::SetColor(int Index, COLORREF Color)
 {
-	RECT rc;
-
 	if (Index < 0 || Index >= m_NumColors)
 		return false;
+
 	m_Palette[Index].rgbBlue = GetBValue(Color);
 	m_Palette[Index].rgbGreen = GetGValue(Color);
 	m_Palette[Index].rgbRed = GetRValue(Color);
+
+	RECT rc;
 	GetItemRect(Index, &rc);
 	InvalidateRect(m_hwnd, &rc, TRUE);
+
 	return true;
 }
 
@@ -186,10 +182,8 @@ void CColorPalette::SetBackColor(COLORREF Color)
 
 void CColorPalette::GetItemRect(int Index, RECT *pRect) const
 {
-	int x, y;
-
-	x = m_Left + Index % 16 * m_ItemWidth;
-	y = m_Top + Index / 16 * m_ItemHeight;
+	const int x = m_Left + Index % 16 * m_ItemWidth;
+	const int y = m_Top + Index / 16 * m_ItemHeight;
 	pRect->left = x;
 	pRect->top = y;
 	pRect->right = x + m_ItemWidth;
@@ -199,15 +193,12 @@ void CColorPalette::GetItemRect(int Index, RECT *pRect) const
 
 void CColorPalette::DrawSelRect(HDC hdc, int Sel, bool fSel)
 {
-	HPEN hpen, hpenOld;
-	HBRUSH hbrOld;
-	RECT rc;
-
-	hpen = CreatePen(
+	const HPEN hpen = CreatePen(
 		PS_INSIDEFRAME, 2,
 		fSel || m_BackColor == CLR_INVALID ? GetSysColor(fSel ? COLOR_HIGHLIGHT : COLOR_3DFACE) : m_BackColor);
-	hpenOld = SelectPen(hdc, hpen);
-	hbrOld = SelectBrush(hdc, GetStockObject(NULL_BRUSH));
+	const HPEN hpenOld = SelectPen(hdc, hpen);
+	const HBRUSH hbrOld = SelectBrush(hdc, GetStockObject(NULL_BRUSH));
+	RECT rc;
 	GetItemRect(Sel, &rc);
 	InflateRect(&rc, 1, 1);
 	Rectangle(hdc, rc.left, rc.top, rc.right, rc.bottom);
@@ -219,9 +210,8 @@ void CColorPalette::DrawSelRect(HDC hdc, int Sel, bool fSel)
 
 void CColorPalette::DrawNewSelHighlight(int OldSel, int NewSel)
 {
-	HDC hdc;
+	const HDC hdc = GetDC(m_hwnd);
 
-	hdc = GetDC(m_hwnd);
 	if (OldSel >= 0)
 		DrawSelRect(hdc, OldSel, false);
 	if (NewSel >= 0)
@@ -232,16 +222,14 @@ void CColorPalette::DrawNewSelHighlight(int OldSel, int NewSel)
 
 void CColorPalette::SetToolTip()
 {
-	int NumTools, i;
-	RECT rc;
-
-	NumTools = m_Tooltip.NumTools();
+	int NumTools = m_Tooltip.NumTools();
 	if (NumTools > m_NumColors) {
 		do {
 			m_Tooltip.DeleteTool(--NumTools);
 		} while (NumTools > m_NumColors);
 	}
-	for (i = 0; i < m_NumColors; i++) {
+	for (int i = 0; i < m_NumColors; i++) {
+		RECT rc;
 		GetItemRect(i, &rc);
 		if (i < NumTools)
 			m_Tooltip.SetToolRect(i, rc);
@@ -253,7 +241,7 @@ void CColorPalette::SetToolTip()
 
 void CColorPalette::SendNotify(int Code)
 {
-	::SendMessage(GetParent(), WM_COMMAND, MAKEWPARAM(GetWindowLong(m_hwnd, GWL_ID), Code), (LPARAM)m_hwnd);
+	::SendMessage(GetParent(), WM_COMMAND, MAKEWPARAM(GetWindowLong(m_hwnd, GWL_ID), Code), reinterpret_cast<LPARAM>(m_hwnd));
 }
 
 
@@ -268,7 +256,7 @@ LRESULT CColorPalette::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 
 	case WM_SIZE:
 		{
-			int sx = LOWORD(lParam), sy = HIWORD(lParam);
+			const int sx = LOWORD(lParam), sy = HIWORD(lParam);
 
 			m_ItemWidth = std::max(sx / 16, 6);
 			m_ItemHeight = std::max(sy / 16, 6);
@@ -282,8 +270,6 @@ LRESULT CColorPalette::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 	case WM_PAINT:
 		if (m_Palette) {
 			PAINTSTRUCT ps;
-			int x, y;
-			RECT rc;
 
 			::BeginPaint(hwnd, &ps);
 
@@ -293,8 +279,9 @@ LRESULT CColorPalette::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 				::FillRect(ps.hdc, &ps.rcPaint, reinterpret_cast<HBRUSH>(COLOR_3DFACE + 1));
 
 			for (int i = 0; i < m_NumColors; i++) {
-				x = i % 16;
-				y = i / 16;
+				const int x = i % 16;
+				const int y = i / 16;
+				RECT rc;
 				rc.left = m_Left + x * m_ItemWidth + 2;
 				rc.top = m_Top + y * m_ItemHeight + 2;
 				rc.right = rc.left + m_ItemWidth - 4;
@@ -317,12 +304,8 @@ LRESULT CColorPalette::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 
 	case WM_MOUSEMOVE:
 		if (m_Palette) {
-			POINT ptCursor;
-			int Hot;
-
-			ptCursor.x = GET_X_LPARAM(lParam);
-			ptCursor.y = GET_Y_LPARAM(lParam);
-			Hot =
+			const POINT ptCursor = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+			int Hot =
 				(ptCursor.y - m_Top) / m_ItemHeight * 16 +
 				(ptCursor.x - m_Left) / m_ItemWidth;
 			if (ptCursor.x < m_Left
@@ -341,12 +324,8 @@ LRESULT CColorPalette::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 	case WM_LBUTTONDOWN:
 	case WM_RBUTTONDOWN:
 		if (m_Palette) {
-			POINT ptCursor;
-			int Sel;
-
-			ptCursor.x = GET_X_LPARAM(lParam);
-			ptCursor.y = GET_Y_LPARAM(lParam);
-			Sel =
+			const POINT ptCursor = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+			const int Sel =
 				(ptCursor.y - m_Top) / m_ItemHeight * 16 +
 				(ptCursor.x - m_Left) / m_ItemWidth;
 			if (ptCursor.x < m_Left
@@ -369,21 +348,19 @@ LRESULT CColorPalette::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 		return 0;
 
 	case WM_NOTIFY:
-		switch (((LPNMHDR)lParam)->code) {
+		switch (reinterpret_cast<LPNMHDR>(lParam)->code) {
 		case TTN_NEEDTEXT:
 			{
 				LPNMTTDISPINFO pttdi = reinterpret_cast<LPNMTTDISPINFO>(lParam);
-				int Index = (int)pttdi->hdr.idFrom;
+				const int Index = static_cast<int>(pttdi->hdr.idFrom);
 
 				pttdi->lpszText = pttdi->szText;
 				pttdi->hinst = nullptr;
 				if (Index >= 0 && Index < m_NumColors) {
-					int r, g, b;
-
-					r = m_Palette[Index].rgbRed;
-					g = m_Palette[Index].rgbGreen;
-					b = m_Palette[Index].rgbBlue;
-					StringPrintf(pttdi->szText, TEXT("%d,%d,%d #%02X%02X%02X"), r, g, b, r, g, b);
+					const int r = m_Palette[Index].rgbRed;
+					const int g = m_Palette[Index].rgbGreen;
+					const int b = m_Palette[Index].rgbBlue;
+					StringFormat(pttdi->szText, TEXT("{0},{1},{2} #{0:02X}{1:02X}{2:02X}"), r, g, b);
 				} else {
 					pttdi->szText[0] = '\0';
 				}

@@ -39,12 +39,12 @@ namespace TVTest
 	class ABSTRACT_CLASS(CBasicWindow)
 	{
 	protected:
-		HWND m_hwnd;
+		HWND m_hwnd = nullptr;
 		struct {
 			int Left, Top;
 			int Width, Height;
 			bool fMaximized;
-		} m_WindowPosition;
+		} m_WindowPosition = {0, 0, 0, 0, false};
 
 		bool CreateBasicWindow(
 			HWND hwndParent, DWORD Style, DWORD ExStyle, int ID,
@@ -54,7 +54,7 @@ namespace TVTest
 		static CBasicWindow *GetBasicWindow(HWND hwnd);
 
 	public:
-		CBasicWindow();
+		CBasicWindow() = default;
 		virtual ~CBasicWindow();
 
 		CBasicWindow(const CBasicWindow &) = delete;
@@ -105,7 +105,6 @@ namespace TVTest
 		virtual LRESULT OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 	public:
-		CCustomWindow();
 		virtual ~CCustomWindow();
 	};
 

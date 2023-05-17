@@ -84,6 +84,7 @@ namespace TVTest
 			NoCurrentTime = 0x0002U,
 			NoTOTTime     = 0x0004U,
 			NoSeparator   = 0x0008U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 		struct EventInfo
@@ -94,7 +95,7 @@ namespace TVTest
 			LibISDB::DateTime TOTTime;
 		};
 
-		CEventVariableStringMap();
+		CEventVariableStringMap() = default;
 		CEventVariableStringMap(const EventInfo &Info);
 
 		bool BeginFormat() override;
@@ -111,13 +112,11 @@ namespace TVTest
 		static void GetEventTitle(const String &EventName, String *pTitle);
 		static void GetEventMark(const String &EventName, String *pMarks);
 
-		Flag m_Flags;
+		Flag m_Flags = Flag::None;
 		EventInfo m_EventInfo;
-		bool m_fCurrentTimeSet;
+		bool m_fCurrentTimeSet = false;
 		LibISDB::DateTime m_CurrentTime;
 	};
-
-	TVTEST_ENUM_FLAGS(CEventVariableStringMap::Flag)
 
 }
 

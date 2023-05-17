@@ -15,11 +15,23 @@
 */
 
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include <windows.h>
-#include <gdiplus.h>
+#include <objbase.h>
 #include <shlwapi.h>
+#include <algorithm>
 #define _USE_MATH_DEFINES
 #include <cmath>
+
+// Windows SDK version 2104 (10.0.20348.0) より前は Gdiplus に min / max の宣言が必要
+namespace Gdiplus {
+	using std::min;
+	using std::max;
+}
+#include <gdiplus.h>
+
 #define TVTEST_PLUGIN_CLASS_IMPLEMENT // クラスとして実装
 #include "TVTestPlugin.h"
 #include "resource.h"
@@ -32,29 +44,18 @@
 extern "C" void rdft(int n, int isgn, double *a, int *ip, double *w);
 
 
-// FFT 処理を行うサンプル数
-#define FFT_SIZE_BITS 10
-#define FFT_SIZE (1 << FFT_SIZE_BITS)
-// 帯域分割数
-#define NUM_BANDS 20
-// レベル分割数
-#define NUM_LEVELS 30
-
-
 // プラグインクラス
 class CSpectrumAnalyzer : public TVTest::CTVTestPlugin
 {
 public:
-	CSpectrumAnalyzer();
-	virtual bool GetPluginInfo(TVTest::PluginInfo *pInfo);
-	virtual bool Initialize();
-	virtual bool Finalize();
+	bool GetPluginInfo(TVTest::PluginInfo *pInfo) override;
+	bool Initialize() override;
+	bool Finalize() override;
 
 private:
 	struct Position
 	{
-		int Left, Top, Width, Height;
-		Position() : Left(0), Top(0), Width(0), Height(0) {}
+		int Left = 0, Top = 0, Width = 0, Height = 0;
 	};
 
 	class CCriticalLock
@@ -77,24 +78,32 @@ private:
 		CRITICAL_SECTION m_CriticalSection;
 	};
 
-	bool m_fInitialized;
-	HWND m_hwnd;
+	// FFT 処理を行うサンプル数
+	static constexpr int FFT_SIZE_BITS = 10;
+	static constexpr int FFT_SIZE = 1 << FFT_SIZE_BITS;
+	// 帯域分割数
+	static constexpr int NUM_BANDS = 20;
+	// レベル分割数
+	static constexpr int NUM_LEVELS = 30;
+
+	bool m_fInitialized = false;
+	HWND m_hwnd = nullptr;
 	Position m_WindowPosition;
 	int m_DPI;
-	Gdiplus::Color m_BackColor;
-	Gdiplus::Color m_SpectrumColor1;
-	Gdiplus::Color m_SpectrumColor2;
-	Gdiplus::SolidBrush *m_pBrush;
-	Gdiplus::Graphics *m_pOffscreen;
-	Gdiplus::Bitmap *m_pOffscreenImage;
+	Gdiplus::Color m_BackColor{255, 0, 0, 0};
+	Gdiplus::Color m_SpectrumColor1{255, 0, 224, 0};
+	Gdiplus::Color m_SpectrumColor2{255, 255, 128, 0};
+	Gdiplus::SolidBrush *m_pBrush = nullptr;
+	Gdiplus::Graphics *m_pOffscreen = nullptr;
+	Gdiplus::Bitmap *m_pOffscreenImage = nullptr;
 
-	short *m_pSampleBuffer;
-	double *m_pFFTBuffer;
-	int *m_pFFTWorkBuffer;
-	double *m_pFFTSinTable;
-	DWORD m_BufferUsed;
-	DWORD m_BufferPos;
-	double *m_pPower;
+	short *m_pSampleBuffer = nullptr;
+	double *m_pFFTBuffer = nullptr;
+	int *m_pFFTWorkBuffer = nullptr;
+	double *m_pFFTSinTable = nullptr;
+	DWORD m_BufferUsed = 0;
+	DWORD m_BufferPos = 0;
+	double *m_pPower = nullptr;
 	struct {
 		double Real;
 		double Delayed;
@@ -135,26 +144,6 @@ private:
 
 // ウィンドウクラス名
 const LPCTSTR CSpectrumAnalyzer::WINDOW_CLASS_NAME = TEXT("TVTest Spectrum Analyzer Window");
-
-
-CSpectrumAnalyzer::CSpectrumAnalyzer()
-	: m_fInitialized(false)
-	, m_hwnd(nullptr)
-	, m_BackColor(255, 0, 0, 0)
-	, m_SpectrumColor1(255, 0, 224, 0)
-	, m_SpectrumColor2(255, 255, 128, 0)
-	, m_pBrush(nullptr)
-	, m_pOffscreen(nullptr)
-	, m_pOffscreenImage(nullptr)
-	, m_pSampleBuffer(nullptr)
-	, m_pFFTBuffer(nullptr)
-	, m_pFFTWorkBuffer(nullptr)
-	, m_pFFTSinTable(nullptr)
-	, m_BufferUsed(0)
-	, m_BufferPos(0)
-	, m_pPower(nullptr)
-{
-}
 
 
 // プラグインの情報を返す
@@ -258,8 +247,8 @@ bool CSpectrumAnalyzer::EnablePlugin(bool fEnable)
 
 		// ウィンドウを作成する
 		if (m_hwnd == nullptr) {
-			static const DWORD Style = WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME;
-			static const DWORD ExStyle = WS_EX_TOOLWINDOW;
+			constexpr DWORD Style = WS_POPUP | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME;
+			constexpr DWORD ExStyle = WS_EX_TOOLWINDOW;
 
 			// プライマリモニタの DPI を取得
 			m_DPI = m_pApp->GetDPIFromPoint(0, 0);
@@ -316,8 +305,8 @@ void CSpectrumAnalyzer::DrawSpectrum(Gdiplus::Graphics &Graphics, int Width, int
 {
 	Graphics.Clear(m_BackColor);
 
-	const int BarWidth = max(Width / NUM_BANDS, 4);
-	const int CellHeight = max(Height / NUM_LEVELS, 3);
+	const int BarWidth = std::max(Width / NUM_BANDS, 4);
+	const int CellHeight = std::max(Height / NUM_LEVELS, 3);
 	const int BaseX = (Width - BarWidth * NUM_BANDS) / 2;
 	const int BaseY = (Height - CellHeight * NUM_LEVELS) / 2;
 
@@ -433,7 +422,7 @@ void CSpectrumAnalyzer::UpdateSpectrum()
 		Peak = std::log10(Peak) * 10.0;
 		m_PeakList[i].Real = Peak;
 		if (Peak < m_PeakList[i].Delayed)
-			Peak = max(m_PeakList[i].Delayed - 2.5, Peak);
+			Peak = std::max(m_PeakList[i].Delayed - 2.5, Peak);
 		m_PeakList[i].Delayed = Peak;
 	}
 }

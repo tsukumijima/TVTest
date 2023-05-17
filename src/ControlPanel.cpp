@@ -56,14 +56,6 @@ bool CControlPanel::Initialize(HINSTANCE hinst)
 }
 
 
-CControlPanel::CControlPanel()
-	: m_FontHeight(0)
-	, m_hwndMessage(nullptr)
-	, m_HotItem(-1)
-{
-}
-
-
 CControlPanel::~CControlPanel()
 {
 	Destroy();
@@ -142,7 +134,7 @@ bool CControlPanel::AddItem(CControlPanelItem *pItem)
 
 CControlPanelItem *CControlPanel::GetItem(int Index) const
 {
-	if (Index < 0 || Index >= (int)m_ItemList.size())
+	if (Index < 0 || Index >= static_cast<int>(m_ItemList.size()))
 		return nullptr;
 	return m_ItemList[Index].get();
 }
@@ -150,10 +142,9 @@ CControlPanelItem *CControlPanel::GetItem(int Index) const
 
 bool CControlPanel::UpdateItem(int Index)
 {
-	RECT rc;
-
-	if (Index < 0 || Index >= (int)m_ItemList.size() || m_hwnd == nullptr)
+	if (Index < 0 || Index >= static_cast<int>(m_ItemList.size()) || m_hwnd == nullptr)
 		return false;
+	RECT rc;
 	m_ItemList[Index]->GetPosition(&rc);
 	Invalidate(&rc);
 	return true;
@@ -162,7 +153,7 @@ bool CControlPanel::UpdateItem(int Index)
 
 bool CControlPanel::GetItemPosition(int Index, RECT *pRect) const
 {
-	if (Index < 0 || Index >= (int)m_ItemList.size())
+	if (Index < 0 || Index >= static_cast<int>(m_ItemList.size()))
 		return false;
 	m_ItemList[Index]->GetPosition(pRect);
 	return true;
@@ -172,14 +163,11 @@ bool CControlPanel::GetItemPosition(int Index, RECT *pRect) const
 void CControlPanel::UpdateLayout()
 {
 	RECT rc;
-	int Width;
-	int x, y;
-	int MaxHeight;
-
 	GetClientRect(&rc);
-	Width = (rc.right - rc.left) - (m_Style.Padding.Left + m_Style.Padding.Right);
-	x = m_Style.Padding.Left;
-	y = m_Style.Padding.Top;
+	const int Width = (rc.right - rc.left) - (m_Style.Padding.Left + m_Style.Padding.Right);
+	int x = m_Style.Padding.Left;
+	int y = m_Style.Padding.Top;
+	int MaxHeight = 0;
 
 	for (size_t i = 0; i < m_ItemList.size(); i++) {
 		CControlPanelItem *pItem = m_ItemList[i].get();
@@ -233,7 +221,7 @@ void CControlPanel::SetSendMessageWindow(HWND hwnd)
 void CControlPanel::SendCommand(int Command)
 {
 	if (m_hwndMessage != nullptr)
-		::SendMessage(m_hwndMessage, WM_COMMAND, Command, (LPARAM)GetHandle());
+		::SendMessage(m_hwndMessage, WM_COMMAND, Command, reinterpret_cast<LPARAM>(GetHandle()));
 }
 
 
@@ -269,10 +257,10 @@ bool CControlPanel::CalcTextSize(LPCTSTR pszText, SIZE *pSize)
 	if (m_hwnd == nullptr || pszText == nullptr)
 		return false;
 
-	HDC hdc = ::GetDC(m_hwnd);
+	const HDC hdc = ::GetDC(m_hwnd);
 	if (hdc == nullptr)
 		return false;
-	HFONT hfontOld = DrawUtil::SelectObject(hdc, m_Font);
+	const HFONT hfontOld = DrawUtil::SelectObject(hdc, m_Font);
 	RECT rc = {0, 0, 0, 0};
 	::DrawText(hdc, pszText, -1, &rc, DT_NOPREFIX | DT_CALCRECT);
 	pSize->cx = rc.right - rc.left;
@@ -300,13 +288,12 @@ void CControlPanel::Draw(HDC hdc, const RECT &PaintRect)
 {
 	RECT rcClient;
 	GetClientRect(&rcClient);
-	int Width = (rcClient.right - rcClient.left) - (m_Style.Padding.Left + m_Style.Padding.Right);
+	const int Width = (rcClient.right - rcClient.left) - (m_Style.Padding.Left + m_Style.Padding.Right);
+	int MaxHeight = 0;
 
-	int MaxHeight;
-	MaxHeight = 0;
 	for (const auto &Item : m_ItemList) {
 		if (Item->GetVisible()) {
-			int Height = Item->m_Position.bottom - Item->m_Position.top;
+			const int Height = Item->m_Position.bottom - Item->m_Position.top;
 			if (Height > MaxHeight)
 				MaxHeight = Height;
 		}
@@ -320,11 +307,8 @@ void CControlPanel::Draw(HDC hdc, const RECT &PaintRect)
 			return;
 	}
 
-	HBRUSH hbrMargin = ::CreateSolidBrush(m_Theme.MarginColor);
-	HDC hdcOffscreen = m_Offscreen.GetDC();
-	HFONT hfontOld;
-	COLORREF crOldTextColor;
-	int OldBkMode;
+	const HBRUSH hbrMargin = ::CreateSolidBrush(m_Theme.MarginColor);
+	const HDC hdcOffscreen = m_Offscreen.GetDC();
 	RECT rc, rcOffscreen, rcDest;
 
 	rc = rcClient;
@@ -333,15 +317,15 @@ void CControlPanel::Draw(HDC hdc, const RECT &PaintRect)
 	rc.right -= m_Style.Padding.Right;
 	rc.bottom -= m_Style.Padding.Bottom;
 	DrawUtil::FillBorder(hdc, &rcClient, &rc, &PaintRect, hbrMargin);
-	hfontOld = DrawUtil::SelectObject(hdcOffscreen, m_Font);
-	crOldTextColor = ::GetTextColor(hdcOffscreen);
-	OldBkMode = ::SetBkMode(hdcOffscreen, TRANSPARENT);
+	const HFONT hfontOld = DrawUtil::SelectObject(hdcOffscreen, m_Font);
+	const COLORREF crOldTextColor = ::GetTextColor(hdcOffscreen);
+	const int OldBkMode = ::SetBkMode(hdcOffscreen, TRANSPARENT);
 	::SetRect(&rcOffscreen, 0, 0, Width, MaxHeight);
 	::SetRect(&rcDest, m_Style.Padding.Left, -1, m_Style.Padding.Left + Width, 0);
 
 	Theme::CThemeDraw ThemeDraw(BeginThemeDraw(hdcOffscreen));
 
-	for (int i = 0; i < (int)m_ItemList.size(); i++) {
+	for (int i = 0; i < static_cast<int>(m_ItemList.size()); i++) {
 		CControlPanelItem *pItem = m_ItemList[i].get();
 
 		if (!pItem->GetVisible())
@@ -365,7 +349,7 @@ void CControlPanel::Draw(HDC hdc, const RECT &PaintRect)
 				crBack = m_Theme.OverItemStyle.Back.Fill.GetSolidColor();
 				ThemeDraw.Draw(m_Theme.OverItemStyle.Back, rc);
 			} else {
-				Theme::Style Style =
+				const Theme::Style Style =
 					pItem->GetCheck() ? m_Theme.CheckedItemStyle : m_Theme.ItemStyle;
 
 				crText = Style.Fore.Fill.GetSolidColor();
@@ -426,32 +410,29 @@ LRESULT CControlPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 	case WM_MOUSEMOVE:
 		{
 			int x = GET_X_LPARAM(lParam), y = GET_Y_LPARAM(lParam);
-			RECT rc;
 
 			if (::GetCapture() == hwnd) {
+				RECT rc;
 				m_ItemList[m_HotItem]->GetPosition(&rc);
 				x -= rc.left;
 				y -= rc.top;
 				m_ItemList[m_HotItem]->OnMouseMove(x, y);
 			} else {
+				const POINT pt = {x, y};
 				int i;
-				POINT pt;
 
-				pt.x = x;
-				pt.y = y;
-				for (i = (int)m_ItemList.size() - 1; i >= 0; i--) {
+				for (i = static_cast<int>(m_ItemList.size()) - 1; i >= 0; i--) {
 					const CControlPanelItem *pItem = m_ItemList[i].get();
 
 					if (pItem->GetVisible() && pItem->GetEnable()) {
+						RECT rc;
 						pItem->GetPosition(&rc);
 						if (::PtInRect(&rc, pt))
 							break;
 					}
 				}
 				if (i != m_HotItem) {
-					int OldHotItem;
-
-					OldHotItem = m_HotItem;
+					const int OldHotItem = m_HotItem;
 					m_HotItem = i;
 					if (OldHotItem >= 0)
 						UpdateItem(OldHotItem);
@@ -474,7 +455,7 @@ LRESULT CControlPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 	case WM_MOUSELEAVE:
 		if (!m_fOnButtonDown) {
 			if (m_HotItem >= 0) {
-				int i = m_HotItem;
+				const int i = m_HotItem;
 
 				m_HotItem = -1;
 				UpdateItem(i);
@@ -532,10 +513,7 @@ LRESULT CControlPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPa
 				else
 					m_ItemList[m_HotItem]->OnRButtonUp(x, y);
 			} else if (uMsg == WM_RBUTTONUP) {
-				POINT pt;
-
-				pt.x = x;
-				pt.y = y;
+				POINT pt = {x, y};
 				::MapWindowPoints(hwnd, GetParent(), &pt, 1);
 				::SendMessage(GetParent(), uMsg, wParam, MAKELPARAM(pt.x, pt.y));
 			}
@@ -583,15 +561,6 @@ void CControlPanel::RealizeStyle()
 
 
 
-CControlPanel::ControlPanelStyle::ControlPanelStyle()
-	: Padding(2)
-	, ItemPadding(4, 2, 4, 2)
-	, TextExtraHeight(4)
-	, IconSize(16, 16)
-{
-}
-
-
 void CControlPanel::ControlPanelStyle::SetStyle(const Style::CStyleManager *pStyleManager)
 {
 	*this = ControlPanelStyle();
@@ -613,18 +582,6 @@ void CControlPanel::ControlPanelStyle::NormalizeStyle(
 }
 
 
-
-
-CControlPanelItem::CControlPanelItem()
-	: m_Command(0)
-	, m_fVisible(true)
-	, m_fEnable(true)
-	, m_fCheck(false)
-	, m_fBreak(true)
-	, m_pControlPanel(nullptr)
-{
-	::SetRectEmpty(&m_Position);
-}
 
 
 void CControlPanelItem::GetPosition(int *pLeft, int *pTop, int *pWidth, int *pHeight) const

@@ -10,14 +10,15 @@
 */
 
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include <windows.h>
 #include <tchar.h>
+
 #define TVTEST_PLUGIN_CLASS_IMPLEMENT
 #include "TVTestPlugin.h"
 #include "resource.h"
-
-
-#define SNAPSHOT_WINDOW_CLASS TEXT("Auto Snap Shot Window")
 
 
 // プラグインクラス
@@ -27,16 +28,21 @@ class CAutoSnapShot : public TVTest::CTVTestPlugin
 	HWND m_hwnd = nullptr;
 	bool m_fEnabled = false;
 
+	static const LPCTSTR SNAPSHOT_WINDOW_CLASS;
+
 	static LRESULT CALLBACK EventCallback(UINT Event, LPARAM lParam1, LPARAM lParam2, void *pClientData);
 	static CAutoSnapShot * GetThis(HWND hwnd);
 	static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 	static INT_PTR CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam, void *pClientData);
 
 public:
-	virtual bool GetPluginInfo(TVTest::PluginInfo *pInfo);
-	virtual bool Initialize();
-	virtual bool Finalize();
+	bool GetPluginInfo(TVTest::PluginInfo *pInfo) override;
+	bool Initialize() override;
+	bool Finalize() override;
 };
+
+
+const LPCTSTR CAutoSnapShot::SNAPSHOT_WINDOW_CLASS = TEXT("Auto Snap Shot Window");
 
 
 bool CAutoSnapShot::GetPluginInfo(TVTest::PluginInfo *pInfo)

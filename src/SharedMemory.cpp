@@ -56,12 +56,6 @@ namespace TVTest
 {
 
 
-CSharedMemory::CSharedMemory()
-	: m_hFileMapping(nullptr)
-{
-}
-
-
 CSharedMemory::~CSharedMemory()
 {
 	Close();
@@ -94,15 +88,15 @@ bool CSharedMemory::Create(LPCWSTR pszName, ULONGLONG Size, bool *pfExists)
 
 	m_hFileMapping = ::CreateFileMapping(
 		INVALID_HANDLE_VALUE, &SecurityAttributes, PAGE_READWRITE,
-		(DWORD)(Size >> 32), (DWORD)(Size & 0xFFFFFFFFULL),
+		static_cast<DWORD>(Size >> 32), static_cast<DWORD>(Size & 0xFFFFFFFFULL),
 		pszName);
 	if (m_hFileMapping == nullptr) {
-		TRACE(TEXT("CreateFileMapping \"%s\" Error %x\n"), pszName, ::GetLastError());
+		TRACE(TEXT("CreateFileMapping \"{}\" Error {:x}\n"), pszName, ::GetLastError());
 		m_Lock.Close();
 		return false;
 	}
 
-	TRACE(TEXT("File mapping created \"%s\"\n"), pszName);
+	TRACE(TEXT("File mapping created \"{}\"\n"), pszName);
 
 	if (pfExists != nullptr)
 		*pfExists = ::GetLastError() == ERROR_ALREADY_EXISTS;
@@ -130,12 +124,12 @@ bool CSharedMemory::Open(LPCWSTR pszName, DWORD DesiredAccess, bool fInheritHand
 
 	m_hFileMapping = ::OpenFileMapping(DesiredAccess, fInheritHandle, pszName);
 	if (m_hFileMapping == nullptr) {
-		TRACE(TEXT("OpenFileMapping \"%s\" Error %x\n"), pszName, ::GetLastError());
+		TRACE(TEXT("OpenFileMapping \"{}\" Error {:x}\n"), pszName, ::GetLastError());
 		m_Lock.Close();
 		return false;
 	}
 
-	TRACE(TEXT("File mapping opened \"%s\"\n"), pszName);
+	TRACE(TEXT("File mapping opened \"{}\"\n"), pszName);
 
 	return true;
 }
@@ -165,7 +159,7 @@ void *CSharedMemory::Map(DWORD DesiredAccess, ULONGLONG Offset, size_t Size)
 
 	return ::MapViewOfFile(
 		m_hFileMapping, DesiredAccess,
-		(DWORD)(Offset >> 32), (DWORD)(Offset & 0xFFFFFFFFULL),
+		static_cast<DWORD>(Offset >> 32), static_cast<DWORD>(Offset & 0xFFFFFFFFULL),
 		Size);
 }
 
@@ -198,10 +192,10 @@ ULONGLONG CSharedMemory::GetSize() const
 		return 0;
 
 	ULONGLONG Size = 0;
-	HMODULE hLib = Util::LoadSystemLibrary(TEXT("ntdll.dll"));
+	const HMODULE hLib = Util::LoadSystemLibrary(TEXT("ntdll.dll"));
 
 	if (hLib != nullptr) {
-		auto pNtQuerySection = GET_LIBRARY_FUNCTION(hLib, NtQuerySection);
+		const auto pNtQuerySection = GET_LIBRARY_FUNCTION(hLib, NtQuerySection);
 
 		if (pNtQuerySection != nullptr) {
 			SECTION_BASIC_INFORMATION Info;

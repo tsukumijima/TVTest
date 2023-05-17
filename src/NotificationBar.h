@@ -47,7 +47,6 @@ namespace TVTest
 		};
 
 		CNotificationBar();
-		~CNotificationBar();
 
 	// CBasicWindow
 		bool Create(HWND hwndParent, DWORD Style, DWORD ExStyle = 0, int ID = 0) override;
@@ -79,13 +78,12 @@ namespace TVTest
 
 		struct NotificationBarStyle
 		{
-			Style::Margins Padding;
-			Style::Size IconSize;
-			Style::Margins IconMargin;
-			Style::Margins TextMargin;
-			Style::IntValue TextExtraHeight;
+			Style::Margins Padding{4, 2, 4, 2};
+			Style::Size IconSize{::GetSystemMetrics(SM_CXSMICON), ::GetSystemMetrics(SM_CYSMICON)};
+			Style::Margins IconMargin{0, 0, 4, 0};
+			Style::Margins TextMargin{0};
+			Style::IntValue TextExtraHeight{4};
 
-			NotificationBarStyle();
 			void SetStyle(const Style::CStyleManager *pStyleManager);
 			void NormalizeStyle(
 				const Style::CStyleManager *pStyleManager,
@@ -98,20 +96,20 @@ namespace TVTest
 			TIMER_ID_HIDE          = 0x0004U
 		};
 
-		static const int SHOW_ANIMATION_COUNT = 4;
-		static const DWORD SHOW_ANIMATION_INTERVAL = 50;
-		static const int FADE_ANIMATION_COUNT = 4;
-		static const DWORD FADE_ANIMATION_INTERVAL = 50;
+		static constexpr int SHOW_ANIMATION_COUNT = 4;
+		static constexpr DWORD SHOW_ANIMATION_INTERVAL = 50;
+		static constexpr int FADE_ANIMATION_COUNT = 4;
+		static constexpr DWORD FADE_ANIMATION_INTERVAL = 50;
 
 		NotificationBarStyle m_Style;
 		Theme::BackgroundStyle m_BackStyle;
 		COLORREF m_TextColor[3];
 		Style::Font m_StyleFont;
 		DrawUtil::CFont m_Font;
-		int m_BarHeight;
-		bool m_fAnimate;
+		int m_BarHeight = 0;
+		bool m_fAnimate = true;
 		std::deque<MessageInfo> m_MessageQueue;
-		int m_TimerCount;
+		int m_TimerCount = 0;
 		CIcon m_Icons[3];
 
 		static HINSTANCE m_hinst;

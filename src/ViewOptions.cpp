@@ -61,26 +61,7 @@ static void TitleFormatMakeCompatible(String &Str)
 
 
 CViewOptions::CViewOptions()
-	: m_fAdjustAspectResizing(false)
-	, m_fSnapAtWindowEdge(false)
-	, m_SnapAtWindowEdgeMargin(8)
-	, m_fSupportAeroSnap(true)
-	, m_fNearCornerResizeOrigin(false)
-	, m_fZoomKeepAspectRatio(false)
-	, m_PanScanAdjustWindowMode(AdjustWindowMode::Width)
-	, m_fRemember1SegWindowSize(true)
-	, m_fMinimizeToTray(false)
-	, m_fDisablePreviewWhenMinimized(false)
-	, m_fHideCursor(false)
-	, m_fUseLogoIcon(false)
-	, m_TitleTextFormat(TitleTextFormatPresets[0].pszFormat)
-	, m_fEnableTitleBarFont(false)
-	, m_fShowLogo(true)
-	, m_LogoFileName(APP_NAME TEXT("_Logo.bmp"))
-
-	, m_fNoScreenSaver(false)
-	, m_fNoMonitorLowPower(false)
-	, m_fNoMonitorLowPowerActiveOnly(false)
+	: m_TitleTextFormat(TitleTextFormatPresets[0].pszFormat)
 {
 	StyleUtil::GetSystemFont(DrawUtil::FontType::Caption, &m_TitleBarFont);
 }
@@ -154,7 +135,7 @@ bool CViewOptions::WriteSettings(CSettings &Settings)
 	Settings.Write(TEXT("SupportAeroSnap"), m_fSupportAeroSnap);
 	Settings.Write(TEXT("NearCornerResizeOrigin"), m_fNearCornerResizeOrigin);
 	Settings.Write(TEXT("ZoomKeepAspectRatio"), m_fZoomKeepAspectRatio);
-	Settings.Write(TEXT("PanScanAdjustWindow"), (int)m_PanScanAdjustWindowMode);
+	Settings.Write(TEXT("PanScanAdjustWindow"), static_cast<int>(m_PanScanAdjustWindowMode));
 	Settings.Write(TEXT("Remember1SegWindowSize"), m_fRemember1SegWindowSize);
 	Settings.Write(TEXT("MinimizeToTray"), m_fMinimizeToTray);
 	Settings.Write(TEXT("DisablePreviewWhenMinimized"), m_fDisablePreviewWhenMinimized);
@@ -213,7 +194,7 @@ INT_PTR CViewOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam
 					TEXT("幅のみ変える"),
 					TEXT("幅と高さを変える"),
 				};
-				for (LPCTSTR e : AdjustWindowModeList) {
+				for (const LPCTSTR e : AdjustWindowModeList) {
 					DlgComboBox_AddString(hDlg, IDC_OPTIONS_PANSCANADJUSTWINDOW, e);
 				}
 				DlgComboBox_SetCurSel(
@@ -265,11 +246,9 @@ INT_PTR CViewOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam
 		case IDC_OPTIONS_TITLETEXTFORMAT_PARAMETERS:
 			{
 				RECT rc;
-				POINT pt;
 
 				::GetWindowRect(::GetDlgItem(hDlg, IDC_OPTIONS_TITLETEXTFORMAT_PARAMETERS), &rc);
-				pt.x = rc.left;
-				pt.y = rc.bottom;
+				const POINT pt = {rc.left, rc.bottom};
 				CUICore::CTitleStringMap StrMap(GetAppClass());
 				StrMap.InputParameter(hDlg, IDC_OPTIONS_TITLETEXTFORMAT, pt);
 			}
@@ -279,13 +258,13 @@ INT_PTR CViewOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam
 			{
 				RECT rc;
 				::GetWindowRect(::GetDlgItem(hDlg, IDC_OPTIONS_TITLETEXTFORMAT_PRESETS), &rc);
-				HMENU hmenu = ::CreatePopupMenu();
+				const HMENU hmenu = ::CreatePopupMenu();
 				for (int i = 0; i < lengthof(TitleTextFormatPresets); i++) {
 					::AppendMenu(
 						hmenu, MF_STRING | MF_ENABLED, i + 1,
 						TitleTextFormatPresets[i].pszDescript);
 				}
-				int Result = ::TrackPopupMenu(hmenu, TPM_RETURNCMD, rc.left, rc.bottom, 0, hDlg, nullptr);
+				const int Result = ::TrackPopupMenu(hmenu, TPM_RETURNCMD, rc.left, rc.bottom, 0, hDlg, nullptr);
 				if (Result > 0 && Result <= lengthof(TitleTextFormatPresets)) {
 					::SetDlgItemText(
 						hDlg, IDC_OPTIONS_TITLETEXTFORMAT,
@@ -350,7 +329,7 @@ INT_PTR CViewOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam
 		return TRUE;
 
 	case WM_NOTIFY:
-		switch (((LPNMHDR)lParam)->code) {
+		switch (reinterpret_cast<LPNMHDR>(lParam)->code) {
 		case PSN_APPLY:
 			{
 				CAppMain &App = GetAppClass();
@@ -367,7 +346,7 @@ INT_PTR CViewOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam
 				m_fZoomKeepAspectRatio =
 					DlgCheckBox_IsChecked(hDlg, IDC_OPTIONS_ZOOMKEEPASPECTRATIO);
 				m_PanScanAdjustWindowMode =
-					(AdjustWindowMode)DlgComboBox_GetCurSel(hDlg, IDC_OPTIONS_PANSCANADJUSTWINDOW);
+					static_cast<AdjustWindowMode>(DlgComboBox_GetCurSel(hDlg, IDC_OPTIONS_PANSCANADJUSTWINDOW));
 				m_fRemember1SegWindowSize =
 					DlgCheckBox_IsChecked(hDlg, IDC_OPTIONS_REMEMBER1SEGWINDOWSIZE);
 				m_fMinimizeToTray =
@@ -390,7 +369,7 @@ INT_PTR CViewOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam
 					}
 				}
 				{
-					bool fLogo = DlgCheckBox_IsChecked(hDlg, IDC_OPTIONS_SHOWLOGO);
+					const bool fLogo = DlgCheckBox_IsChecked(hDlg, IDC_OPTIONS_SHOWLOGO);
 					String FileName;
 
 					GetDlgItemString(hDlg, IDC_OPTIONS_LOGOFILENAME, &FileName);
@@ -402,7 +381,7 @@ INT_PTR CViewOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam
 				}
 
 				bool fTitleBarFontChanged = false;
-				bool fEnableTitleBarFont =
+				const bool fEnableTitleBarFont =
 					DlgCheckBox_IsChecked(hDlg, IDC_OPTIONS_TITLEBARFONT_ENABLE);
 				if (m_fEnableTitleBarFont != fEnableTitleBarFont) {
 					m_fEnableTitleBarFont = fEnableTitleBarFont;
@@ -429,7 +408,7 @@ INT_PTR CViewOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam
 					DlgCheckBox_IsChecked(hDlg, IDC_OPTIONS_NOMONITORLOWPOWER);
 				m_fNoMonitorLowPowerActiveOnly =
 					DlgCheckBox_IsChecked(hDlg, IDC_OPTIONS_NOMONITORLOWPOWERACTIVEONLY);
-				App.UICore.PreventDisplaySave(true);
+				App.UICore.PreventDisplaySave(App.UICore.IsViewerEnabled());
 
 				m_fChanged = true;
 			}

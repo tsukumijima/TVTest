@@ -1,3 +1,6 @@
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include <windows.h>
 #include <windowsx.h>
 #include <commctrl.h>
@@ -29,13 +32,6 @@ bool CToolbar::Initialize(HINSTANCE hinst)
 
 
 CToolbar::CToolbar()
-	: m_pApp(nullptr)
-	, m_hwnd(nullptr)
-	, m_hwndTooltips(nullptr)
-	, m_DPI(96)
-	, m_hbmIcons(nullptr)
-	, m_HotItem(-1)
-	, m_ClickItem(-1)
 {
 	CalcMetrics();
 }

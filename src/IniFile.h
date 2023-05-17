@@ -32,11 +32,15 @@ namespace TVTest
 	class CIniFile
 	{
 	public:
-		static const UINT OPEN_READ           = 0x0001U;
-		static const UINT OPEN_WRITE          = 0x0002U;
-		static const UINT OPEN_WRITE_VOLATILE = 0x0004U;
+		enum class OpenFlag : unsigned int {
+			None          = 0x0000U,
+			Read          = 0x0001U,
+			Write         = 0x0002U,
+			WriteVolatile = 0x0004U,
+			TVTEST_ENUM_FLAGS_TRAILER
+		};
 
-		static const UINT MAX_FILE_SIZE = 0x100000;
+		static constexpr UINT MAX_FILE_SIZE = 0x100000;
 
 		class CEntry
 		{
@@ -44,20 +48,20 @@ namespace TVTest
 			String Name;
 			String Value;
 
-			CEntry() {}
+			CEntry() = default;
 			CEntry(const String &Text);
 			CEntry(LPCWSTR pszName, LPCWSTR pszValue);
 		};
 
 		typedef std::vector<CEntry> EntryArray;
 
-		CIniFile();
+		CIniFile() = default;
 		~CIniFile();
 
 		CIniFile(const CIniFile &) = delete;
 		CIniFile &operator=(const CIniFile &) = delete;
 
-		bool Open(LPCWSTR pszFileName, UINT Flags);
+		bool Open(LPCWSTR pszFileName, OpenFlag Flags);
 		bool Close();
 		bool SelectSection(LPCWSTR pszSection);
 		bool IsSectionExists(LPCWSTR pszSection);
@@ -93,11 +97,11 @@ namespace TVTest
 
 		String m_FileName;
 		String m_Section;
-		UINT m_OpenFlags;
+		OpenFlag m_OpenFlags = OpenFlag::None;
 		SectionList m_SectionList;
-		CSectionData *m_pCurSection;
+		CSectionData *m_pCurSection = nullptr;
 		CGlobalLock m_FileLock;
-		HANDLE m_hFile;
+		HANDLE m_hFile = INVALID_HANDLE_VALUE;
 	};
 
 }

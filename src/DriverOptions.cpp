@@ -51,19 +51,19 @@ constexpr unsigned int DRIVER_FLAG_DEFAULTMASK                  = 0x0000003F;
 class CDriverSettings
 {
 	String m_FileName;
-	int m_InitialChannelType;
-	int m_InitialSpace;
-	int m_InitialChannel;
-	int m_InitialServiceID;
-	bool m_fAllChannels;
+	int m_InitialChannelType = INITIALCHANNEL_LAST;
+	int m_InitialSpace = 0;
+	int m_InitialChannel = 0;
+	int m_InitialServiceID = -1;
+	bool m_fAllChannels = false;
 	CDriverOptions::BonDriverOptions m_Options;
 
 public:
-	int m_LastSpace;
-	int m_LastChannel;
-	int m_LastServiceID;
-	int m_LastTransportStreamID;
-	bool m_fLastAllChannels;
+	int m_LastSpace = -1;
+	int m_LastChannel = -1;
+	int m_LastServiceID = -1;
+	int m_LastTransportStreamID = -1;
+	bool m_fLastAllChannels = false;
 
 	CDriverSettings(LPCTSTR pszFileName);
 
@@ -104,18 +104,7 @@ public:
 
 CDriverSettings::CDriverSettings(LPCTSTR pszFileName)
 	: m_FileName(pszFileName)
-	, m_InitialChannelType(INITIALCHANNEL_LAST)
-	, m_InitialSpace(0)
-	, m_InitialChannel(0)
-	, m_InitialServiceID(-1)
-	, m_fAllChannels(false)
 	, m_Options(pszFileName)
-
-	, m_LastSpace(-1)
-	, m_LastChannel(-1)
-	, m_LastServiceID(-1)
-	, m_LastTransportStreamID(-1)
-	, m_fLastAllChannels(false)
 {
 }
 
@@ -143,11 +132,6 @@ bool CDriverSettings::SetInitialChannel(int Channel)
 }
 
 
-
-
-CDriverSettingList::CDriverSettingList()
-{
-}
 
 
 CDriverSettingList::CDriverSettingList(const CDriverSettingList &Src)
@@ -207,7 +191,7 @@ int CDriverSettingList::Find(LPCTSTR pszFileName) const
 		return -1;
 	for (size_t i = 0; i < m_SettingList.size(); i++) {
 		if (IsEqualFileName(m_SettingList[i]->GetFileName(), pszFileName))
-			return (int)i;
+			return static_cast<int>(i);
 	}
 	return -1;
 }
@@ -217,7 +201,6 @@ int CDriverSettingList::Find(LPCTSTR pszFileName) const
 
 CDriverOptions::CDriverOptions()
 	: COptions(TEXT("DriverSettings"))
-	, m_pDriverManager(nullptr)
 {
 }
 
@@ -236,29 +219,29 @@ bool CDriverOptions::ReadSettings(CSettings &Settings)
 		for (int i = 0; i < NumDrivers; i++) {
 			TCHAR szName[64], szFileName[MAX_PATH];
 
-			StringPrintf(szName, TEXT("Driver%d_FileName"), i);
+			StringFormat(szName, TEXT("Driver{}_FileName"), i);
 			if (!Settings.Read(szName, szFileName, lengthof(szFileName)))
 				break;
 			if (szFileName[0] != _T('\0')) {
 				CDriverSettings *pSettings = new CDriverSettings(szFileName);
 				int Value;
 
-				StringPrintf(szName, TEXT("Driver%d_InitChannelType"), i);
+				StringFormat(szName, TEXT("Driver{}_InitChannelType"), i);
 				if (Settings.Read(szName, &Value))
 					pSettings->SetInitialChannelType(Value);
-				StringPrintf(szName, TEXT("Driver%d_InitSpace"), i);
+				StringFormat(szName, TEXT("Driver{}_InitSpace"), i);
 				if (Settings.Read(szName, &Value))
 					pSettings->SetInitialSpace(Value);
-				StringPrintf(szName, TEXT("Driver%d_InitChannel"), i);
+				StringFormat(szName, TEXT("Driver{}_InitChannel"), i);
 				if (Settings.Read(szName, &Value))
 					pSettings->SetInitialChannel(Value);
-				StringPrintf(szName, TEXT("Driver%d_InitServiceID"), i);
+				StringFormat(szName, TEXT("Driver{}_InitServiceID"), i);
 				if (Settings.Read(szName, &Value))
 					pSettings->SetInitialServiceID(Value);
-				StringPrintf(szName, TEXT("Driver%d_Options"), i);
+				StringFormat(szName, TEXT("Driver{}_Options"), i);
 				if (Settings.Read(szName, &Value)) {
 					unsigned int Mask;
-					StringPrintf(szName, TEXT("Driver%d_OptionsMask"), i);
+					StringFormat(szName, TEXT("Driver{}_OptionsMask"), i);
 					if (!Settings.Read(szName, &Mask))
 						Mask = DRIVER_FLAG_DEFAULTMASK;
 					if ((Mask & DRIVER_FLAG_NOSIGNALLEVEL) != 0)
@@ -274,25 +257,25 @@ bool CDriverOptions::ReadSettings(CSettings &Settings)
 					if ((Mask & DRIVER_FLAG_PUMPSTREAMSYNCPLAYBACK) != 0)
 						pSettings->SetPumpStreamSyncPlayback((Value & DRIVER_FLAG_PUMPSTREAMSYNCPLAYBACK) != 0);
 				}
-				StringPrintf(szName, TEXT("Driver%d_FirstChSetDelay"), i);
+				StringFormat(szName, TEXT("Driver{}_FirstChSetDelay"), i);
 				if (Settings.Read(szName, &Value))
 					pSettings->SetFirstChannelSetDelay(Value);
-				StringPrintf(szName, TEXT("Driver%d_MinChChangeInterval"), i);
+				StringFormat(szName, TEXT("Driver{}_MinChChangeInterval"), i);
 				if (Settings.Read(szName, &Value))
 					pSettings->SetMinChannelChangeInterval(Value);
-				StringPrintf(szName, TEXT("Driver%d_LastSpace"), i);
+				StringFormat(szName, TEXT("Driver{}_LastSpace"), i);
 				if (Settings.Read(szName, &Value))
 					pSettings->m_LastSpace = Value;
-				StringPrintf(szName, TEXT("Driver%d_LastChannel"), i);
+				StringFormat(szName, TEXT("Driver{}_LastChannel"), i);
 				if (Settings.Read(szName, &Value))
 					pSettings->m_LastChannel = Value;
-				StringPrintf(szName, TEXT("Driver%d_LastServiceID"), i);
+				StringFormat(szName, TEXT("Driver{}_LastServiceID"), i);
 				if (Settings.Read(szName, &Value))
 					pSettings->m_LastServiceID = Value;
-				StringPrintf(szName, TEXT("Driver%d_LastTSID"), i);
+				StringFormat(szName, TEXT("Driver{}_LastTSID"), i);
 				if (Settings.Read(szName, &Value))
 					pSettings->m_LastTransportStreamID = Value;
-				StringPrintf(szName, TEXT("Driver%d_LastStatus"), i);
+				StringFormat(szName, TEXT("Driver{}_LastStatus"), i);
 				if (Settings.Read(szName, &Value))
 					pSettings->m_fLastAllChannels = (Value & 1) != 0;
 
@@ -306,24 +289,24 @@ bool CDriverOptions::ReadSettings(CSettings &Settings)
 
 bool CDriverOptions::WriteSettings(CSettings &Settings)
 {
-	int NumDrivers = (int)m_SettingList.NumDrivers();
+	const int NumDrivers = static_cast<int>(m_SettingList.NumDrivers());
 
 	Settings.Write(TEXT("DriverCount"), NumDrivers);
 	for (int i = 0; i < NumDrivers; i++) {
 		const CDriverSettings *pSettings = m_SettingList.GetDriverSettings(i);
 		TCHAR szName[64];
 
-		StringPrintf(szName, TEXT("Driver%d_FileName"), i);
+		StringFormat(szName, TEXT("Driver{}_FileName"), i);
 		Settings.Write(szName, pSettings->GetFileName());
-		StringPrintf(szName, TEXT("Driver%d_InitChannelType"), i);
+		StringFormat(szName, TEXT("Driver{}_InitChannelType"), i);
 		Settings.Write(szName, pSettings->GetInitialChannelType());
-		StringPrintf(szName, TEXT("Driver%d_InitSpace"), i);
+		StringFormat(szName, TEXT("Driver{}_InitSpace"), i);
 		Settings.Write(szName, pSettings->GetInitialSpace());
-		StringPrintf(szName, TEXT("Driver%d_InitChannel"), i);
+		StringFormat(szName, TEXT("Driver{}_InitChannel"), i);
 		Settings.Write(szName, pSettings->GetInitialChannel());
-		StringPrintf(szName, TEXT("Driver%d_InitServiceID"), i);
+		StringFormat(szName, TEXT("Driver{}_InitServiceID"), i);
 		Settings.Write(szName, pSettings->GetInitialServiceID());
-		StringPrintf(szName, TEXT("Driver%d_Options"), i);
+		StringFormat(szName, TEXT("Driver{}_Options"), i);
 		int Flags = 0;
 		if (pSettings->GetNoSignalLevel())
 			Flags |= DRIVER_FLAG_NOSIGNALLEVEL;
@@ -338,21 +321,21 @@ bool CDriverOptions::WriteSettings(CSettings &Settings)
 		if (pSettings->GetPumpStreamSyncPlayback())
 			Flags |= DRIVER_FLAG_PUMPSTREAMSYNCPLAYBACK;
 		Settings.Write(szName, Flags);
-		StringPrintf(szName, TEXT("Driver%d_OptionsMask"), i);
+		StringFormat(szName, TEXT("Driver{}_OptionsMask"), i);
 		Settings.Write(szName, DRIVER_FLAG_MASK);
-		StringPrintf(szName, TEXT("Driver%d_FirstChSetDelay"), i);
-		Settings.Write(szName, (unsigned int)pSettings->GetFirstChannelSetDelay());
-		StringPrintf(szName, TEXT("Driver%d_MinChChangeInterval"), i);
-		Settings.Write(szName, (unsigned int)pSettings->GetMinChannelChangeInterval());
-		StringPrintf(szName, TEXT("Driver%d_LastSpace"), i);
+		StringFormat(szName, TEXT("Driver{}_FirstChSetDelay"), i);
+		Settings.Write(szName, static_cast<unsigned int>(pSettings->GetFirstChannelSetDelay()));
+		StringFormat(szName, TEXT("Driver{}_MinChChangeInterval"), i);
+		Settings.Write(szName, static_cast<unsigned int>(pSettings->GetMinChannelChangeInterval()));
+		StringFormat(szName, TEXT("Driver{}_LastSpace"), i);
 		Settings.Write(szName, pSettings->m_LastSpace);
-		StringPrintf(szName, TEXT("Driver%d_LastChannel"), i);
+		StringFormat(szName, TEXT("Driver{}_LastChannel"), i);
 		Settings.Write(szName, pSettings->m_LastChannel);
-		StringPrintf(szName, TEXT("Driver%d_LastServiceID"), i);
+		StringFormat(szName, TEXT("Driver{}_LastServiceID"), i);
 		Settings.Write(szName, pSettings->m_LastServiceID);
-		StringPrintf(szName, TEXT("Driver%d_LastTSID"), i);
+		StringFormat(szName, TEXT("Driver{}_LastTSID"), i);
 		Settings.Write(szName, pSettings->m_LastTransportStreamID);
-		StringPrintf(szName, TEXT("Driver%d_LastStatus"), i);
+		StringFormat(szName, TEXT("Driver{}_LastStatus"), i);
 		Settings.Write(szName, pSettings->m_fLastAllChannels ? 0x01U : 0x00U);
 	}
 	return true;
@@ -380,7 +363,7 @@ bool CDriverOptions::GetInitialChannel(LPCTSTR pszFileName, ChannelInfo *pChanne
 	if (pszFileName == nullptr || pChannelInfo == nullptr)
 		return false;
 
-	int Index = m_SettingList.Find(pszFileName);
+	const int Index = m_SettingList.Find(pszFileName);
 
 	if (Index >= 0) {
 		const CDriverSettings *pSettings = m_SettingList.GetDriverSettings(Index);
@@ -420,7 +403,7 @@ bool CDriverOptions::SetLastChannel(LPCTSTR pszFileName, const ChannelInfo *pCha
 	if (IsStringEmpty(pszFileName) || pChannelInfo == nullptr)
 		return false;
 
-	int Index = m_SettingList.Find(pszFileName);
+	const int Index = m_SettingList.Find(pszFileName);
 	CDriverSettings *pSettings;
 
 	if (Index < 0) {
@@ -476,7 +459,7 @@ CDriverSettings *CDriverOptions::GetBonDriverSettings(LPCTSTR pszFileName)
 	if (IsStringEmpty(pszFileName))
 		return nullptr;
 
-	int Index = m_SettingList.Find(pszFileName);
+	const int Index = m_SettingList.Find(pszFileName);
 	if (Index < 0)
 		return nullptr;
 
@@ -489,7 +472,7 @@ const CDriverSettings *CDriverOptions::GetBonDriverSettings(LPCTSTR pszFileName)
 	if (IsStringEmpty(pszFileName))
 		return nullptr;
 
-	int Index = m_SettingList.Find(pszFileName);
+	const int Index = m_SettingList.Find(pszFileName);
 	if (Index < 0)
 		return nullptr;
 
@@ -505,10 +488,10 @@ void CDriverOptions::InitDlgItem(int Driver)
 
 	if (Driver >= 0) {
 		CDriverInfo *pDriverInfo = m_pDriverManager->GetDriverInfo(Driver);
-		LPCTSTR pszFileName = pDriverInfo->GetFileName();
-		CDriverSettings *pSettings = reinterpret_cast<CDriverSettings*>(DlgComboBox_GetItemData(m_hDlg, IDC_DRIVEROPTIONS_DRIVERLIST, Driver));
+		const LPCTSTR pszFileName = pDriverInfo->GetFileName();
+		const CDriverSettings *pSettings = reinterpret_cast<CDriverSettings*>(DlgComboBox_GetItemData(m_hDlg, IDC_DRIVEROPTIONS_DRIVERLIST, Driver));
 
-		int InitChannelType = pSettings->GetInitialChannelType();
+		const int InitChannelType = pSettings->GetInitialChannelType();
 		::CheckRadioButton(
 			m_hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_NONE,
 			IDC_DRIVEROPTIONS_INITCHANNEL_CUSTOM,
@@ -517,12 +500,12 @@ void CDriverOptions::InitDlgItem(int Driver)
 			m_hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_SPACE,
 			IDC_DRIVEROPTIONS_INITCHANNEL_CHANNEL,
 			InitChannelType == CDriverSettings::INITIALCHANNEL_CUSTOM);
-		bool fCur = IsEqualFileName(
+		const bool fCur = IsEqualFileName(
 			pszFileName,
 			::PathFindFileName(GetAppClass().CoreEngine.GetDriverFileName()));
 		if (fCur || pDriverInfo->LoadTuningSpaceList(CDriverInfo::LoadTuningSpaceListMode::UseDriverNoOpen)) {
 			const CTuningSpaceList *pTuningSpaceList;
-			int NumSpaces, i;
+			int NumSpaces;
 
 			if (fCur) {
 				pTuningSpaceList = GetAppClass().ChannelManager.GetDriverTuningSpaceList();
@@ -534,14 +517,14 @@ void CDriverOptions::InitDlgItem(int Driver)
 					NumSpaces = pDriverInfo->GetDriverSpaceList()->NumSpaces();
 			}
 			DlgComboBox_AddString(m_hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_SPACE, TEXT("すべて"));
-			for (i = 0; i < NumSpaces; i++) {
+			for (int i = 0; i < NumSpaces; i++) {
 				LPCTSTR pszName = pTuningSpaceList->GetTuningSpaceName(i);
 				TCHAR szName[16];
 
 				if (pszName == nullptr && !fCur)
 					pszName = pDriverInfo->GetDriverSpaceList()->GetTuningSpaceName(i);
 				if (pszName == nullptr) {
-					StringPrintf(szName, TEXT("Space %d"), i + 1);
+					StringFormat(szName, TEXT("Space {}"), i + 1);
 					pszName = szName;
 				}
 				DlgComboBox_AddString(m_hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_SPACE, pszName);
@@ -549,18 +532,18 @@ void CDriverOptions::InitDlgItem(int Driver)
 			if (pSettings->GetAllChannels()) {
 				DlgComboBox_SetCurSel(m_hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_SPACE, 0);
 			} else {
-				i = pSettings->GetInitialSpace();
-				if (i >= 0)
-					DlgComboBox_SetCurSel(m_hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_SPACE, i + 1);
+				const int Space = pSettings->GetInitialSpace();
+				if (Space >= 0)
+					DlgComboBox_SetCurSel(m_hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_SPACE, Space + 1);
 			}
 			SetChannelList(Driver);
 			int Sel = 0;
 			if (pSettings->GetInitialSpace() >= 0
 					&& pSettings->GetInitialChannel() >= 0) {
-				int Count = (int)DlgComboBox_GetCount(m_hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_CHANNEL);
-				for (i = 1; i < Count; i++) {
+				const int Count = static_cast<int>(DlgComboBox_GetCount(m_hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_CHANNEL));
+				for (int i = 1; i < Count; i++) {
 					const CChannelInfo *pChInfo = m_InitChannelList.GetChannelInfo(
-						(int)DlgComboBox_GetItemData(m_hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_CHANNEL, i));
+						static_cast<int>(DlgComboBox_GetItemData(m_hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_CHANNEL, i)));
 					if (pChInfo->GetSpace() == pSettings->GetInitialSpace()
 							&& pChInfo->GetChannelIndex() == pSettings->GetInitialChannel()
 							&& (pSettings->GetInitialServiceID() < 0
@@ -596,7 +579,7 @@ void CDriverOptions::InitDlgItem(int Driver)
 			m_hDlg, IDC_DRIVEROPTIONS_FIRSTCHANNELSETDELAY_SPIN,
 			0, LibISDB::BonDriverSourceFilter::FIRST_CHANNEL_SET_DELAY_MAX);
 		TCHAR szText[64];
-		StringPrintf(szText, TEXT("ms (0～%u)"), LibISDB::BonDriverSourceFilter::FIRST_CHANNEL_SET_DELAY_MAX);
+		StringFormat(szText, TEXT("ms (0～{})"), LibISDB::BonDriverSourceFilter::FIRST_CHANNEL_SET_DELAY_MAX);
 		::SetDlgItemText(m_hDlg, IDC_DRIVEROPTIONS_FIRSTCHANNELSETDELAY_UNIT, szText);
 
 		::SetDlgItemInt(
@@ -605,7 +588,7 @@ void CDriverOptions::InitDlgItem(int Driver)
 		DlgUpDown_SetRange(
 			m_hDlg, IDC_DRIVEROPTIONS_MINCHANNELCHANGEINTERVAL_SPIN,
 			0, LibISDB::BonDriverSourceFilter::CHANNEL_CHANGE_INTERVAL_MAX);
-		StringPrintf(szText, TEXT("ms (0～%u)"), LibISDB::BonDriverSourceFilter::CHANNEL_CHANGE_INTERVAL_MAX);
+		StringFormat(szText, TEXT("ms (0～{})"), LibISDB::BonDriverSourceFilter::CHANNEL_CHANGE_INTERVAL_MAX);
 		::SetDlgItemText(m_hDlg, IDC_DRIVEROPTIONS_MINCHANNELCHANGEINTERVAL_UNIT, szText);
 	} else {
 		::SetDlgItemText(m_hDlg, IDC_DRIVEROPTIONS_FIRSTCHANNELSETDELAY, TEXT(""));
@@ -620,7 +603,7 @@ void CDriverOptions::SetChannelList(int Driver)
 		DlgComboBox_GetItemData(m_hDlg, IDC_DRIVEROPTIONS_DRIVERLIST, Driver));
 	if (pSettings == nullptr)
 		return;
-	bool fCur = IsEqualFileName(
+	const bool fCur = IsEqualFileName(
 		pSettings->GetFileName(),
 		::PathFindFileName(GetAppClass().CoreEngine.GetDriverFileName()));
 	const CDriverInfo *pDriverInfo;
@@ -671,7 +654,7 @@ void CDriverOptions::AddChannelList(const CChannelList *pChannelList)
 		if (!pChannelInfo->IsEnabled())
 			continue;
 		m_InitChannelList.AddChannel(*pChannelInfo);
-		int Index = (int)DlgComboBox_AddString(m_hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_CHANNEL, pChannelInfo->GetName());
+		const int Index = static_cast<int>(DlgComboBox_AddString(m_hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_CHANNEL, pChannelInfo->GetName()));
 		DlgComboBox_SetItemData(m_hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_CHANNEL, Index, m_InitChannelList.NumChannels() - 1);
 	}
 }
@@ -679,7 +662,7 @@ void CDriverOptions::AddChannelList(const CChannelList *pChannelList)
 
 CDriverSettings *CDriverOptions::GetCurSelDriverSettings() const
 {
-	int Sel = (int)DlgComboBox_GetCurSel(m_hDlg, IDC_DRIVEROPTIONS_DRIVERLIST);
+	const int Sel = static_cast<int>(DlgComboBox_GetCurSel(m_hDlg, IDC_DRIVEROPTIONS_DRIVERLIST));
 
 	if (Sel < 0)
 		return nullptr;
@@ -698,25 +681,25 @@ INT_PTR CDriverOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPar
 
 				m_CurSettingList = m_SettingList;
 				for (int i = 0; i < m_pDriverManager->NumDrivers(); i++) {
-					LPCTSTR pszFileName = m_pDriverManager->GetDriverInfo(i)->GetFileName();
+					const LPCTSTR pszFileName = m_pDriverManager->GetDriverInfo(i)->GetFileName();
 					CDriverSettings *pSettings;
 
 					DlgComboBox_AddString(hDlg, IDC_DRIVEROPTIONS_DRIVERLIST, pszFileName);
-					int Index = m_CurSettingList.Find(pszFileName);
+					const int Index = m_CurSettingList.Find(pszFileName);
 					if (Index < 0) {
 						pSettings = new CDriverSettings(pszFileName);
 						m_CurSettingList.Add(pSettings);
 					} else {
 						pSettings = m_CurSettingList.GetDriverSettings(Index);
 					}
-					DlgComboBox_SetItemData(hDlg, IDC_DRIVEROPTIONS_DRIVERLIST, i, (LPARAM)pSettings);
+					DlgComboBox_SetItemData(hDlg, IDC_DRIVEROPTIONS_DRIVERLIST, i, reinterpret_cast<LPARAM>(pSettings));
 				}
 				int CurDriver = -1;
-				LPCTSTR pszCurDriverName = GetAppClass().CoreEngine.GetDriverFileName();
+				const LPCTSTR pszCurDriverName = GetAppClass().CoreEngine.GetDriverFileName();
 				if (pszCurDriverName[0] != '\0') {
-					CurDriver = (int)DlgComboBox_FindStringExact(
+					CurDriver = static_cast<int>(DlgComboBox_FindStringExact(
 						hDlg, IDC_DRIVEROPTIONS_DRIVERLIST,
-						-1, ::PathFindFileName(pszCurDriverName));
+						-1, ::PathFindFileName(pszCurDriverName)));
 				}
 				DlgComboBox_SetCurSel(hDlg, IDC_DRIVEROPTIONS_DRIVERLIST, CurDriver);
 				DlgComboBox_SetCueBanner(
@@ -733,7 +716,7 @@ INT_PTR CDriverOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPar
 		switch (LOWORD(wParam)) {
 		case IDC_DRIVEROPTIONS_DRIVERLIST:
 			if (HIWORD(wParam) == CBN_SELCHANGE) {
-				InitDlgItem((int)DlgComboBox_GetCurSel(hDlg, IDC_DRIVEROPTIONS_DRIVERLIST));
+				InitDlgItem(static_cast<int>(DlgComboBox_GetCurSel(hDlg, IDC_DRIVEROPTIONS_DRIVERLIST)));
 			}
 			return TRUE;
 
@@ -741,7 +724,7 @@ INT_PTR CDriverOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPar
 		case IDC_DRIVEROPTIONS_INITCHANNEL_LAST:
 		case IDC_DRIVEROPTIONS_INITCHANNEL_CUSTOM:
 			{
-				int Sel = (int)DlgComboBox_GetCurSel(hDlg, IDC_DRIVEROPTIONS_DRIVERLIST);
+				const int Sel = static_cast<int>(DlgComboBox_GetCurSel(hDlg, IDC_DRIVEROPTIONS_DRIVERLIST));
 
 				if (Sel >= 0) {
 					CDriverSettings *pSettings = reinterpret_cast<CDriverSettings*>(
@@ -762,13 +745,13 @@ INT_PTR CDriverOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPar
 
 				DlgComboBox_Clear(hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_CHANNEL);
 				if (pSettings != nullptr) {
-					int Space = (int)DlgComboBox_GetCurSel(hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_SPACE) - 1;
+					const int Space = static_cast<int>(DlgComboBox_GetCurSel(hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_SPACE)) - 1;
 
 					pSettings->SetInitialSpace(Space);
 					pSettings->SetAllChannels(Space < 0);
 					pSettings->SetInitialChannel(-1);
 					pSettings->SetInitialServiceID(-1);
-					SetChannelList((int)DlgComboBox_GetCurSel(hDlg, IDC_DRIVEROPTIONS_DRIVERLIST));
+					SetChannelList(static_cast<int>(DlgComboBox_GetCurSel(hDlg, IDC_DRIVEROPTIONS_DRIVERLIST)));
 					DlgComboBox_SetCurSel(hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_CHANNEL, 0);
 				}
 			}
@@ -779,12 +762,12 @@ INT_PTR CDriverOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPar
 				CDriverSettings *pSettings = GetCurSelDriverSettings();
 
 				if (pSettings != nullptr) {
-					int Sel = (int)DlgComboBox_GetCurSel(hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_CHANNEL);
+					const int Sel = static_cast<int>(DlgComboBox_GetCurSel(hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_CHANNEL));
 					int Channel = -1, ServiceID = -1;
 
 					if (Sel > 0) {
 						const CChannelInfo *pChInfo = m_InitChannelList.GetChannelInfo(
-							(int)DlgComboBox_GetItemData(hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_CHANNEL, Sel));
+							static_cast<int>(DlgComboBox_GetItemData(hDlg, IDC_DRIVEROPTIONS_INITCHANNEL_CHANNEL, Sel)));
 						if (pChInfo != nullptr) {
 							pSettings->SetInitialSpace(pChInfo->GetSpace());
 							Channel = pChInfo->GetChannelIndex();
@@ -853,7 +836,7 @@ INT_PTR CDriverOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPar
 				CDriverSettings *pSettings = GetCurSelDriverSettings();
 
 				if (pSettings != nullptr) {
-					DWORD Delay = ::GetDlgItemInt(hDlg, IDC_DRIVEROPTIONS_FIRSTCHANNELSETDELAY, nullptr, FALSE);
+					const DWORD Delay = ::GetDlgItemInt(hDlg, IDC_DRIVEROPTIONS_FIRSTCHANNELSETDELAY, nullptr, FALSE);
 					if (Delay <= LibISDB::BonDriverSourceFilter::FIRST_CHANNEL_SET_DELAY_MAX)
 						pSettings->SetFirstChannelSetDelay(Delay);
 				}
@@ -865,7 +848,7 @@ INT_PTR CDriverOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPar
 				CDriverSettings *pSettings = GetCurSelDriverSettings();
 
 				if (pSettings != nullptr) {
-					DWORD Interval = ::GetDlgItemInt(hDlg, IDC_DRIVEROPTIONS_MINCHANNELCHANGEINTERVAL, nullptr, FALSE);
+					const DWORD Interval = ::GetDlgItemInt(hDlg, IDC_DRIVEROPTIONS_MINCHANNELCHANGEINTERVAL, nullptr, FALSE);
 					if (Interval <= LibISDB::BonDriverSourceFilter::CHANNEL_CHANGE_INTERVAL_MAX)
 						pSettings->SetMinChannelChangeInterval(Interval);
 				}
@@ -875,7 +858,7 @@ INT_PTR CDriverOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPar
 		return TRUE;
 
 	case WM_NOTIFY:
-		switch (((LPNMHDR)lParam)->code) {
+		switch (reinterpret_cast<LPNMHDR>(lParam)->code) {
 		case PSN_APPLY:
 			m_SettingList = m_CurSettingList;
 			GetAppClass().Core.ApplyBonDriverOptions();
@@ -895,22 +878,8 @@ INT_PTR CDriverOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPar
 
 
 
-CDriverOptions::BonDriverOptions::BonDriverOptions()
-	: fNoSignalLevel(false)
-	, fIgnoreInitialStream(true)
-	, fPurgeStreamOnChannelChange(true)
-	, fResetChannelChangeErrorCount(true)
-	, fPumpStreamSyncPlayback(false)
-	, FirstChannelSetDelay(0)
-	, MinChannelChangeInterval(0)
-{
-}
-
-
 CDriverOptions::BonDriverOptions::BonDriverOptions(LPCTSTR pszBonDriverName)
 {
-	*this = BonDriverOptions();
-
 	CDriverManager::TunerSpec Spec;
 	if (GetAppClass().DriverManager.GetTunerSpec(pszBonDriverName, &Spec)) {
 		if (!!(Spec.Flags &

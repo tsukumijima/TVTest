@@ -45,7 +45,6 @@ namespace TVTest
 
 		typedef std::vector<AudioLanguageInfo> AudioLanguageList;
 
-		CAudioOptions();
 		~CAudioOptions();
 
 	// CSettingsBase
@@ -85,22 +84,24 @@ namespace TVTest
 		static const LibISDB::DirectShow::AudioDecoderFilter::SurroundMixingMatrix m_DefaultSurroundMixingMatrix;
 		static const LibISDB::DirectShow::AudioDecoderFilter::DownMixMatrix m_DefaultDownMixMatrix;
 		static const DWORD m_AudioLanguageList[];
-		static const DWORD LANGUAGE_FLAG_SUB = 0x01000000;
+		static constexpr DWORD LANGUAGE_FLAG_SUB = 0x01000000;
 
 		using FilterInfo = LibISDB::DirectShow::FilterInfo;
 
 		FilterInfo m_AudioDevice;
 		String m_AudioFilterName;
 
-		LibISDB::DirectShow::AudioDecoderFilter::SPDIFOptions m_SPDIFOptions;
-		bool m_fDownMixSurround;
-		bool m_fUseCustomSurroundMixingMatrix;
-		LibISDB::DirectShow::AudioDecoderFilter::SurroundMixingMatrix m_SurroundMixingMatrix;
-		bool m_fUseCustomDownMixMatrix;
-		LibISDB::DirectShow::AudioDecoderFilter::DownMixMatrix m_DownMixMatrix;
-		bool m_fEnableLanguagePriority;
+		LibISDB::DirectShow::AudioDecoderFilter::SPDIFOptions m_SPDIFOptions{
+			LibISDB::DirectShow::AudioDecoderFilter::SPDIFMode::Disabled,
+			LibISDB::DirectShow::AudioDecoderFilter::SPDIFOptions::Channel_Surround};
+		bool m_fDownMixSurround = true;
+		bool m_fUseCustomSurroundMixingMatrix = false;
+		LibISDB::DirectShow::AudioDecoderFilter::SurroundMixingMatrix m_SurroundMixingMatrix{m_DefaultSurroundMixingMatrix};
+		bool m_fUseCustomDownMixMatrix = false;
+		LibISDB::DirectShow::AudioDecoderFilter::DownMixMatrix m_DownMixMatrix{m_DefaultDownMixMatrix};
+		bool m_fEnableLanguagePriority = false;
 		AudioLanguageList m_LanguagePriority;
-		bool m_fResetAudioDelayOnChannelChange;
+		bool m_fResetAudioDelayOnChannelChange = true;
 
 		std::vector<FilterInfo> m_AudioDeviceList;
 

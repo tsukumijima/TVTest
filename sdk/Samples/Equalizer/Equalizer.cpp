@@ -13,6 +13,9 @@
 */
 
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include <windows.h>
 #include <windowsx.h>
 #include <shlwapi.h>
@@ -20,10 +23,13 @@
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <cstddef>
+#include <cstdlib>
+#include <algorithm>
 #include <crtdbg.h>
 #if defined(_MSC_VER) && defined(_M_X64)
 #include <emmintrin.h>
 #endif
+
 #define TVTEST_PLUGIN_CLASS_IMPLEMENT // クラスとして実装
 #include "TVTestPlugin.h"
 #include "resource.h"
@@ -60,7 +66,7 @@ class CBandPass
 	double m_Coef[MAX_FREQUENCY * MAX_CHANNELS];
 	double m_Ener[MAX_FREQUENCY * MAX_CHANNELS];
 	double m_Volume[MAX_FREQUENCY * MAX_CHANNELS];
-	int m_EqualizerCount;
+	int m_EqualizerCount = 0;
 	double m_PreAmplifier;
 	CRITICAL_SECTION m_Lock;
 
@@ -76,7 +82,6 @@ public:
 
 
 CBandPass::CBandPass()
-	: m_EqualizerCount(0)
 {
 	::InitializeCriticalSection(&m_Lock);
 }
@@ -174,9 +179,9 @@ class CEqualizer : public TVTest::CTVTestPlugin
 {
 public:
 	CEqualizer();
-	virtual bool GetPluginInfo(TVTest::PluginInfo *pInfo);
-	virtual bool Initialize();
-	virtual bool Finalize();
+	bool GetPluginInfo(TVTest::PluginInfo *pInfo) override;
+	bool Initialize() override;
+	bool Finalize() override;
 
 private:
 	// コマンド
@@ -185,26 +190,22 @@ private:
 		COMMAND_ONOFF = 2  // On/Off
 	};
 
-	enum {
-		NUM_FREQUENCY = 10,
-		NUM_CUSTOM_PRESETS = 10
-	};
+	static constexpr int NUM_FREQUENCY = 10;
+	static constexpr int NUM_CUSTOM_PRESETS = 10;
 
 	// 各部のサイズ(DIP単位)
-	enum {
-		SLIDER_WIDTH         = 16,
-		SLIDER_HEIGHT        = 80,
-		SLIDER_MARGIN        = 4,
-		SLIDER_PADDING       = 2,
-		WINDOW_MARGIN        = 8,
-		TEXT_HEIGHT          = 10,
-		SLIDER_TEXT_MARGIN   = 3,
-		SLIDER_BUTTON_MARGIN = 4,
-		BUTTON_WIDTH         = 52,
-		BUTTON_HEIGHT        = TEXT_HEIGHT + 8,
-		BUTTON_MARGIN        = 4,
-		LINE_WIDTH           = 1
-	};
+	static constexpr int SLIDER_WIDTH         = 16;
+	static constexpr int SLIDER_HEIGHT        = 80;
+	static constexpr int SLIDER_MARGIN        = 4;
+	static constexpr int SLIDER_PADDING       = 2;
+	static constexpr int WINDOW_MARGIN        = 8;
+	static constexpr int TEXT_HEIGHT          = 10;
+	static constexpr int SLIDER_TEXT_MARGIN   = 3;
+	static constexpr int SLIDER_BUTTON_MARGIN = 4;
+	static constexpr int BUTTON_WIDTH         = 52;
+	static constexpr int BUTTON_HEIGHT        = TEXT_HEIGHT + 8;
+	static constexpr int BUTTON_MARGIN        = 4;
+	static constexpr int LINE_WIDTH           = 1;
 
 	enum {
 		BUTTON_ENABLE,
@@ -227,9 +228,9 @@ private:
 	};
 
 	TCHAR m_szIniFileName[MAX_PATH];
-	bool m_fSettingsLoaded;
-	bool m_fShowed;
-	HWND m_hwnd;
+	bool m_fSettingsLoaded = false;
+	bool m_fShowed = false;
+	HWND m_hwnd = nullptr;
 	COLORREF m_crBackColor;
 	COLORREF m_crTextColor;
 	int m_DPI;
@@ -247,11 +248,11 @@ private:
 	int m_LineWidth;
 	int m_ClientWidth;
 	int m_ClientHeight;
-	HFONT m_hfont;
-	POINT m_WindowPosition;
+	HFONT m_hfont = nullptr;
+	POINT m_WindowPosition{};
 	CBandPass m_BandPass;
-	bool m_fEnabled;
-	bool m_fEnableDefault;
+	bool m_fEnabled = false;
+	bool m_fEnableDefault = false;
 	EqualizerSettings m_CurSettings;
 	int m_CurSlider;
 	EqualizerSettings m_CustomPresetList[NUM_CUSTOM_PRESETS];
@@ -318,15 +319,7 @@ const double CEqualizer::m_FreqTable[NUM_FREQUENCY-1] = {
 
 
 CEqualizer::CEqualizer()
-	: m_fSettingsLoaded(false)
-	, m_fShowed(false)
-	, m_hwnd(nullptr)
-	, m_fEnabled(false)
-	, m_fEnableDefault(false)
 {
-	m_WindowPosition.x = 0;
-	m_WindowPosition.y = 0;
-
 	ResetSettings();
 
 	for (int i = 0; i < NUM_CUSTOM_PRESETS; i++) {
@@ -440,7 +433,7 @@ bool CEqualizer::ReadPreset(LPCTSTR pszSection, LPCTSTR pszKeyName, EqualizerSet
 		if (*p == _T('\0'))
 			break;
 		LPTSTR pEnd;
-		int Value = (int)::_tcstol(p, &pEnd, 10);
+		int Value = (int)std::_tcstol(p, &pEnd, 10);
 		if (pEnd == p)
 			break;
 		p = pEnd;
@@ -558,8 +551,8 @@ bool CEqualizer::EnablePlugin(bool fEnable)
 
 			CalcMetrics();
 
-			static const DWORD Style = WS_POPUP | WS_CAPTION | WS_SYSMENU;
-			static const DWORD ExStyle = WS_EX_TOOLWINDOW;
+			constexpr DWORD Style = WS_POPUP | WS_CAPTION | WS_SYSMENU;
+			constexpr DWORD ExStyle = WS_EX_TOOLWINDOW;
 			RECT rc;
 			::SetRect(&rc, 0, 0, m_ClientWidth, m_ClientHeight);
 			::AdjustWindowRectEx(&rc, Style, FALSE, ExStyle);
@@ -869,7 +862,7 @@ void CEqualizer::Draw(HDC hdc, const RECT &rcPaint)
 	rcText.right = rc.right + m_SliderMargin;
 	rcText.top = rc.bottom + m_SliderTextMargin;
 	rcText.bottom = rcText.top + m_TextHeight;
-	rcText.top -= min(tm.tmInternalLeading, m_SliderTextMargin);
+	rcText.top -= std::min<LONG>(tm.tmInternalLeading, m_SliderTextMargin);
 	::DrawText(hdc, TEXT("Pre"), -1, &rcText, DT_CENTER | DT_SINGLELINE);
 
 	// 目盛

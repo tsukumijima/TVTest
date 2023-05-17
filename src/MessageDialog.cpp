@@ -31,19 +31,9 @@ namespace TVTest
 {
 
 
-CMessageDialog::CMessageDialog()
-{
-}
-
-
-CMessageDialog::~CMessageDialog()
-{
-}
-
-
 void CMessageDialog::LogFontToCharFormat(const LOGFONT *plf, CHARFORMAT *pcf)
 {
-	HDC hdc = ::GetDC(m_hDlg);
+	const HDC hdc = ::GetDC(m_hDlg);
 	CRichEditUtil::LogFontToCharFormat(hdc, plf, pcf);
 	::ReleaseDC(m_hDlg, hdc);
 }
@@ -156,18 +146,16 @@ INT_PTR CMessageDialog::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPar
 			{
 				REQRESIZE *prr = reinterpret_cast<REQRESIZE*>(lParam);
 				RECT rcEdit, rcDialog, rcClient, rcOK, rcIcon;
-				int Width, Height, MinWidth;
-				int XOffset, YOffset;
 
 				::GetWindowRect(hDlg, &rcDialog);
 				::GetClientRect(hDlg, &rcClient);
 				::GetWindowRect(prr->nmhdr.hwndFrom, &rcEdit);
 				GetDlgItemRect(hDlg, IDOK, &rcOK);
-				MinWidth = (rcOK.right - rcOK.left) + (rcClient.right - rcOK.right) * 2;
-				Width = prr->rc.right - prr->rc.left;
+				const int MinWidth = (rcOK.right - rcOK.left) + (rcClient.right - rcOK.right) * 2;
+				int Width = prr->rc.right - prr->rc.left;
 				if (Width < MinWidth)
 					Width = MinWidth;
-				Height = prr->rc.bottom - prr->rc.top;
+				int Height = prr->rc.bottom - prr->rc.top;
 				::GetWindowRect(::GetDlgItem(hDlg, IDC_ERROR_ICON), &rcIcon);
 				rcIcon.bottom -= rcIcon.top;
 				if (Height < rcIcon.bottom)
@@ -175,8 +163,8 @@ INT_PTR CMessageDialog::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPar
 				if (Width == rcEdit.right - rcEdit.left
 						&& Height == rcEdit.bottom - rcEdit.top)
 					break;
-				XOffset = Width - (rcEdit.right - rcEdit.left);
-				YOffset = Height - (rcEdit.bottom - rcEdit.top);
+				const int XOffset = Width - (rcEdit.right - rcEdit.left);
+				const int YOffset = Height - (rcEdit.bottom - rcEdit.top);
 				::SetWindowPos(
 					prr->nmhdr.hwndFrom, nullptr, 0, 0, Width, Height,
 					SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
@@ -196,10 +184,9 @@ INT_PTR CMessageDialog::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPar
 
 		case EN_MSGFILTER:
 			if (reinterpret_cast<MSGFILTER*>(lParam)->msg == WM_RBUTTONUP) {
-				HMENU hmenu;
+				const HMENU hmenu = ::CreatePopupMenu();
 				POINT pt;
 
-				hmenu = ::CreatePopupMenu();
 				::AppendMenu(hmenu, MF_STRING | MF_ENABLED, IDC_ERROR_COPY, TEXT("コピー(&C)"));
 				::GetCursorPos(&pt);
 				::TrackPopupMenu(hmenu, TPM_RIGHTBUTTON, pt.x, pt.y, 0, hDlg, nullptr);
@@ -213,7 +200,7 @@ INT_PTR CMessageDialog::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPar
 		switch (LOWORD(wParam)) {
 		case IDC_ERROR_COPY:
 			{
-				HWND hwndEdit = ::GetDlgItem(hDlg, IDC_ERROR_MESSAGE);
+				const HWND hwndEdit = ::GetDlgItem(hDlg, IDC_ERROR_MESSAGE);
 
 				if (::SendMessage(hwndEdit, EM_SELECTIONTYPE, 0, 0) == SEL_EMPTY) {
 					CRichEditUtil::CopyAllText(hwndEdit);

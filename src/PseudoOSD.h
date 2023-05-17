@@ -45,12 +45,14 @@ namespace TVTest
 			Outline        = 0x0010U,
 			FillBackground = 0x0020U,
 			MultiLine      = 0x0040U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 		enum class ImageEffect : unsigned int {
 			None  = 0x0000U,
 			Gloss = 0x0001U,
 			Dark  = 0x0002U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 		static bool Initialize(HINSTANCE hinst);
@@ -76,20 +78,20 @@ namespace TVTest
 		void OnParentMove();
 
 	private:
-		HWND m_hwnd;
-		COLORREF m_crBackColor;
-		COLORREF m_crTextColor;
+		HWND m_hwnd = nullptr;
+		COLORREF m_crBackColor = RGB(16, 0, 16);
+		COLORREF m_crTextColor = RGB(0, 255, 128);
 		DrawUtil::CFont m_Font;
-		TextStyle m_TextStyle;
+		TextStyle m_TextStyle = TextStyle::Outline;
 		String m_Text;
-		HBITMAP m_hbmIcon;
-		int m_IconWidth;
-		int m_IconHeight;
-		HBITMAP m_hbm;
-		ImageEffect m_ImageEffect;
+		HBITMAP m_hbmIcon = nullptr;
+		int m_IconWidth = 0;
+		int m_IconHeight = 0;
+		HBITMAP m_hbm = nullptr;
+		ImageEffect m_ImageEffect = ImageEffect::None;
 		struct {
 			int Left, Top, Width, Height;
-		} m_Position;
+		} m_Position = {0, 0, 0, 0};
 		CWindowTimerManager m_Timer;
 		int m_AnimationCount;
 		bool m_fLayeredWindow;
@@ -106,9 +108,6 @@ namespace TVTest
 		static CPseudoOSD *GetThis(HWND hwnd);
 		static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 	};
-
-	TVTEST_ENUM_FLAGS(CPseudoOSD::TextStyle)
-	TVTEST_ENUM_FLAGS(CPseudoOSD::ImageEffect)
 
 }	// namespace TVTest
 

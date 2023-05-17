@@ -47,7 +47,7 @@ struct TVTestWindowEnumInfo {
 static BOOL CALLBACK TVTestWindowEnumProc(HWND hwnd, LPARAM Param)
 {
 	if (IsTVTestWindow(hwnd)) {
-		TVTestWindowEnumInfo *pInfo = reinterpret_cast<TVTestWindowEnumInfo*>(Param);
+		const TVTestWindowEnumInfo *pInfo = reinterpret_cast<const TVTestWindowEnumInfo*>(Param);
 
 		if (!(*pInfo->pEnumFunc)(hwnd, pInfo->Param))
 			return FALSE;
@@ -72,12 +72,9 @@ CAppMutex::CAppMutex(bool fEnable)
 	if (fEnable) {
 		TCHAR szName[MAX_PATH];
 
-		::GetModuleFileName(nullptr, szName, lengthof(szName));
-		::CharUpperBuff(szName, ::lstrlen(szName));
-		for (int i = 0; szName[i] != '\0'; i++) {
-			if (szName[i] == '\\')
-				szName[i] = ':';
-		}
+		const DWORD Length = ::GetModuleFileName(nullptr, szName, lengthof(szName));
+		::CharUpperBuff(szName, Length);
+		std::ranges::replace(szName, szName + Length, _T('\\'), _T(':'));
 
 		CBasicSecurityAttributes SecAttributes;
 		SecAttributes.Initialize();
@@ -148,8 +145,6 @@ BOOL CALLBACK CTVTestWindowFinder::FindWindowCallback(HWND hwnd, LPARAM lParam)
 
 bool CPortQuery::Query(HWND hwnd, WORD *pUDPPort, WORD MaxPort)
 {
-	size_t i;
-
 	m_hwndSelf = hwnd;
 	m_UDPPortList.clear();
 	::EnumWindows(EnumProc, reinterpret_cast<LPARAM>(this));
@@ -157,11 +152,7 @@ bool CPortQuery::Query(HWND hwnd, WORD *pUDPPort, WORD MaxPort)
 		WORD UDPPort;
 
 		for (UDPPort = *pUDPPort; UDPPort <= MaxPort; UDPPort++) {
-			for (i = 0; i < m_UDPPortList.size(); i++) {
-				if (m_UDPPortList[i] == UDPPort)
-					break;
-			}
-			if (i == m_UDPPortList.size())
+			if (std::ranges::find(m_UDPPortList, UDPPort) == m_UDPPortList.end())
 				break;
 		}
 		if (UDPPort > MaxPort)
@@ -179,15 +170,15 @@ BOOL CALLBACK CPortQuery::EnumProc(HWND hwnd, LPARAM lParam)
 	if (hwnd == pThis->m_hwndSelf)
 		return TRUE;
 	if (IsTVTestWindow(hwnd)) {
-		DWORD_PTR Result;
+		DWORD_PTR Result = 0;
 
 		if (::SendMessageTimeout(
 					hwnd, WM_APP_QUERYPORT, 0, 0,
 					SMTO_NORMAL | SMTO_ABORTIFHUNG, 1000, &Result)) {
-			WORD UDPPort = LOWORD(Result);
+			const WORD UDPPort = LOWORD(Result);
 
 			pThis->m_UDPPortList.push_back(UDPPort);
-			GetAppClass().AddLog(TEXT("既に起動している") APP_NAME TEXT("が見付かりました。(UDPポート %d)"), UDPPort);
+			GetAppClass().AddLog(TEXT("既に起動している") APP_NAME TEXT("が見付かりました。(UDPポート {})"), UDPPort);
 		}
 	}
 	return TRUE;

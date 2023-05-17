@@ -33,14 +33,14 @@ namespace TVTest
 		: public COptions
 	{
 		CFilePath m_SaveFolder;
-		CFilePath m_FileName;
-		bool m_fConfirmChannelChange;
-		bool m_fConfirmExit;
-		bool m_fConfirmStop;
-		bool m_fConfirmStopStatusBarOnly;
-		bool m_fAlertLowFreeSpace;
-		unsigned int m_LowFreeSpaceThreshold;
-		bool m_fShowRemainTime;
+		CFilePath m_FileName{TEXT("Record_%date%-%time%.ts")};
+		bool m_fConfirmChannelChange = true;
+		bool m_fConfirmExit = true;
+		bool m_fConfirmStop = false;
+		bool m_fConfirmStopStatusBarOnly = false;
+		bool m_fAlertLowFreeSpace = true;
+		unsigned int m_LowFreeSpaceThreshold = 2048;
+		bool m_fShowRemainTime = false;
 		int m_StatusBarRecordCommand;
 		CRecordingSettings m_Settings;
 
@@ -82,7 +82,7 @@ namespace TVTest
 		bool GetAlertLowFreeSpace() const { return m_fAlertLowFreeSpace; }
 		ULONGLONG GetLowFreeSpaceThresholdBytes() const
 		{
-			return (ULONGLONG)m_LowFreeSpaceThreshold * (1024 * 1024);
+			return static_cast<ULONGLONG>(m_LowFreeSpaceThreshold) * (1024 * 1024);
 		}
 		bool IsTimeShiftRecordingEnabled() const { return m_Settings.m_fEnableTimeShift; }
 		bool EnableTimeShiftRecording(bool fEnable);

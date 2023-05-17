@@ -134,7 +134,7 @@ HRESULT CVariant::ToString(String *pStr) const
 	VARIANT var;
 
 	::VariantInit(&var);
-	HRESULT hr = ::VariantChangeType(&var, this, VARIANT_ALPHABOOL, VT_BSTR);
+	const HRESULT hr = ::VariantChangeType(&var, this, VARIANT_ALPHABOOL, VT_BSTR);
 	if (FAILED(hr))
 		return hr;
 
@@ -159,16 +159,6 @@ HRESULT CVariant::FromString(const String &Str)
 }
 
 
-
-
-CPropertyBag::CPropertyBag()
-{
-}
-
-
-CPropertyBag::~CPropertyBag()
-{
-}
 
 
 STDMETHODIMP CPropertyBag::QueryInterface(REFIID riid, void **ppvObject)
@@ -211,7 +201,7 @@ STDMETHODIMP CPropertyBag::Write(LPCOLESTR pszPropName, VARIANT *pVar)
 		return E_POINTER;
 
 	CVariant var;
-	HRESULT hr = var.Assign(*pVar);
+	const HRESULT hr = var.Assign(*pVar);
 	if (FAILED(hr))
 		return hr;
 
@@ -236,8 +226,6 @@ class CPropertyPageSite
 	, protected CIUnknownImpl
 {
 public:
-	CPropertyPageSite();
-
 // IUnknown
 	STDMETHODIMP QueryInterface(REFIID riid, void **ppvObject) override;
 	STDMETHODIMP_(ULONG) AddRef() override { return AddRefImpl(); }
@@ -250,18 +238,8 @@ public:
 	STDMETHODIMP TranslateAccelerator(MSG *pMsg) override { return E_NOTIMPL; }
 
 private:
-	~CPropertyPageSite();
+	~CPropertyPageSite() = default;
 };
-
-
-CPropertyPageSite::CPropertyPageSite()
-{
-}
-
-
-CPropertyPageSite::~CPropertyPageSite()
-{
-}
 
 
 STDMETHODIMP CPropertyPageSite::QueryInterface(REFIID riid, void **ppvObject)
@@ -314,8 +292,8 @@ private:
 
 	CPropertyPageSite *m_pPageSite;
 	std::vector<PageInfo> m_PageList;
-	bool m_fTabInitialized;
-	int m_CurTab;
+	bool m_fTabInitialized = false;
+	int m_CurTab = -1;
 	RECT m_PageRect;
 
 	INT_PTR DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam) override;
@@ -325,8 +303,6 @@ private:
 
 CPropertyPageFrame::CPropertyPageFrame(IPropertyPage **ppPropPages, int NumPages, CPropertyPageSite *pPageSite)
 	: m_pPageSite(pPageSite)
-	, m_fTabInitialized(false)
-	, m_CurTab(-1)
 {
 	m_fDisableDarkMode = true;
 
@@ -369,7 +345,7 @@ INT_PTR CPropertyPageFrame::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM 
 			m_fTabInitialized = false;
 			m_CurTab = -1;
 
-			HWND hwndTab = ::GetDlgItem(hDlg, IDC_PROPERTYPAGEFRAME_TAB);
+			const HWND hwndTab = ::GetDlgItem(hDlg, IDC_PROPERTYPAGEFRAME_TAB);
 			SIZE MaxSize = {0, 0};
 			TCITEM tci;
 
@@ -378,7 +354,7 @@ INT_PTR CPropertyPageFrame::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM 
 			for (size_t i = 0; i < m_PageList.size(); i++) {
 				PageInfo &Info = m_PageList[i];
 				PROPPAGEINFO PropPageInfo = {sizeof(PROPPAGEINFO)};
-				HRESULT hr = Info.pPropPage->GetPageInfo(&PropPageInfo);
+				const HRESULT hr = Info.pPropPage->GetPageInfo(&PropPageInfo);
 				if (FAILED(hr))
 					return TRUE;
 				Info.Size = PropPageInfo.size;
@@ -455,6 +431,7 @@ INT_PTR CPropertyPageFrame::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM 
 				if (e.fActivated)
 					e.pPropPage->Apply();
 			}
+			[[fallthrough]];
 		case IDCANCEL:
 			::EndDialog(hDlg, LOWORD(wParam));
 			return TRUE;
@@ -463,7 +440,7 @@ INT_PTR CPropertyPageFrame::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM 
 
 	case WM_NOTIFY:
 		{
-			NMHDR *pnmh = reinterpret_cast<NMHDR*>(lParam);
+			const NMHDR *pnmh = reinterpret_cast<const NMHDR*>(lParam);
 
 			switch (pnmh->code) {
 			case TCN_SELCHANGE:
@@ -492,7 +469,7 @@ void CPropertyPageFrame::SetCurTab(int Tab)
 {
 	if (m_CurTab == Tab)
 		return;
-	if (Tab < 0 || (size_t)Tab >= m_PageList.size())
+	if (Tab < 0 || static_cast<size_t>(Tab) >= m_PageList.size())
 		return;
 
 	PageInfo &Page = m_PageList[Tab];
@@ -526,11 +503,9 @@ HRESULT ShowPropertyPageFrame(
 	if (NumPages < 1)
 		return E_INVALIDARG;
 
-	HRESULT hr;
-
 	CPropertyPageSite *pPageSite = new CPropertyPageSite;
 	for (int i = 0; i < NumPages; i++) {
-		hr = ppPropPages[i]->SetPageSite(pPageSite);
+		const HRESULT hr = ppPropPages[i]->SetPageSite(pPageSite);
 		if (FAILED(hr)) {
 			for (i--; i >= 0; i--)
 				ppPropPages[i]->SetPageSite(nullptr);
@@ -571,19 +546,18 @@ HRESULT ShowPropertyPageFrame(IUnknown *pObject, HWND hwndOwner, HINSTANCE hinst
 		hr = pSpecifyPropPages2->GetPages(&Pages);
 		if (SUCCEEDED(hr) && Pages.pElems != nullptr) {
 			if (Pages.cElems > 0) {
-				IPropertyPage **ppPropPages = new IPropertyPage*[Pages.cElems];
+				std::vector<IPropertyPage*> PropPages(Pages.cElems);
 				ULONG j;
 
 				for (j = 0; j < Pages.cElems; j++) {
-					hr = pSpecifyPropPages2->CreatePage(Pages.pElems[j], &ppPropPages[j]);
+					hr = pSpecifyPropPages2->CreatePage(Pages.pElems[j], &PropPages[j]);
 					if (FAILED(hr))
 						break;
 				}
 				if (SUCCEEDED(hr))
-					hr = ShowPropertyPageFrame(ppPropPages, Pages.cElems, pObject, hwndOwner, hinst);
+					hr = ShowPropertyPageFrame(PropPages.data(), Pages.cElems, pObject, hwndOwner, hinst);
 				while (j > 0)
-					ppPropPages[--j]->Release();
-				delete [] ppPropPages;
+					PropPages[--j]->Release();
 			}
 			::CoTaskMemFree(Pages.pElems);
 		}

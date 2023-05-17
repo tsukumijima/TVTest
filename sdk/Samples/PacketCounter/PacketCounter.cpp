@@ -14,31 +14,29 @@
 */
 
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include <windows.h>
 #include <tchar.h>
+
 #define TVTEST_PLUGIN_CLASS_IMPLEMENT
 #include "TVTestPlugin.h"
-
-
-// ステータス項目の識別子
-#define STATUS_ITEM_ID 1
 
 
 // プラグインクラス
 class CPacketCounter : public TVTest::CTVTestPlugin
 {
-	LONG m_PacketCount;
+	// ステータス項目の識別子
+	static constexpr int STATUS_ITEM_ID = 1;
+
+	LONG m_PacketCount = 0;
 
 	static LRESULT CALLBACK EventCallback(UINT Event, LPARAM lParam1, LPARAM lParam2, void *pClientData);
 	static BOOL CALLBACK StreamCallback(BYTE *pData, void *pClientData);
 	void ShowItem(bool fShow);
 
 public:
-	CPacketCounter()
-		: m_PacketCount(0)
-	{
-	}
-
 	bool GetPluginInfo(TVTest::PluginInfo *pInfo) override;
 	bool Initialize() override;
 	bool Finalize() override;

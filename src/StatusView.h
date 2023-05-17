@@ -46,6 +46,7 @@ namespace TVTest
 			VariableWidth = 0x0001U,
 			FullRow       = 0x0002U,
 			ForceFullRow  = 0x0004U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 		enum class SizeUnit {
@@ -53,7 +54,7 @@ namespace TVTest
 			EM,
 		};
 
-		static const int EM_FACTOR = 1000;
+		static constexpr int EM_FACTOR = 1000;
 
 		struct SizeValue
 		{
@@ -63,10 +64,12 @@ namespace TVTest
 			SizeValue(int v, SizeUnit u) : Value(v), Unit(u) {}
 		};
 
-		enum {
-			DRAW_HIGHLIGHT = 0x00000001U,
-			DRAW_BOTTOM    = 0x00000002U,
-			DRAW_PREVIEW   = 0x00000004U
+		enum class DrawFlag : unsigned int {
+			None      = 0x0000U,
+			Highlight = 0x0001U,
+			Bottom    = 0x0002U,
+			Preview   = 0x0004U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 		CStatusItem(int ID, const SizeValue &DefaultWidth);
@@ -97,7 +100,7 @@ namespace TVTest
 		virtual LPCTSTR GetIDText() const = 0;
 		virtual LPCTSTR GetName() const = 0;
 		virtual bool UpdateContent() { return true; }
-		virtual void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags) = 0;
+		virtual void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags) = 0;
 		virtual void OnLButtonDown(int x, int y) {}
 		virtual void OnLButtonUp(int x, int y) {}
 		virtual void OnLButtonDoubleClick(int x, int y) { OnLButtonDown(x, y); }
@@ -121,30 +124,30 @@ namespace TVTest
 		friend CStatusView;
 
 	protected:
-		CStatusView *m_pStatus;
+		CStatusView *m_pStatus = nullptr;
 		int m_ID;
 		SizeValue m_DefaultWidth;
-		int m_Width;
-		int m_MinWidth;
-		int m_MaxWidth;
-		int m_ActualWidth;
-		int m_MinHeight;
-		bool m_fVisible;
-		bool m_fBreak;
-		StyleFlag m_Style;
+		int m_Width = -1;
+		int m_MinWidth = 8;
+		int m_MaxWidth = -1;
+		int m_ActualWidth = -1;
+		int m_MinHeight = 0;
+		bool m_fVisible = true;
+		bool m_fBreak = false;
+		StyleFlag m_Style = StyleFlag::None;
 
 		bool GetMenuPos(POINT *pPos, UINT *pFlags, RECT *pExcludeRect);
-		enum {
-			DRAWTEXT_HCENTER       = 0x00000001UL,
-			DRAWTEXT_NOENDELLIPSIS = 0x00000002UL
+		enum class DrawTextFlag : unsigned int {
+			None             = 0x0000U,
+			HorizontalCenter = 0x0001U,
+			NoEndEllipsis    = 0x0002U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
-		void DrawText(HDC hdc, const RECT &Rect, LPCTSTR pszText, DWORD Flags = 0) const;
+		void DrawText(HDC hdc, const RECT &Rect, LPCTSTR pszText, DrawTextFlag Flags = DrawTextFlag::None) const;
 		void DrawIcon(
 			HDC hdc, const RECT &Rect, DrawUtil::CMonoColorIconList &IconList,
 			int IconIndex = 0, bool fEnabled = true) const;
 	};
-
-	TVTEST_ENUM_FLAGS(CStatusItem::StyleFlag)
 
 	class CIconStatusItem
 		: public CStatusItem
@@ -165,10 +168,9 @@ namespace TVTest
 		class ABSTRACT_CLASS(CEventHandler)
 		{
 		protected:
-			CStatusView *m_pStatusView;
+			CStatusView *m_pStatusView = nullptr;
 
 		public:
-			CEventHandler();
 			virtual ~CEventHandler();
 
 			virtual void OnMouseLeave() {}
@@ -202,7 +204,7 @@ namespace TVTest
 		void SetTheme(const Theme::CThemeManager *pThemeManager) override;
 
 	// CStatusView
-		int NumItems() const { return (int)m_ItemList.size(); }
+		int NumItems() const { return static_cast<int>(m_ItemList.size()); }
 		const CStatusItem *GetItem(int Index) const;
 		CStatusItem *GetItem(int Index);
 		const CStatusItem *GetItemByID(int ID) const;
@@ -249,11 +251,9 @@ namespace TVTest
 	private:
 		struct StatusViewStyle
 		{
-			Style::Margins ItemPadding;
-			Style::IntValue TextExtraHeight;
-			Style::Size IconSize;
-
-			StatusViewStyle();
+			Style::Margins ItemPadding{4, 2, 4, 2};
+			Style::IntValue TextExtraHeight{4};
+			Style::Size IconSize{16, 16};
 
 			void SetStyle(const Style::CStyleManager *pStyleManager);
 			void NormalizeStyle(
@@ -267,25 +267,25 @@ namespace TVTest
 		StatusViewStyle m_Style;
 		Style::Font m_Font;
 		DrawUtil::CFont m_DrawFont;
-		int m_FontHeight;
-		int m_TextHeight;
-		int m_ItemHeight;
-		bool m_fMultiRow;
-		int m_MaxRows;
-		int m_Rows;
+		int m_FontHeight = 0;
+		int m_TextHeight = 0;
+		int m_ItemHeight = 0;
+		bool m_fMultiRow = false;
+		int m_MaxRows = 2;
+		int m_Rows = 1;
 		StatusViewTheme m_Theme;
 		std::vector<std::unique_ptr<CStatusItem>> m_ItemList;
-		bool m_fSingleMode;
+		bool m_fSingleMode = false;
 		String m_SingleText;
-		int m_HotItem;
+		int m_HotItem = -1;
 		CMouseLeaveTrack m_MouseLeaveTrack;
-		bool m_fOnButtonDown;
-		int m_CapturedItem;
-		CEventHandler *m_pEventHandler;
+		bool m_fOnButtonDown = false;
+		int m_CapturedItem = -1;
+		CEventHandler *m_pEventHandler = nullptr;
 		DrawUtil::COffscreen m_Offscreen;
-		bool m_fBufferedPaint;
+		bool m_fBufferedPaint = false;
 		CBufferedPaint m_BufferedPaint;
-		bool m_fAdjustSize;
+		bool m_fAdjustSize = true;
 
 		void SetHotItem(int Item);
 		void Draw(HDC hdc, const RECT *pPaintRect);

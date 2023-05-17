@@ -39,11 +39,11 @@ namespace TVTest
 
 	class CMainMenu
 	{
-		HMENU m_hmenu;
-		HMENU m_hmenuPopup;
-		HMENU m_hmenuShow;
-		bool m_fPopup;
-		int m_PopupMenu;
+		HMENU m_hmenu = nullptr;
+		HMENU m_hmenuPopup = nullptr;
+		HMENU m_hmenuShow = nullptr;
+		bool m_fPopup = false;
+		int m_PopupMenu = -1;
 
 	public:
 		// サブメニュー項目の位置
@@ -64,7 +64,7 @@ namespace TVTest
 			SUBMENU_FILTERPROPERTY = 31
 		};
 
-		CMainMenu();
+		CMainMenu() = default;
 		~CMainMenu();
 
 		CMainMenu(const CMainMenu &) = delete;
@@ -89,13 +89,12 @@ namespace TVTest
 		int ItemStateToID(UINT State) const;
 
 		CUxTheme m_UxTheme;
-		HWND m_hwnd;
-		int m_DPI;
-		bool m_fFlatMenu;
+		HWND m_hwnd = nullptr;
+		int m_DPI = 0;
+		bool m_fFlatMenu = false;
 
 	public:
-		CMenuPainter();
-		~CMenuPainter();
+		CMenuPainter() = default;
 
 		CMenuPainter(const CMenuPainter &) = delete;
 		CMenuPainter &operator=(const CMenuPainter &) = delete;
@@ -127,9 +126,8 @@ namespace TVTest
 		enum class InitializeFlag : unsigned int {
 			None    = 0x0000U,
 			NoFrame = 0x0001U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
-
-		CChannelMenuLogo();
 
 		bool Initialize(int IconHeight, InitializeFlag Flags = InitializeFlag::None);
 		bool DrawLogo(HDC hdc, int x, int y, const CChannelInfo &Channel);
@@ -137,13 +135,11 @@ namespace TVTest
 		int GetLogoHeight() const { return m_LogoHeight; }
 
 	private:
-		int m_LogoWidth;
-		int m_LogoHeight;
-		bool m_fNoFrame;
+		int m_LogoWidth = 26;
+		int m_LogoHeight = 16;
+		bool m_fNoFrame = false;
 		Graphics::CImage m_FrameImage;
 	};
-
-	TVTEST_ENUM_FLAGS(CChannelMenuLogo::InitializeFlag)
 
 	class CChannelMenu
 	{
@@ -156,27 +152,28 @@ namespace TVTest
 			SpaceBreak      = 0x0008U,
 			CurrentServices = 0x0010U,
 			Shared          = 0x1000U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 	private:
-		CreateFlag m_Flags;
-		HWND m_hwnd;
-		HMENU m_hmenu;
+		CreateFlag m_Flags = CreateFlag::None;
+		HWND m_hwnd = nullptr;
+		HMENU m_hmenu = nullptr;
 		CChannelList m_ChannelList;
 		int m_CurChannel;
 		UINT m_FirstCommand;
 		UINT m_LastCommand;
 		DrawUtil::CFont m_Font;
 		DrawUtil::CFont m_FontCurrent;
-		int m_TextHeight;
-		int m_ChannelNameWidth;
-		int m_EventNameWidth;
+		int m_TextHeight = 0;
+		int m_ChannelNameWidth = 0;
+		int m_EventNameWidth = 0;
 		int m_LogoWidth;
 		int m_LogoHeight;
 		CMenuPainter m_MenuPainter;
 		CChannelMenuLogo m_Logo;
 		MARGINS m_Margins;
-		int m_MenuLogoMargin;
+		int m_MenuLogoMargin = 3;
 		CTooltip m_Tooltip;
 
 		int GetEventText(const LibISDB::EventInfo *pEventInfo, LPTSTR pszText, int MaxLength) const;
@@ -184,7 +181,7 @@ namespace TVTest
 		static void GetBaseTime(LibISDB::DateTime *pTime);
 
 	public:
-		CChannelMenu();
+		CChannelMenu() = default;
 		~CChannelMenu();
 
 		CChannelMenu(const CChannelMenu &) = delete;
@@ -204,8 +201,6 @@ namespace TVTest
 		bool HandleMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT *pResult);
 	};
 
-	TVTEST_ENUM_FLAGS(CChannelMenu::CreateFlag)
-
 	class CPopupMenu
 	{
 		enum class PopupMenuType {
@@ -214,11 +209,11 @@ namespace TVTest
 			Attached,
 		};
 
-		HMENU m_hmenu;
+		HMENU m_hmenu = nullptr;
 		PopupMenuType m_Type;
 
 	public:
-		CPopupMenu();
+		CPopupMenu() = default;
 		CPopupMenu(HINSTANCE hinst, LPCTSTR pszName);
 		CPopupMenu(HINSTANCE hinst, UINT ID);
 		CPopupMenu(HMENU hmenu);
@@ -268,7 +263,7 @@ namespace TVTest
 			LPCTSTR pszIcon;
 		};
 
-		CIconMenu();
+		CIconMenu() = default;
 		~CIconMenu();
 
 		CIconMenu(const CIconMenu &) = delete;
@@ -283,10 +278,9 @@ namespace TVTest
 		bool CheckRadioItem(UINT FirstID, UINT LastID, UINT CheckID);
 
 	private:
-		enum {
-			ICON_MARGIN = 1,
-			TEXT_MARGIN = 3
-		};
+		static constexpr int ICON_MARGIN = 1;
+		static constexpr int TEXT_MARGIN = 3;
+
 		enum {
 			ITEM_DATA_IMAGEMASK = 0x0000FFFFUL,
 			ITEM_DATA_CHECKED   = 0x00010000UL
@@ -298,7 +292,7 @@ namespace TVTest
 			int Icon;
 		};
 
-		HMENU m_hmenu;
+		HMENU m_hmenu = nullptr;
 		std::vector<ItemIconInfo> m_ItemList;
 		std::vector<HBITMAP> m_BitmapList;
 	};
@@ -310,7 +304,8 @@ namespace TVTest
 		{
 		public:
 			CItem(int Command, LPCTSTR pszText);
-			virtual ~CItem();
+			virtual ~CItem() = default;
+
 			int GetCommand() const { return m_Command; }
 			LPCTSTR GetText() const { return m_Text.c_str(); }
 			void SetText(LPCTSTR pszText);
@@ -321,12 +316,12 @@ namespace TVTest
 		protected:
 			int m_Command;
 			String m_Text;
-			int m_Width;
+			int m_Width = 0;
 		};
 
 		static bool Initialize(HINSTANCE hinst);
 
-		CDropDownMenu();
+		CDropDownMenu() = default;
 
 		CDropDownMenu(const CDropDownMenu &) = delete;
 		CDropDownMenu &operator=(const CDropDownMenu &) = delete;
@@ -346,8 +341,8 @@ namespace TVTest
 
 	private:
 		std::vector<std::unique_ptr<CItem>> m_ItemList;
-		HWND m_hwnd;
-		HWND m_hwndMessage;
+		HWND m_hwnd = nullptr;
+		HWND m_hwndMessage = nullptr;
 		MARGINS m_ItemMargin;
 		MARGINS m_WindowMargin;
 		DrawUtil::CFont m_Font;
@@ -357,8 +352,8 @@ namespace TVTest
 		int m_ItemHeight;
 		int m_MaxRows;
 		int m_HotItem;
-		bool m_fTrackMouseEvent;
-		bool m_fDarkMode;
+		bool m_fTrackMouseEvent = false;
+		bool m_fDarkMode = false;
 
 		bool GetItemRect(int Index, RECT *pRect) const;
 		int HitTest(int x, int y) const;

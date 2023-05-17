@@ -1,3 +1,6 @@
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include <windows.h>
 #include <tchar.h>
 #include "PreviewWindow.h"
@@ -23,16 +26,6 @@ bool CPreviewWindow::Initialize(HINSTANCE hinst)
 	m_hinst = hinst;
 
 	return true;
-}
-
-
-CPreviewWindow::CPreviewWindow()
-	: m_hwnd(nullptr)
-	, m_pImage(nullptr)
-	, m_fFitImageToWindow(true)
-	, m_ZoomNum(50)
-	, m_ZoomDenom(100)
-{
 }
 
 

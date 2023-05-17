@@ -86,21 +86,19 @@ void CChannelControlItem::CalcSize(int Width, SIZE *pSize)
 
 void CChannelControlItem::Draw(HDC hdc, const RECT &Rect)
 {
-	CAppMain &App = GetAppClass();
+	const CAppMain &App = GetAppClass();
 	const CChannelManager &ChannelManager = App.ChannelManager;
 	const CChannelInfo *pInfo;
 	TCHAR szText[4 + MAX_CHANNEL_NAME];
 
 	if (App.UICore.GetSkin()->IsWheelChannelChanging()) {
-		COLORREF crText, crBack;
-
-		crText = ::GetTextColor(hdc);
-		crBack = ::GetBkColor(hdc);
+		const COLORREF crText = ::GetTextColor(hdc);
+		const COLORREF crBack = ::GetBkColor(hdc);
 		::SetTextColor(hdc, MixColor(crText, crBack, 128));
 		pInfo = ChannelManager.GetChangingChannelInfo();
-		StringPrintf(szText, TEXT("%d: %s"), pInfo->GetChannelNo(), pInfo->GetName());
+		StringFormat(szText, TEXT("{}: {}"), pInfo->GetChannelNo(), pInfo->GetName());
 	} else if ((pInfo = ChannelManager.GetCurrentChannelInfo()) != nullptr) {
-		StringPrintf(szText, TEXT("%d: %s"), pInfo->GetChannelNo(), pInfo->GetName());
+		StringFormat(szText, TEXT("{}: {}"), pInfo->GetChannelNo(), pInfo->GetName());
 	} else {
 		StringCopy(szText, TEXT("<チャンネル>"));
 	}
@@ -136,12 +134,12 @@ void CVideoControlItem::CalcSize(int Width, SIZE *pSize)
 
 void CVideoControlItem::Draw(HDC hdc, const RECT &Rect)
 {
-	CAppMain &App = GetAppClass();
+	const CAppMain &App = GetAppClass();
 	const CCoreEngine &CoreEngine = App.CoreEngine;
 	TCHAR szText[32];
 
-	StringPrintf(
-		szText, TEXT("%d x %d (%d %%)"),
+	StringFormat(
+		szText, TEXT("{} x {} ({} %)"),
 		CoreEngine.GetOriginalVideoWidth(),
 		CoreEngine.GetOriginalVideoHeight(),
 		App.UICore.GetZoomPercentage());
@@ -178,22 +176,15 @@ void CVolumeControlItem::CalcSize(int Width, SIZE *pSize)
 
 void CVolumeControlItem::Draw(HDC hdc, const RECT &Rect)
 {
-	CUICore &UICore = GetAppClass().UICore;
-	COLORREF TextColor = ::GetTextColor(hdc), BarColor;
-	LOGBRUSH lb;
-	HPEN hpen, hpenOld;
-	HBRUSH hbrOld;
-	RECT rc;
-
-	lb.lbStyle = BS_SOLID;
-	lb.lbColor = TextColor;
-	lb.lbHatch = 0;
-	hpen = ::ExtCreatePen(
+	const CUICore &UICore = GetAppClass().UICore;
+	const COLORREF TextColor = ::GetTextColor(hdc);
+	const LOGBRUSH lb = {BS_SOLID, TextColor, 0};
+	const HPEN hpen = ::ExtCreatePen(
 		PS_GEOMETRIC | PS_SOLID | PS_INSIDEFRAME | PS_JOIN_MITER,
 		m_Style.BarBorderWidth, &lb, 0, nullptr);
-	hpenOld = SelectPen(hdc, hpen);
-	hbrOld = SelectBrush(hdc, ::GetStockObject(NULL_BRUSH));
-	rc = Rect;
+	const HPEN hpenOld = SelectPen(hdc, hpen);
+	const HBRUSH hbrOld = SelectBrush(hdc, ::GetStockObject(NULL_BRUSH));
+	RECT rc = Rect;
 	Style::Subtract(&rc, m_pControlPanel->GetItemPadding());
 	rc.top += ((rc.bottom - rc.top) - m_Style.BarHeight) / 2;
 	rc.bottom = rc.top + m_Style.BarHeight;
@@ -201,6 +192,8 @@ void CVolumeControlItem::Draw(HDC hdc, const RECT &Rect)
 	SelectBrush(hdc, hbrOld);
 	SelectPen(hdc, hpenOld);
 	::DeleteObject(hpen);
+
+	COLORREF BarColor;
 	if (!UICore.GetMute())
 		BarColor = TextColor;
 	else
@@ -226,13 +219,10 @@ void CVolumeControlItem::OnRButtonDown(int x, int y)
 void CVolumeControlItem::OnMouseMove(int x, int y)
 {
 	CUICore &UICore = GetAppClass().UICore;
-	RECT rc;
-	int Volume;
-
-	rc = m_Position;
+	RECT rc = m_Position;
 	Style::Subtract(&rc, m_pControlPanel->GetItemPadding());
 	Style::Subtract(&rc, m_Style.BarPadding);
-	Volume = (x - rc.left) * CCoreEngine::MAX_VOLUME / ((rc.right - rc.left) - 1);
+	int Volume = (x - rc.left) * CCoreEngine::MAX_VOLUME / ((rc.right - rc.left) - 1);
 	if (Volume < 0)
 		Volume = 0;
 	else if (Volume > CCoreEngine::MAX_VOLUME)
@@ -258,13 +248,6 @@ void CVolumeControlItem::NormalizeStyle(
 	pStyleScaling->ToPixels(&m_Style.BarBorderWidth);
 }
 
-CVolumeControlItem::VolumeControlStyle::VolumeControlStyle()
-	: BarHeight(8)
-	, BarPadding(1)
-	, BarBorderWidth(1)
-{
-}
-
 
 void CAudioControlItem::CalcSize(int Width, SIZE *pSize)
 {
@@ -276,13 +259,13 @@ void CAudioControlItem::CalcSize(int Width, SIZE *pSize)
 
 void CAudioControlItem::Draw(HDC hdc, const RECT &Rect)
 {
-	CAppMain &App = GetAppClass();
+	const CAppMain &App = GetAppClass();
 	RECT rc = Rect;
 	Style::Subtract(&rc, m_pControlPanel->GetItemPadding());
 
 	const LibISDB::ViewerFilter *pViewer = App.CoreEngine.GetFilter<LibISDB::ViewerFilter>();
 	if (pViewer != nullptr && pViewer->IsSPDIFPassthrough()) {
-		Style::Size IconSize = m_pControlPanel->GetIconSize();
+		const Style::Size IconSize = m_pControlPanel->GetIconSize();
 		if (!m_Icons.IsCreated()) {
 			static const Theme::IconList::ResourceInfo ResourceList[] = {
 				{MAKEINTRESOURCE(IDB_PASSTHROUGH16), 16, 16},

@@ -9,16 +9,15 @@ class CImage
 {
 public:
 	// 再サンプリングの種類
-	enum ResampleType
+	enum class ResampleType
 	{
-		Resample_NearestNeighbor, // 最近傍法
-		Resample_Bilinear,        // 線形補間法
-		Resample_Averaging,       // 平均画素法
-		Resample_Lanczos2,        // Lanczos2
-		Resample_Lanczos3         // Lanczos3
+		NearestNeighbor, // 最近傍法
+		Bilinear,        // 線形補間法
+		Averaging,       // 平均画素法
+		Lanczos2,        // Lanczos2
+		Lanczos3,        // Lanczos3
 	};
 
-	CImage();
 	~CImage();
 
 	bool Create(int Width, int Height, int BitsPerPixel, int AspectRatioX, int AspectRatioY);
@@ -41,14 +40,14 @@ public:
 	CImage * Resize(int Width, int Height, ResampleType Resample) const;
 
 private:
-	int m_Width;
-	int m_Height;
-	int m_BitsPerPixel;
-	int m_AspectRatioX;
-	int m_AspectRatioY;
-	unsigned int m_FrameFlags;
-	BYTE *m_pPixels;
-	std::size_t m_RowBytes;
+	int m_Width = 0;
+	int m_Height = 0;
+	int m_BitsPerPixel = 0;
+	int m_AspectRatioX = 0;
+	int m_AspectRatioY = 0;
+	unsigned int m_FrameFlags = 0;
+	BYTE *m_pPixels = nullptr;
+	std::size_t m_RowBytes = 0;
 
 	typedef double (*KernelFunc)(double x);
 

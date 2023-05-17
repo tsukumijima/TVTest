@@ -39,24 +39,10 @@ const int CTaskbarOptions::m_DefaultTaskList[] = {
 
 CTaskbarOptions::CTaskbarOptions()
 	: COptions(TEXT("Taskbar"))
-	, m_fEnableJumpList(true)
-	, m_fShowTasks(true)
-	, m_fShowRecentChannels(true)
-	, m_MaxRecentChannels(10)
-	, m_fShowChannelIcon(true)
-	, m_IconDirectory(TEXT(".\\JumpListIcons"))
-	, m_fJumpListKeepSingleTask(false)
-	, m_fUseUniqueAppID(false)
-	, m_AppID(TEXT("DBCTRADO.") APP_NAME)
 {
 	m_TaskList.resize(lengthof(m_DefaultTaskList));
 	for (int i = 0; i < lengthof(m_DefaultTaskList); i++)
 		m_TaskList[i] = m_DefaultTaskList[i];
-}
-
-
-CTaskbarOptions::~CTaskbarOptions()
-{
 }
 
 
@@ -81,14 +67,14 @@ bool CTaskbarOptions::ReadSettings(CSettings &Settings)
 
 		for (int i = 0; TaskCount; i++) {
 			TCHAR szKey[32];
-			StringPrintf(szKey, TEXT("Task%d"), i);
+			StringFormat(szKey, TEXT("Task{}"), i);
 			if (!Settings.Read(szKey, &Command))
 				break;
 			StringUtility::Trim(Command);
 			if (Command.empty()) {
 				m_TaskList.push_back(0);	// Separator
 			} else {
-				int ID = CommandManager.ParseIDText(Command);
+				const int ID = CommandManager.ParseIDText(Command);
 				if (ID != 0)
 					m_TaskList.push_back(ID);
 			}
@@ -110,11 +96,11 @@ bool CTaskbarOptions::WriteSettings(CSettings &Settings)
 	Settings.Write(TEXT("ShowChannelIcon"), m_fShowChannelIcon);
 	Settings.Write(TEXT("IconDirectory"), m_IconDirectory);
 
-	Settings.Write(TEXT("TaskCount"), (int)m_TaskList.size());
+	Settings.Write(TEXT("TaskCount"), static_cast<int>(m_TaskList.size()));
 	const CCommandManager &CommandManager = GetAppClass().CommandManager;
-	for (int i = 0; i < (int)m_TaskList.size(); i++) {
+	for (size_t i = 0; i < m_TaskList.size(); i++) {
 		TCHAR szKey[32];
-		StringPrintf(szKey, TEXT("Task%d"), i);
+		StringFormat(szKey, TEXT("Task{}"), i);
 		Settings.Write(szKey, CommandManager.GetCommandIDText(m_TaskList[i]));
 	}
 #endif

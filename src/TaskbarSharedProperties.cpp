@@ -29,13 +29,6 @@ namespace TVTest
 {
 
 
-CTaskbarSharedProperties::CTaskbarSharedProperties()
-	: m_pHeader(nullptr)
-	, m_LockTimeout(3000)
-{
-}
-
-
 CTaskbarSharedProperties::~CTaskbarSharedProperties()
 {
 	Close();
@@ -52,7 +45,7 @@ bool CTaskbarSharedProperties::Open(LPCTSTR pszName, const CRecentChannelList *p
 				&fExists)) {
 		GetAppClass().AddLog(
 			CLogItem::LogType::Error,
-			TEXT("共有メモリ(%s)を作成できません。"),
+			TEXT("共有メモリ({})を作成できません。"),
 			pszName);
 		return false;
 	}

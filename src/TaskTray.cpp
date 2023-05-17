@@ -30,17 +30,6 @@ namespace TVTest
 {
 
 
-CTaskTrayManager::CTaskTrayManager()
-	: m_hwnd(nullptr)
-	, m_TrayIconMessage(0)
-	, m_fResident(false)
-	, m_fMinimizeToTray(true)
-	, m_Status(StatusFlag::None)
-	, m_TaskbarCreatedMessage(0)
-{
-}
-
-
 CTaskTrayManager::~CTaskTrayManager()
 {
 	Finalize();
@@ -113,7 +102,7 @@ bool CTaskTrayManager::AddTrayIcon()
 	nid.uCallbackMessage = m_TrayIconMessage;
 	nid.hIcon = LoadTrayIcon();
 	StringCopy(nid.szTip, !m_TipText.empty() ? m_TipText.c_str() : APP_NAME);
-	bool fResult = ::Shell_NotifyIcon(NIM_ADD, &nid) != FALSE;
+	const bool fResult = ::Shell_NotifyIcon(NIM_ADD, &nid) != FALSE;
 	::DestroyIcon(nid.hIcon);
 	if (!fResult)
 		return false;
@@ -146,7 +135,7 @@ bool CTaskTrayManager::ChangeTrayIcon()
 	nid.uID = 1;
 	nid.uFlags = NIF_ICON;
 	nid.hIcon = LoadTrayIcon();
-	bool fResult = Shell_NotifyIcon(NIM_MODIFY, &nid) != FALSE;
+	const bool fResult = Shell_NotifyIcon(NIM_MODIFY, &nid) != FALSE;
 	::DestroyIcon(nid.hIcon);
 	if (!fResult) {
 		if (!AddTrayIcon())

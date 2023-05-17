@@ -250,6 +250,7 @@ const CColorScheme::ColorInfo CColorScheme::m_ColorInfoList[NUM_COLORS] = {
 	{HEXRGB(0x333333), CLR_INVALID,      TEXT("ProgramGuideChannelBack"),            TEXT("EPG番組表 チャンネル名背景1")},
 	{HEXRGB(0x111111), CLR_INVALID,      TEXT("ProgramGuideChannelBack2"),           TEXT("EPG番組表 チャンネル名背景2")},
 	{HEXRGB(0x999999), CLR_INVALID,      TEXT("ProgramGuideChannelText"),            TEXT("EPG番組表 チャンネル名文字")},
+	{HEXRGB(0xDDDDDD), CLR_INVALID,      TEXT("ProgramGuideChannelHighlightText"),   TEXT("EPG番組表 チャンネル名強調文字")},
 	{HEXRGB(0x4486E8), CLR_INVALID,      TEXT("ProgramGuideCurChannelBack"),         TEXT("EPG番組表 チャンネル名選択背景1")},
 	{HEXRGB(0x3C76CC), CLR_INVALID,      TEXT("ProgramGuideCurChannelBack2"),        TEXT("EPG番組表 チャンネル名選択背景2")},
 	{HEXRGB(0xDDDDDD), CLR_INVALID,      TEXT("ProgramGuideCurChannelText"),         TEXT("EPG番組表 チャンネル名選択文字")},
@@ -482,18 +483,12 @@ const Theme::BorderType CColorScheme::m_CustomDefaultBorderList[NUM_BORDERS] = {
 CColorScheme::CColorScheme()
 {
 	SetDefault();
-	::ZeroMemory(m_LoadedFlags, sizeof(m_LoadedFlags));
 }
 
 
 CColorScheme::CColorScheme(const CColorScheme &ColorScheme)
 {
 	*this = ColorScheme;
-}
-
-
-CColorScheme::~CColorScheme()
-{
 }
 
 
@@ -648,7 +643,7 @@ bool CColorScheme::Load(CSettings &Settings)
 			m_BaseScheme = BaseSchemeType::Light;
 	}
 
-	::ZeroMemory(m_LoadedFlags, sizeof(m_LoadedFlags));
+	m_LoadedFlags.reset();
 	for (int i = 0; i < NUM_COLORS; i++) {
 		if (Settings.ReadColor(m_ColorInfoList[i].pszText, &m_ColorList[i]))
 			SetLoadedFlag(i);
@@ -720,6 +715,7 @@ bool CColorScheme::Load(CSettings &Settings)
 		{COLOR_EVENTINFOPOPUP_BACK,                   COLOR_PROGRAMINFOBACK},
 		{COLOR_EVENTINFOPOPUP_TEXT,                   COLOR_PROGRAMINFOTEXT},
 		{COLOR_EVENTINFOPOPUP_EVENTTITLE,             COLOR_EVENTINFOPOPUP_TEXT},
+		{COLOR_PROGRAMGUIDE_CHANNELHIGHLIGHTTEXT,     COLOR_PROGRAMGUIDE_CHANNELTEXT},
 		{COLOR_PROGRAMGUIDE_CURCHANNELTEXT,           COLOR_PROGRAMGUIDE_CHANNELTEXT},
 		{COLOR_PROGRAMGUIDE_TIMELINE,                 COLOR_PROGRAMGUIDE_TIMETEXT},
 		{COLOR_PROGRAMGUIDE_DATEBUTTON_BORDER,        COLOR_PROGRAMGUIDE_DATEBUTTON_BACK1},
@@ -730,11 +726,10 @@ bool CColorScheme::Load(CSettings &Settings)
 		{COLOR_PROGRAMGUIDE_DATEBUTTON_HOTTEXT,       COLOR_PROGRAMGUIDE_DATEBUTTON_TEXT},
 	};
 
-	for (int i = 0; i < lengthof(ColorMap); i++) {
-		const int To = ColorMap[i].To;
-		if (!IsLoaded(To) && IsLoaded(ColorMap[i].From)) {
-			m_ColorList[To] = m_ColorList[ColorMap[i].From];
-			SetLoadedFlag(To);
+	for (const auto Map : ColorMap) {
+		if (!IsLoaded(Map.To) && IsLoaded(Map.From)) {
+			m_ColorList[Map.To] = m_ColorList[Map.From];
+			SetLoadedFlag(Map.To);
 		}
 	}
 
@@ -748,18 +743,17 @@ bool CColorScheme::Load(CSettings &Settings)
 		{COLOR_SIDEBARBORDER,      COLOR_SIDEBARBACK1,      COLOR_SIDEBARBACK2},
 	};
 
-	for (int i = 0; i < lengthof(MixMap); i++) {
-		const int To = MixMap[i].To;
-		if (!IsLoaded(To) && IsLoaded(MixMap[i].From1) && IsLoaded(MixMap[i].From2)) {
-			m_ColorList[To] = MixColor(m_ColorList[MixMap[i].From1], m_ColorList[MixMap[i].From2]);
-			SetLoadedFlag(To);
+	for (const auto Map : MixMap) {
+		if (!IsLoaded(Map.To) && IsLoaded(Map.From1) && IsLoaded(Map.From2)) {
+			m_ColorList[Map.To] = MixColor(m_ColorList[Map.From1], m_ColorList[Map.From2]);
+			SetLoadedFlag(Map.To);
 		}
 	}
 
 	for (int i = 0; i < NUM_GRADIENTS; i++) {
 		TCHAR szName[128];
 
-		StringPrintf(szName, TEXT("%sStyle"), m_GradientInfoList[i].pszText);
+		StringFormat(szName, TEXT("{}Style"), m_GradientInfoList[i].pszText);
 		m_FillList[i].Type = Theme::FillType::Gradient;
 		if (Settings.Read(szName, szText, lengthof(szText))) {
 			for (int j = 0; j < lengthof(FillTypeNameList); j++) {
@@ -770,7 +764,7 @@ bool CColorScheme::Load(CSettings &Settings)
 			}
 		}
 
-		StringPrintf(szName, TEXT("%sGradient"), m_GradientInfoList[i].pszText);
+		StringFormat(szName, TEXT("{}Gradient"), m_GradientInfoList[i].pszText);
 		m_FillList[i].Gradient.Type = Theme::GradientType::Normal;
 		if (Settings.Read(szName, szText, lengthof(szText))) {
 			for (int j = 0; j < lengthof(GradientTypeNameList); j++) {
@@ -790,7 +784,7 @@ bool CColorScheme::Load(CSettings &Settings)
 			}
 		}
 
-		StringPrintf(szName, TEXT("%sGradientDirection"), m_GradientInfoList[i].pszText);
+		StringFormat(szName, TEXT("{}GradientDirection"), m_GradientInfoList[i].pszText);
 		m_FillList[i].Gradient.Direction = m_GradientInfoList[i].Direction;
 		if (Settings.Read(szName, szText, lengthof(szText))) {
 			for (int j = 0; j < lengthof(GradientDirectionList); j++) {
@@ -838,16 +832,15 @@ bool CColorScheme::Load(CSettings &Settings)
 		{GRADIENT_PROGRAMGUIDE_DATEBUTTON_HOTBACK,       GRADIENT_PROGRAMGUIDE_DATEBUTTON_BACK},
 	};
 
-	for (const auto &Map : GradientMap) {
-		const int To = Map.To, From = Map.From;
-		if (m_GradientInfoList[To].Color1 >= 0
-				&& !IsLoaded(m_GradientInfoList[To].Color1)
-				&& IsLoaded(m_GradientInfoList[From].Color1)) {
-			m_ColorList[m_GradientInfoList[To].Color1] = m_ColorList[m_GradientInfoList[From].Color1];
-			m_ColorList[m_GradientInfoList[To].Color2] = m_ColorList[m_GradientInfoList[From].Color2];
-			SetLoadedFlag(m_GradientInfoList[To].Color1);
-			SetLoadedFlag(m_GradientInfoList[To].Color2);
-			m_FillList[To] = m_FillList[From];
+	for (const auto Map : GradientMap) {
+		if (m_GradientInfoList[Map.To].Color1 >= 0
+				&& !IsLoaded(m_GradientInfoList[Map.To].Color1)
+				&& IsLoaded(m_GradientInfoList[Map.From].Color1)) {
+			m_ColorList[m_GradientInfoList[Map.To].Color1] = m_ColorList[m_GradientInfoList[Map.From].Color1];
+			m_ColorList[m_GradientInfoList[Map.To].Color2] = m_ColorList[m_GradientInfoList[Map.From].Color2];
+			SetLoadedFlag(m_GradientInfoList[Map.To].Color1);
+			SetLoadedFlag(m_GradientInfoList[Map.To].Color2);
+			m_FillList[Map.To] = m_FillList[Map.From];
 		}
 	}
 
@@ -884,14 +877,12 @@ bool CColorScheme::Load(CSettings &Settings)
 		{BORDER_PROGRAMGUIDE_DATEBUTTON_HOT,       BORDER_PROGRAMGUIDE_DATEBUTTON},
 	};
 
-	for (const auto &Map : BorderMap) {
-		const int To = Map.To;
-		const int From = Map.From;
-		if (!BorderLoaded[To] && BorderLoaded[From]) {
-			m_BorderList[To] = m_BorderList[From];
+	for (const auto Map : BorderMap) {
+		if (!BorderLoaded[Map.To] && BorderLoaded[Map.From]) {
+			m_BorderList[Map.To] = m_BorderList[Map.From];
 		}
-		const int ColorTo = m_BorderInfoList[To].Color;
-		const int ColorFrom = m_BorderInfoList[From].Color;
+		const int ColorTo = m_BorderInfoList[Map.To].Color;
+		const int ColorFrom = m_BorderInfoList[Map.From].Color;
 		if (!IsLoaded(ColorTo) && IsLoaded(ColorFrom)) {
 			m_ColorList[ColorTo] = m_ColorList[ColorFrom];
 			SetLoadedFlag(ColorTo);
@@ -963,18 +954,18 @@ bool CColorScheme::Save(CSettings &Settings, SaveFlag Flags) const
 		for (int i = 0; i < NUM_GRADIENTS; i++) {
 			TCHAR szName[128];
 
-			StringPrintf(szName, TEXT("%sType"), m_GradientInfoList[i].pszText);
-			Settings.Write(szName, FillTypeNameList[(int)m_FillList[i].Type]);
-			StringPrintf(szName, TEXT("%sGradient"), m_GradientInfoList[i].pszText);
-			Settings.Write(szName, GradientTypeNameList[(int)m_FillList[i].Gradient.Type]);
-			StringPrintf(szName, TEXT("%sGradientDirection"), m_GradientInfoList[i].pszText);
-			Settings.Write(szName, GradientDirectionList[(int)m_FillList[i].Gradient.Direction]);
+			StringFormat(szName, TEXT("{}Type"), m_GradientInfoList[i].pszText);
+			Settings.Write(szName, FillTypeNameList[static_cast<int>(m_FillList[i].Type)]);
+			StringFormat(szName, TEXT("{}Gradient"), m_GradientInfoList[i].pszText);
+			Settings.Write(szName, GradientTypeNameList[static_cast<int>(m_FillList[i].Gradient.Type)]);
+			StringFormat(szName, TEXT("{}GradientDirection"), m_GradientInfoList[i].pszText);
+			Settings.Write(szName, GradientDirectionList[static_cast<int>(m_FillList[i].Gradient.Direction)]);
 		}
 	}
 
 	if (Settings.SetSection(TEXT("Style"))) {
 		for (int i = 0; i < NUM_BORDERS; i++)
-			Settings.Write(m_BorderInfoList[i].pszText, BorderTypeNameList[(int)m_BorderList[i]]);
+			Settings.Write(m_BorderInfoList[i].pszText, BorderTypeNameList[static_cast<int>(m_BorderList[i])]);
 	}
 
 	return true;
@@ -1101,13 +1092,13 @@ bool CColorScheme::IsLoaded(int Type) const
 {
 	if (Type < 0 || Type >= NUM_COLORS)
 		return false;
-	return (m_LoadedFlags[Type / 32] & (1 << (Type % 32))) != 0;
+	return m_LoadedFlags[Type];
 }
 
 
 void CColorScheme::SetLoaded()
 {
-	::FillMemory(m_LoadedFlags, sizeof(m_LoadedFlags), 0xFF);
+	m_LoadedFlags.set();
 }
 
 
@@ -1155,7 +1146,7 @@ int CColorScheme::GetColorBorder(int Type)
 
 void CColorScheme::SetLoadedFlag(int Color)
 {
-	m_LoadedFlags[Color / 32] |= 1 << (Color % 32);
+	m_LoadedFlags.set(Color);
 }
 
 
@@ -1174,7 +1165,7 @@ bool CColorSchemeList::Insert(int Index, CColorScheme *pColorScheme)
 {
 	if (Index < 0)
 		return false;
-	if ((size_t)Index >= m_List.size())
+	if (static_cast<size_t>(Index) >= m_List.size())
 		return Add(pColorScheme);
 	auto i = m_List.begin();
 	std::advance(i, Index);
@@ -1185,12 +1176,11 @@ bool CColorSchemeList::Insert(int Index, CColorScheme *pColorScheme)
 
 bool CColorSchemeList::Load(LPCTSTR pszDirectory)
 {
-	HANDLE hFind;
 	WIN32_FIND_DATA wfd;
 	TCHAR szFileName[MAX_PATH];
 
 	::PathCombine(szFileName, pszDirectory, TEXT("*.httheme"));
-	hFind = ::FindFirstFileEx(szFileName, FindExInfoBasic, &wfd, FindExSearchNameMatch, nullptr, 0);
+	const HANDLE hFind = ::FindFirstFileEx(szFileName, FindExInfoBasic, &wfd, FindExSearchNameMatch, nullptr, 0);
 	if (hFind != INVALID_HANDLE_VALUE) {
 		do {
 			if ((wfd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
@@ -1218,7 +1208,7 @@ void CColorSchemeList::Clear()
 
 CColorScheme *CColorSchemeList::GetColorScheme(int Index)
 {
-	if (Index < 0 || (size_t)Index >= m_List.size())
+	if (Index < 0 || static_cast<size_t>(Index) >= m_List.size())
 		return nullptr;
 	return m_List[Index].get();
 }
@@ -1226,7 +1216,7 @@ CColorScheme *CColorSchemeList::GetColorScheme(int Index)
 
 bool CColorSchemeList::SetColorScheme(int Index, const CColorScheme *pColorScheme)
 {
-	if (Index < 0 || (size_t)Index >= m_List.size() || pColorScheme == nullptr)
+	if (Index < 0 || static_cast<size_t>(Index) >= m_List.size() || pColorScheme == nullptr)
 		return false;
 	*m_List[Index] = *pColorScheme;
 	return true;
@@ -1238,7 +1228,7 @@ int CColorSchemeList::FindByName(LPCTSTR pszName, int FirstIndex) const
 	if (pszName == nullptr)
 		return -1;
 
-	for (int i = std::max(FirstIndex, 0); i < (int)m_List.size(); i++) {
+	for (int i = std::max(FirstIndex, 0); i < static_cast<int>(m_List.size()); i++) {
 		if (!IsStringEmpty(m_List[i]->GetName())
 				&& ::lstrcmpi(m_List[i]->GetName(), pszName) == 0)
 			return i;
@@ -1250,8 +1240,8 @@ int CColorSchemeList::FindByName(LPCTSTR pszName, int FirstIndex) const
 void CColorSchemeList::SortByName()
 {
 	if (m_List.size() > 1) {
-		std::sort(
-			m_List.begin(), m_List.end(),
+		std::ranges::sort(
+			m_List,
 			[](const std::unique_ptr<CColorScheme> &ColorScheme1,
 			   const std::unique_ptr<CColorScheme> &ColorScheme2) -> bool {
 				return ::lstrcmpi(ColorScheme1->GetName(), ColorScheme2->GetName()) < 0;

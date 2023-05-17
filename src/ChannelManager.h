@@ -52,7 +52,6 @@ namespace TVTest
 		};
 
 		CChannelManager();
-		~CChannelManager();
 
 		void Reset();
 		bool LoadChannelList(LPCTSTR pszFileName);
@@ -93,14 +92,11 @@ namespace TVTest
 
 	class CChannelSpec
 	{
-		int m_Space;
-		int m_Channel;
-		int m_ServiceID;
+		int m_Space = CChannelManager::SPACE_INVALID;
+		int m_Channel = -1;
+		int m_ServiceID = -1;
 
 	public:
-		CChannelSpec();
-		~CChannelSpec();
-
 		bool Store(const CChannelManager *pChannelManager);
 		bool SetSpace(int Space);
 		int GetSpace() const { return m_Space; }

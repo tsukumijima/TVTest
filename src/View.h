@@ -44,7 +44,7 @@ namespace TVTest
 			virtual void OnMouseMessage(UINT Msg, int x, int y) {}
 		};
 
-		CDisplayView();
+		CDisplayView() = default;
 		virtual ~CDisplayView() = 0;
 
 		virtual bool Close() = 0;
@@ -77,17 +77,15 @@ namespace TVTest
 
 		struct DisplayViewStyle
 		{
-			Style::IntValue TextSizeRatioHorz;
-			Style::IntValue TextSizeRatioVert;
-			Style::IntValue TextSizeScaleBase;
-			Style::IntValue TextSizeMin;
-			Style::IntValue TextSizeMax;
-			Style::Margins ContentMargin;
-			Style::Margins CategoriesMargin;
-			Style::Size CloseButtonSize;
-			Style::Margins CloseButtonMargin;
-
-			DisplayViewStyle();
+			Style::IntValue TextSizeRatioHorz{50};
+			Style::IntValue TextSizeRatioVert{30};
+			Style::IntValue TextSizeScaleBase{140};
+			Style::IntValue TextSizeMin{12};
+			Style::IntValue TextSizeMax{72};
+			Style::Margins ContentMargin{8, 16, 18, 16};
+			Style::Margins CategoriesMargin{8, 32, 8, 32};
+			Style::Size CloseButtonSize{14, 14};
+			Style::Margins CloseButtonMargin{2};
 
 			void SetStyle(const Style::CStyleManager *pStyleManager);
 			void NormalizeStyle(
@@ -95,9 +93,9 @@ namespace TVTest
 				const Style::CStyleScaling *pStyleScaling);
 		};
 
-		class CDisplayBase *m_pDisplayBase;
+		class CDisplayBase *m_pDisplayBase = nullptr;
 		DisplayViewStyle m_Style;
-		CEventHandler *m_pEventHandler;
+		CEventHandler *m_pEventHandler = nullptr;
 
 		virtual bool OnVisibleChange(bool fVisible);
 		virtual bool GetCloseButtonRect(RECT *pRect) const;
@@ -129,8 +127,7 @@ namespace TVTest
 			virtual bool OnVisibleChange(bool fVisible) { return true; }
 		};
 
-		CDisplayBase();
-		~CDisplayBase();
+		CDisplayBase() = default;
 
 		CDisplayBase(const CDisplayBase &) = delete;
 		CDisplayBase &operator=(const CDisplayBase &) = delete;
@@ -148,10 +145,10 @@ namespace TVTest
 		void SetFocus();
 
 	private:
-		CBasicWindow *m_pParentWindow;
-		CDisplayView *m_pDisplayView;
-		CEventHandler *m_pEventHandler;
-		bool m_fVisible;
+		CBasicWindow *m_pParentWindow = nullptr;
+		CDisplayView *m_pDisplayView = nullptr;
+		CEventHandler *m_pEventHandler = nullptr;
+		bool m_fVisible = false;
 	};
 
 	class CDisplayEventHandlerBase
@@ -167,10 +164,9 @@ namespace TVTest
 		class ABSTRACT_CLASS(CEventHandler)
 		{
 		protected:
-			CVideoContainerWindow *m_pVideoContainer;
+			CVideoContainerWindow *m_pVideoContainer = nullptr;
 
 		public:
-			CEventHandler();
 			virtual ~CEventHandler();
 
 			virtual void OnSizeChanged(int Width, int Height) {}
@@ -178,7 +174,6 @@ namespace TVTest
 			friend class CVideoContainerWindow;
 		};
 
-		CVideoContainerWindow();
 		~CVideoContainerWindow();
 
 		bool Create(HWND hwndParent, DWORD Style, DWORD ExStyle, int ID, LibISDB::ViewerFilter *pViewer);
@@ -190,10 +185,10 @@ namespace TVTest
 	private:
 		static HINSTANCE m_hinst;
 
-		LibISDB::ViewerFilter *m_pViewer;
-		CDisplayBase *m_pDisplayBase;
-		CEventHandler *m_pEventHandler;
-		SIZE m_ClientSize;
+		LibISDB::ViewerFilter *m_pViewer = nullptr;
+		CDisplayBase *m_pDisplayBase = nullptr;
+		CEventHandler *m_pEventHandler = nullptr;
+		SIZE m_ClientSize{};
 
 	// CBasicWindow
 		bool Create(HWND hwndParent, DWORD Style, DWORD ExStyle = 0, int ID = 0) override;
@@ -210,10 +205,9 @@ namespace TVTest
 		class ABSTRACT_CLASS(CEventHandler)
 		{
 		protected:
-			CViewWindow *m_pView;
+			CViewWindow *m_pView = nullptr;
 
 		public:
-			CEventHandler();
 			virtual ~CEventHandler();
 
 			virtual void OnSizeChanged(int Width, int Height) {}
@@ -221,7 +215,6 @@ namespace TVTest
 			friend class CViewWindow;
 		};
 
-		CViewWindow();
 		~CViewWindow();
 
 	// CBasicWindow
@@ -234,7 +227,7 @@ namespace TVTest
 		bool SetLogo(HBITMAP hbm);
 		void SetBorder(const Theme::BorderStyle &Style);
 		void SetMargin(const Style::Margins &Margin);
-		void ShowCursor(bool fShow);
+		void SetShowCursor(bool fShow);
 		bool CalcClientRect(RECT *pRect) const;
 		bool CalcWindowRect(RECT *pRect) const;
 
@@ -243,13 +236,13 @@ namespace TVTest
 	private:
 		static HINSTANCE m_hinst;
 
-		CVideoContainerWindow *m_pVideoContainer;
-		HWND m_hwndMessage;
-		CEventHandler *m_pEventHandler;
-		HBITMAP m_hbmLogo;
-		Theme::BorderStyle m_BorderStyle;
+		CVideoContainerWindow *m_pVideoContainer = nullptr;
+		HWND m_hwndMessage = nullptr;
+		CEventHandler *m_pEventHandler = nullptr;
+		HBITMAP m_hbmLogo = nullptr;
+		Theme::BorderStyle m_BorderStyle{Theme::BorderType::None, RGB(128, 128, 128)};
 		Style::Margins m_Margin;
-		bool m_fShowCursor;
+		bool m_fShowCursor = true;
 
 	// CCustomWindow
 		LRESULT OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) override;

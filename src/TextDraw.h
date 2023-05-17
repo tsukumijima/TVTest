@@ -40,6 +40,7 @@ namespace TVTest
 			None               = 0x0000U,
 			EndEllipsis        = 0x0001U,	// 収まりきらない場合省略記号を付加
 			JapaneseHyphnation = 0x0002U,	// 禁則処理
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 		enum class DrawFlag : unsigned int {
@@ -50,6 +51,7 @@ namespace TVTest
 			Align_VertCenter = 0x0008U,
 			Align_Bottom     = 0x0010U,
 			JustifyMultiLine = 0x0020U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 		struct FontMetrics
@@ -64,8 +66,7 @@ namespace TVTest
 			int Height;
 		};
 
-		CTextDraw();
-		~CTextDraw();
+		CTextDraw() = default;
 
 		CTextDraw(const CTextDraw &) = delete;
 		CTextDraw &operator=(const CTextDraw &) = delete;
@@ -87,9 +88,9 @@ namespace TVTest
 		bool ResetClipping();
 
 	private:
-		CTextDrawEngine *m_pEngine;
+		CTextDrawEngine *m_pEngine = nullptr;
 		std::unique_ptr<CTextDrawEngine> m_DefaultEngine;
-		Flag m_Flags;
+		Flag m_Flags = Flag::None;
 		std::vector<WCHAR> m_StringBuffer;
 
 		int GetLineLength(LPCWSTR pszText);
@@ -102,9 +103,6 @@ namespace TVTest
 		static bool IsStartProhibitChar(WCHAR Char);
 		static bool IsEndProhibitChar(WCHAR Char);
 	};
-
-	TVTEST_ENUM_FLAGS(CTextDraw::Flag)
-	TVTEST_ENUM_FLAGS(CTextDraw::DrawFlag)
 
 	class CTextDrawEngine
 	{
@@ -137,7 +135,6 @@ namespace TVTest
 		: public CTextDrawEngine
 	{
 	public:
-		CTextDrawEngine_GDI();
 		~CTextDrawEngine_GDI();
 
 		void Finalize() override;
@@ -154,8 +151,8 @@ namespace TVTest
 	private:
 		void UnbindDC();
 
-		HDC m_hdc;
-		HFONT m_hfontOld;
+		HDC m_hdc = nullptr;
+		HFONT m_hfontOld = nullptr;
 		COLORREF m_OldTextColor;
 	};
 
@@ -184,9 +181,9 @@ namespace TVTest
 
 	private:
 		CDirectWriteRenderer &m_Renderer;
-		CDirectWriteFont *m_pFont;
+		CDirectWriteFont *m_pFont = nullptr;
 		std::deque<std::unique_ptr<CDirectWriteFont>> m_FontCache;
-		std::size_t m_MaxFontCache;
+		std::size_t m_MaxFontCache = 4;
 		CDirectWriteBrush m_Brush;
 	};
 

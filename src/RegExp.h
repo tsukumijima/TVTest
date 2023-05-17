@@ -46,6 +46,7 @@ namespace TVTest
 			IgnoreCase  = 0x0001U,
 			IgnoreWidth = 0x0002U,
 			Optimize    = 0x0004U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 		struct TextRange
@@ -71,12 +72,9 @@ namespace TVTest
 		std::unique_ptr<CRegExpEngine> m_Engine;
 	};
 
-	TVTEST_ENUM_FLAGS(CRegExp::PatternFlag)
-
 	class ABSTRACT_CLASS(CRegExpEngine)
 	{
 	public:
-		CRegExpEngine();
 		virtual ~CRegExpEngine() = default;
 
 		virtual bool GetName(LPTSTR pszName, size_t MaxLength) const = 0;
@@ -93,7 +91,7 @@ namespace TVTest
 		void MapTargetString(String &Text) const;
 
 		String m_Pattern;
-		CRegExp::PatternFlag m_Flags;
+		CRegExp::PatternFlag m_Flags = CRegExp::PatternFlag::None;
 	};
 
 }

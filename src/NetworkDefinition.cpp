@@ -32,7 +32,7 @@ namespace TVTest
 
 WORD StrToWord(const String &Str)
 {
-	unsigned long Value = std::_tcstoul(Str.c_str(), nullptr, 0);
+	const unsigned long Value = std::_tcstoul(Str.c_str(), nullptr, 0);
 	if (Value > 0xFFFF)
 		return 0;
 	return static_cast<WORD>(Value);
@@ -93,7 +93,7 @@ bool CNetworkDefinition::LoadSettings(CSettings &Settings)
 			TCHAR szKey[32];
 			String Value;
 
-			StringPrintf(szKey, TEXT("Assign%d"), i);
+			StringFormat(szKey, TEXT("Assign{}"), i);
 			if (!Settings.Read(szKey, &Value))
 				break;
 
@@ -120,8 +120,8 @@ bool CNetworkDefinition::LoadSettings(CSettings &Settings)
 		}
 
 		for (const RemoteControlKeyIDAssignInfo &DefInfo : m_DefaultKeyIDAssignList) {
-			auto itr = std::find_if(
-				List.begin(), List.end(),
+			auto itr = std::ranges::find_if(
+				List,
 				[&](const RemoteControlKeyIDAssignInfo &Info) -> bool {
 					return Info.NetworkID == DefInfo.NetworkID
 						&& Info.FirstServiceID <= DefInfo.LastServiceID
@@ -176,7 +176,7 @@ bool CNetworkDefinition::IsCSNetworkID(WORD NetworkID) const
 
 bool CNetworkDefinition::IsSatelliteNetworkID(WORD NetworkID) const
 {
-	NetworkType Type = GetNetworkType(NetworkID);
+	const NetworkType Type = GetNetworkType(NetworkID);
 	return Type == NetworkType::BS || Type == NetworkType::CS;
 }
 
@@ -185,8 +185,8 @@ int CNetworkDefinition::GetNetworkTypeOrder(WORD NetworkID1, WORD NetworkID2) co
 {
 	if (NetworkID1 == NetworkID2)
 		return 0;
-	NetworkType Network1 = GetNetworkType(NetworkID1);
-	NetworkType Network2 = GetNetworkType(NetworkID2);
+	const NetworkType Network1 = GetNetworkType(NetworkID1);
+	const NetworkType Network2 = GetNetworkType(NetworkID2);
 	int Order;
 	if (Network1 == Network2)
 		Order = 0;
@@ -222,17 +222,13 @@ int CNetworkDefinition::GetRemoteControlKeyID(WORD NetworkID, WORD ServiceID) co
 
 CNetworkDefinition::NetworkInfoList::iterator CNetworkDefinition::FindNetworkInfoByID(WORD NetworkID)
 {
-	return std::find_if(
-		m_NetworkInfoList.begin(), m_NetworkInfoList.end(),
-		[&](const NetworkInfo & Info) -> bool { return Info.NetworkID == NetworkID; });
+	return std::ranges::find(m_NetworkInfoList, NetworkID, &NetworkInfo::NetworkID);
 }
 
 
 CNetworkDefinition::NetworkInfoList::const_iterator CNetworkDefinition::FindNetworkInfoByID(WORD NetworkID) const
 {
-	return std::find_if(
-		m_NetworkInfoList.begin(), m_NetworkInfoList.end(),
-		[&](const NetworkInfo & Info) -> bool { return Info.NetworkID == NetworkID; });
+	return std::ranges::find(m_NetworkInfoList, NetworkID, &NetworkInfo::NetworkID);
 }
 
 

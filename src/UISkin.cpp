@@ -34,13 +34,6 @@ static CMessageDialog MessageDialog;
 
 
 
-CUISkin::CUISkin()
-	: m_pCore(nullptr)
-	, m_fWheelChannelChanging(false)
-{
-}
-
-
 int CUISkin::ShowMessage(LPCTSTR pszText, LPCTSTR pszCaption, UINT Type) const
 {
 	return ::MessageBox(GetVideoHostWindow(), pszText, pszCaption, Type);
@@ -56,9 +49,8 @@ void CUISkin::ShowErrorMessage(LPCTSTR pszText) const
 void CUISkin::ShowErrorMessage(
 	const LibISDB::ErrorHandler *pErrorHandler, LPCTSTR pszTitle) const
 {
-	String Text;
+	String Text = pErrorHandler->GetLastErrorText();
 
-	Text = pErrorHandler->GetLastErrorText();
 	if (!IsStringEmpty(pErrorHandler->GetLastErrorAdvise())) {
 		if (!Text.empty())
 			Text += TEXT('\n');

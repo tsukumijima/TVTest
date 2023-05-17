@@ -33,30 +33,29 @@ namespace TVTest
 */
 static bool IsWindowEdgeVisible(HWND hwnd, HWND hwndTop, const RECT *pRect, HWND hwndTarget)
 {
-	RECT rc, rcEdge;
-	HWND hwndNext;
-
 	if (hwndTop == hwnd || hwndTop == nullptr)
 		return true;
+
+	RECT rc;
 	GetWindowRect(hwndTop, &rc);
-	hwndNext = GetNextWindow(hwndTop, GW_HWNDNEXT);
+	const HWND hwndNext = GetNextWindow(hwndTop, GW_HWNDNEXT);
 	if (hwndTop == hwndTarget || !IsWindowVisible(hwndTop)
 			|| rc.left == rc.right || rc.top == rc.bottom)
 		return IsWindowEdgeVisible(hwnd, hwndNext, pRect, hwndTarget);
+
+	RECT rcEdge = *pRect;
+
 	if (pRect->top == pRect->bottom) {
 		if (rc.top <= pRect->top && rc.bottom > pRect->top) {
 			if (rc.left <= pRect->left && rc.right >= pRect->right)
 				return false;
 			if (rc.left <= pRect->left && rc.right > pRect->left) {
-				rcEdge = *pRect;
 				rcEdge.right = std::min(rc.right, pRect->right);
 				return IsWindowEdgeVisible(hwnd, hwndNext, &rcEdge, hwndTarget);
 			} else if (rc.left > pRect->left && rc.right >= pRect->right) {
-				rcEdge = *pRect;
 				rcEdge.left = rc.left;
 				return IsWindowEdgeVisible(hwnd, hwndNext, &rcEdge, hwndTarget);
 			} else if (rc.left > pRect->left && rc.right < pRect->right) {
-				rcEdge = *pRect;
 				rcEdge.right = rc.left;
 				if (IsWindowEdgeVisible(hwnd, hwndNext, &rcEdge, hwndTarget))
 					return true;
@@ -70,15 +69,12 @@ static bool IsWindowEdgeVisible(HWND hwnd, HWND hwndTop, const RECT *pRect, HWND
 			if (rc.top <= pRect->top && rc.bottom >= pRect->bottom)
 				return false;
 			if (rc.top <= pRect->top && rc.bottom > pRect->top) {
-				rcEdge = *pRect;
 				rcEdge.bottom = std::min(rc.bottom, pRect->bottom);
 				return IsWindowEdgeVisible(hwnd, hwndNext, &rcEdge, hwndTarget);
 			} else if (rc.top > pRect->top && rc.bottom >= pRect->bottom) {
-				rcEdge = *pRect;
 				rcEdge.top = rc.top;
 				return IsWindowEdgeVisible(hwnd, hwndNext, &rcEdge, hwndTarget);
 			} else if (rc.top > pRect->top && rc.bottom < pRect->bottom) {
-				rcEdge = *pRect;
 				rcEdge.bottom = rc.top;
 				if (IsWindowEdgeVisible(hwnd, hwndNext, &rcEdge, hwndTarget))
 					return true;
@@ -109,7 +105,7 @@ static BOOL CALLBACK SnapWindowProc(HWND hwnd, LPARAM lParam)
 		GetWindowRect(hwnd, &rc);
 		if (rc.right > rc.left && rc.bottom > rc.top) {
 			if (rc.top < pInfo->rcOriginal.bottom && rc.bottom > pInfo->rcOriginal.top) {
-				if (abs(rc.left - pInfo->rcOriginal.right) < abs(pInfo->rcNearest.right)) {
+				if (std::abs(rc.left - pInfo->rcOriginal.right) < std::abs(pInfo->rcNearest.right)) {
 					rcEdge.left = rc.left;
 					rcEdge.right = rc.left;
 					rcEdge.top = std::max(rc.top, pInfo->rcOriginal.top);
@@ -117,7 +113,7 @@ static BOOL CALLBACK SnapWindowProc(HWND hwnd, LPARAM lParam)
 					if (IsWindowEdgeVisible(hwnd, GetTopWindow(GetDesktopWindow()), &rcEdge, pInfo->hwnd))
 						pInfo->rcNearest.right = rc.left - pInfo->rcOriginal.right;
 				}
-				if (abs(rc.right - pInfo->rcOriginal.left) < abs(pInfo->rcNearest.left)) {
+				if (std::abs(rc.right - pInfo->rcOriginal.left) < std::abs(pInfo->rcNearest.left)) {
 					rcEdge.left = rc.right;
 					rcEdge.right = rc.right;
 					rcEdge.top = std::max(rc.top, pInfo->rcOriginal.top);
@@ -127,7 +123,7 @@ static BOOL CALLBACK SnapWindowProc(HWND hwnd, LPARAM lParam)
 				}
 			}
 			if (rc.left < pInfo->rcOriginal.right && rc.right > pInfo->rcOriginal.left) {
-				if (abs(rc.top - pInfo->rcOriginal.bottom) < abs(pInfo->rcNearest.bottom)) {
+				if (std::abs(rc.top - pInfo->rcOriginal.bottom) < std::abs(pInfo->rcNearest.bottom)) {
 					rcEdge.left = std::max(rc.left, pInfo->rcOriginal.left);
 					rcEdge.right = std::min(rc.right, pInfo->rcOriginal.right);
 					rcEdge.top = rc.top;
@@ -135,7 +131,7 @@ static BOOL CALLBACK SnapWindowProc(HWND hwnd, LPARAM lParam)
 					if (IsWindowEdgeVisible(hwnd, GetTopWindow(GetDesktopWindow()), &rcEdge, pInfo->hwnd))
 						pInfo->rcNearest.bottom = rc.top - pInfo->rcOriginal.bottom;
 				}
-				if (abs(rc.bottom - pInfo->rcOriginal.top) < abs(pInfo->rcNearest.top)) {
+				if (std::abs(rc.bottom - pInfo->rcOriginal.top) < std::abs(pInfo->rcNearest.top)) {
 					rcEdge.left = std::max(rc.left, pInfo->rcOriginal.left);
 					rcEdge.right = std::min(rc.right, pInfo->rcOriginal.right);
 					rcEdge.top = rc.bottom;
@@ -152,12 +148,9 @@ static BOOL CALLBACK SnapWindowProc(HWND hwnd, LPARAM lParam)
 
 void SnapWindow(HWND hwnd, RECT *prc, int Margin, HWND hwndExclude)
 {
-	HMONITOR hMonitor;
 	RECT rc;
-	SnapWindowInfo Info;
-	int XOffset, YOffset;
 
-	hMonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+	const HMONITOR hMonitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
 	if (hMonitor != nullptr) {
 		MONITORINFO mi;
 
@@ -170,6 +163,8 @@ void SnapWindow(HWND hwnd, RECT *prc, int Margin, HWND hwndExclude)
 		rc.right = GetSystemMetrics(SM_CXSCREEN);
 		rc.bottom = GetSystemMetrics(SM_CYSCREEN);
 	}
+
+	SnapWindowInfo Info;
 	Info.hwnd = hwnd;
 	Info.rcOriginal = *prc;
 	Info.rcNearest.left = rc.left - prc->left;
@@ -178,23 +173,25 @@ void SnapWindow(HWND hwnd, RECT *prc, int Margin, HWND hwndExclude)
 	Info.rcNearest.bottom = rc.bottom - prc->bottom;
 	Info.hwndExclude = hwndExclude;
 	EnumWindows(SnapWindowProc, reinterpret_cast<LPARAM>(&Info));
-	if (abs(Info.rcNearest.left) < abs(Info.rcNearest.right)
+
+	int XOffset, YOffset;
+	if (std::abs(Info.rcNearest.left) < std::abs(Info.rcNearest.right)
 			|| Info.rcNearest.left == Info.rcNearest.right)
 		XOffset = Info.rcNearest.left;
-	else if (abs(Info.rcNearest.left) > abs(Info.rcNearest.right))
+	else if (std::abs(Info.rcNearest.left) > std::abs(Info.rcNearest.right))
 		XOffset = Info.rcNearest.right;
 	else
 		XOffset = 0;
-	if (abs(Info.rcNearest.top) < abs(Info.rcNearest.bottom)
+	if (std::abs(Info.rcNearest.top) < std::abs(Info.rcNearest.bottom)
 			|| Info.rcNearest.top == Info.rcNearest.bottom)
 		YOffset = Info.rcNearest.top;
-	else if (abs(Info.rcNearest.top) > abs(Info.rcNearest.bottom))
+	else if (std::abs(Info.rcNearest.top) > std::abs(Info.rcNearest.bottom))
 		YOffset = Info.rcNearest.bottom;
 	else
 		YOffset = 0;
-	if (abs(XOffset) <= Margin)
+	if (std::abs(XOffset) <= Margin)
 		prc->left += XOffset;
-	if (abs(YOffset) <= Margin)
+	if (std::abs(YOffset) <= Margin)
 		prc->top += YOffset;
 	prc->right = prc->left + (Info.rcOriginal.right - Info.rcOriginal.left);
 	prc->bottom = prc->top + (Info.rcOriginal.bottom - Info.rcOriginal.top);
@@ -218,13 +215,6 @@ bool IsMessageInQueue(HWND hwnd, UINT Message)
 
 
 
-
-CMouseLeaveTrack::CMouseLeaveTrack()
-	: m_hwnd(nullptr)
-	, m_fClientTrack(false)
-	, m_fNonClientTrack(false)
-{
-}
 
 void CMouseLeaveTrack::Initialize(HWND hwnd)
 {
@@ -303,19 +293,14 @@ bool CMouseLeaveTrack::OnMessage(UINT Msg, WPARAM wParam, LPARAM lParam)
 
 bool CMouseLeaveTrack::IsCursorInWindow() const
 {
-	DWORD Pos = ::GetMessagePos();
-	POINT pt = {GET_X_LPARAM(Pos), GET_Y_LPARAM(Pos)};
+	const DWORD Pos = ::GetMessagePos();
+	const POINT pt = {GET_X_LPARAM(Pos), GET_Y_LPARAM(Pos)};
 	RECT rc;
 
 	::GetWindowRect(m_hwnd, &rc);
 	return ::PtInRect(&rc, pt) != FALSE;
 }
 
-
-CMouseWheelHandler::CMouseWheelHandler()
-{
-	Reset();
-}
 
 void CMouseWheelHandler::Reset()
 {
@@ -332,9 +317,9 @@ void CMouseWheelHandler::ResetDelta()
 
 int CMouseWheelHandler::OnWheel(int Delta)
 {
-	DWORD CurTime = ::GetTickCount();
+	const DWORD CurTime = ::GetTickCount();
 
-	if ((DWORD)(CurTime - m_LastTime) > 500
+	if (static_cast<DWORD>(CurTime - m_LastTime) > 500
 			|| (Delta > 0) != (m_LastDelta > 0)) {
 		m_DeltaSum = 0;
 	}
@@ -348,8 +333,8 @@ int CMouseWheelHandler::OnWheel(int Delta)
 
 int CMouseWheelHandler::OnMouseWheel(WPARAM wParam, int ScrollLines)
 {
-	int Delta = OnWheel(GET_WHEEL_DELTA_WPARAM(wParam));
-	if (abs(Delta) < WHEEL_DELTA)
+	const int Delta = OnWheel(GET_WHEEL_DELTA_WPARAM(wParam));
+	if (std::abs(Delta) < WHEEL_DELTA)
 		return 0;
 
 	if (ScrollLines == 0)
@@ -362,8 +347,8 @@ int CMouseWheelHandler::OnMouseWheel(WPARAM wParam, int ScrollLines)
 
 int CMouseWheelHandler::OnMouseHWheel(WPARAM wParam, int ScrollChars)
 {
-	int Delta = OnWheel(GET_WHEEL_DELTA_WPARAM(wParam));
-	if (abs(Delta) < WHEEL_DELTA)
+	const int Delta = OnWheel(GET_WHEEL_DELTA_WPARAM(wParam));
+	if (std::abs(Delta) < WHEEL_DELTA)
 		return 0;
 
 	if (ScrollChars == 0)
@@ -390,13 +375,6 @@ int CMouseWheelHandler::GetDefaultScrollChars() const
 	if (::SystemParametersInfo(SPI_GETWHEELSCROLLCHARS, 0, &Chars, 0))
 		return Chars;
 	return 3;
-}
-
-
-CWindowTimerManager::CWindowTimerManager()
-	: m_hwndTimer(nullptr)
-	, m_TimerIDs(0)
-{
 }
 
 
@@ -430,7 +408,7 @@ void CWindowTimerManager::EndAllTimers()
 {
 	unsigned int Flags = m_TimerIDs;
 	for (int i = 0; Flags != 0; i++, Flags >>= 1) {
-		unsigned int ID = m_TimerIDs & (1U << i);
+		const unsigned int ID = m_TimerIDs & (1U << i);
 		if (ID != 0)
 			EndTimer(ID);
 	}
@@ -443,12 +421,6 @@ bool CWindowTimerManager::IsTimerEnabled(unsigned int ID) const
 }
 
 
-
-
-CWindowSubclass::CWindowSubclass()
-	: m_hwnd(nullptr)
-{
-}
 
 
 CWindowSubclass::~CWindowSubclass()
@@ -493,7 +465,7 @@ LRESULT CALLBACK CWindowSubclass::SubclassProc(
 
 	if (uMsg == WM_NCDESTROY) {
 		pThis->RemoveSubclass();
-		LRESULT Result = pThis->OnMessage(hWnd, uMsg, wParam, lParam);
+		const LRESULT Result = pThis->OnMessage(hWnd, uMsg, wParam, lParam);
 		pThis->OnSubclassRemoved();
 		return Result;
 	}

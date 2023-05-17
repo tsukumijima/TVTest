@@ -92,7 +92,6 @@ namespace TVTest
 			virtual void OnSPDIFPassthroughError(LibISDB::ViewerFilter *pViewer, HRESULT hr) {}
 		};
 
-		CCoreEngine();
 		~CCoreEngine();
 
 		void Close();
@@ -163,6 +162,7 @@ namespace TVTest
 			EventInfo          = 0x0020U,
 			EventID            = 0x0040U,
 			TOT                = 0x0080U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 		StatusFlag UpdateAsyncStatus();
 		void SetAsyncStatusUpdatedFlag(StatusFlag Status);
@@ -175,6 +175,7 @@ namespace TVTest
 			BitRate                    = 0x0010U,
 			StreamRemain               = 0x0020U,
 			PacketBufferRate           = 0x0040U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 		StatisticsFlag UpdateStatistics();
 		unsigned long long GetErrorPacketCount() const { return m_ErrorPacketCount; }
@@ -185,7 +186,7 @@ namespace TVTest
 		int GetSignalLevelText(LPTSTR pszText, int MaxLength) const;
 		int GetSignalLevelText(float SignalLevel, LPTSTR pszText, int MaxLength) const;
 		unsigned long GetBitRate() const { return m_BitRate; }
-		static float BitRateToFloat(unsigned long BitRate) { return (float)BitRate / (float)(1000 * 1000); }
+		static float BitRateToFloat(unsigned long BitRate) { return static_cast<float>(BitRate) / static_cast<float>(1000 * 1000); }
 		float GetBitRateFloat() const { return BitRateToFloat(m_BitRate); }
 		int GetBitRateText(LPTSTR pszText, int MaxLength) const;
 		int GetBitRateText(unsigned long BitRate, LPTSTR pszText, int MaxLength) const;
@@ -227,38 +228,38 @@ namespace TVTest
 
 		CFilePath m_DriverDirectory;
 		CFilePath m_DriverFileName;
-		DriverType m_DriverType;
+		DriverType m_DriverType = DriverType::Unknown;
 
 		std::vector<TSProcessorInfo> m_TSProcessorList;
-		bool m_fEnableTSProcessor;
+		bool m_fEnableTSProcessor = true;
 
-		bool m_fPacketBuffering;
+		bool m_fPacketBuffering = false;
 
-		int m_OriginalVideoWidth;
-		int m_OriginalVideoHeight;
-		int m_DisplayVideoWidth;
-		int m_DisplayVideoHeight;
-		int m_NumAudioChannels;
-		int m_NumAudioStreams;
-		uint8_t m_AudioComponentType;
-		bool m_fMute;
-		int m_Volume;
-		int m_AudioGain;
-		int m_SurroundAudioGain;
-		LibISDB::DirectShow::AudioDecoderFilter::DualMonoMode m_DualMonoMode;
+		int m_OriginalVideoWidth = 0;
+		int m_OriginalVideoHeight = 0;
+		int m_DisplayVideoWidth = 0;
+		int m_DisplayVideoHeight = 0;
+		int m_NumAudioChannels = LibISDB::ViewerFilter::AudioChannelCount_Invalid;
+		int m_NumAudioStreams = 0;
+		uint8_t m_AudioComponentType = 0;
+		bool m_fMute = false;
+		int m_Volume = 50;
+		int m_AudioGain = 100;
+		int m_SurroundAudioGain = 100;
+		LibISDB::DirectShow::AudioDecoderFilter::DualMonoMode m_DualMonoMode = LibISDB::DirectShow::AudioDecoderFilter::DualMonoMode::Main;
 		LibISDB::DirectShow::AudioDecoderFilter::SPDIFOptions m_SPDIFOptions;
-		bool m_fSPDIFPassthrough;
-		unsigned long long m_ErrorPacketCount;
-		unsigned long long m_ContinuityErrorPacketCount;
-		unsigned long long m_ScrambledPacketCount;
-		float m_SignalLevel;
-		unsigned long m_BitRate;
-		uint32_t m_StreamRemain;
-		int m_PacketBufferFillPercentage;
-		UINT m_TimerResolution;
-		bool m_fNoEpg;
+		bool m_fSPDIFPassthrough = false;
+		unsigned long long m_ErrorPacketCount = 0;
+		unsigned long long m_ContinuityErrorPacketCount = 0;
+		unsigned long long m_ScrambledPacketCount = 0;
+		float m_SignalLevel = 0.0f;
+		unsigned long m_BitRate = 0;
+		uint32_t m_StreamRemain = 0;
+		int m_PacketBufferFillPercentage = 0;
+		UINT m_TimerResolution = 0;
+		bool m_fNoEpg = false;
 
-		std::atomic<std::underlying_type_t<StatusFlag>> m_AsyncStatusUpdatedFlags;
+		std::atomic<std::underlying_type_t<StatusFlag>> m_AsyncStatusUpdatedFlags{0};
 
 		void ConnectFilter(
 			TSProcessorConnectionList *pList,
@@ -294,9 +295,6 @@ namespace TVTest
 	// RecorderFilter::EventListener
 		void OnWriteError(LibISDB::RecorderFilter *pRecorder, LibISDB::RecorderFilter::RecordingTask *pTask) override;
 	};
-
-	TVTEST_ENUM_FLAGS(CCoreEngine::StatusFlag)
-	TVTEST_ENUM_FLAGS(CCoreEngine::StatisticsFlag)
 
 }	// namespace TVTest
 

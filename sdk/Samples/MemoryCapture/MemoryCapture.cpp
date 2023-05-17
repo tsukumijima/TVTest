@@ -18,16 +18,22 @@
 */
 
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include <windows.h>
 #include <windowsx.h>
 #include <tchar.h>
 #include <shlwapi.h>
 #include <shlobj.h>
+#include <commdlg.h>
 #include <process.h>
+#include <algorithm>
 #include <vector>
 #include <string>
 #include <new>
 #include <strsafe.h>
+
 #define TVTEST_PLUGIN_CLASS_IMPLEMENT // クラスとして実装
 #include "TVTestPlugin.h"
 #include "VideoDecoder.h"
@@ -84,14 +90,13 @@ private:
 
 	struct Position
 	{
-		int Left, Top, Width, Height;
-		Position() : Left(0), Top(0), Width(0), Height(0) {}
+		int Left = 0, Top = 0, Width = 0, Height = 0;
 	};
 
-	enum CaptureSizeType
+	enum class CaptureSizeType
 	{
-		CaptureSizeType_Size,
-		CaptureSizeType_Rate
+		Size,
+		Rate,
 	};
 
 	struct CaptureSizeInfo
@@ -146,46 +151,46 @@ private:
 		WM_APP_FRAME_DECODED
 	};
 
-	static const unsigned int VideoMemorySizeLimitInMB = 40;
+	static constexpr unsigned int VideoMemorySizeLimitInMB = 40;
 
-	bool m_fInitialized;
-	HWND m_hwnd;
+	bool m_fInitialized = false;
+	HWND m_hwnd = nullptr;
 	Position m_WindowPosition;
-	bool m_fFitWindowToImage;
-	bool m_fAccumulateAlways;
+	bool m_fFitWindowToImage = true;
+	bool m_fAccumulateAlways = false;
 	int m_DPI;
-	int m_SkipFrames;
-	int m_CurFrame;
-	int m_SeekCommand;
-	int m_WheelDelta;
-	DWORD m_WheelTime;
+	int m_SkipFrames = 10;
+	int m_CurFrame = -1;
+	int m_SeekCommand = 0;
+	int m_WheelDelta = 0;
+	DWORD m_WheelTime = 0;
 	CImageCodec m_Codec;
 	CVideoDecoder m_Decoder;
 	CPreviewWindow m_Preview;
 	CSeekBar m_SeekBar;
 	CToolbar m_Toolbar;
 	CaptureSizeInfo m_CaptureSize;
-	CImage::ResampleType m_Resample;
-	CVideoDecoder::DeinterlaceMethod m_Deinterlace;
+	CImage::ResampleType m_Resample = CImage::ResampleType::Lanczos3;
+	CVideoDecoder::DeinterlaceMethod m_Deinterlace = CVideoDecoder::DeinterlaceMethod::Blend;
 	CLocalLock m_WindowLock;
 
-	unsigned int m_VideoMemorySizeInMB;
-	BYTE *m_pStreamBuffer;
-	std::size_t m_StreamSize;
-	std::size_t m_StreamAvail;
-	std::size_t m_StreamPos;
-	DWORD m_StreamFormat;
+	unsigned int m_VideoMemorySizeInMB = 2;
+	BYTE *m_pStreamBuffer = nullptr;
+	std::size_t m_StreamSize = 0;
+	std::size_t m_StreamAvail = 0;
+	std::size_t m_StreamPos = 0;
+	DWORD m_StreamFormat = 0;
 	CLocalLock m_StreamLock;
 
 	std::vector<CImage*> m_ImageList;
 	CLocalLock m_ImageLock;
 	std::vector<FrameGroupInfo> m_FrameGroupList;
-	BYTE *m_pDecodeBuffer;
-	std::size_t m_DecodeSize;
-	HANDLE m_hDecodeThread;
+	BYTE *m_pDecodeBuffer = nullptr;
+	std::size_t m_DecodeSize = 0;
+	HANDLE m_hDecodeThread = nullptr;
 
-	CImageCodec::FormatType m_SaveFormat;
-	CImageCodec::FormatType m_LastSaveFormat;
+	CImageCodec::FormatType m_SaveFormat = CImageCodec::FormatType::JPEG;
+	CImageCodec::FormatType m_LastSaveFormat = CImageCodec::FormatType::JPEG;
 	String m_LastSaveFileName;
 	String m_LastSaveFolder;
 
@@ -200,7 +205,7 @@ private:
 	void LoadAppSettings();
 	bool AllocateStreamBuffer();
 	void FreeStreamBuffer();
-	void InputStream(DWORD Format, const void *pData, SIZE_T Size);
+	void InputStream(DWORD Format, const void *pData, std::size_t Size);
 	bool StartCapture(bool fAdd);
 	void CloseDecodeThread();
 	void FreeImages();
@@ -254,72 +259,47 @@ const LPCTSTR CMemoryCapture::m_WindowClassName = TEXT("TVTest Memory Capture Wi
 const CMemoryCapture::CaptureSizeInfo CMemoryCapture::m_CaptureSizeList[] =
 {
 	// 倍率
-	{CaptureSizeType_Rate, {1, 4}},
-	{CaptureSizeType_Rate, {1, 3}},
-	{CaptureSizeType_Rate, {1, 2}},
-	{CaptureSizeType_Rate, {2, 3}},
-	{CaptureSizeType_Rate, {3, 4}},
-	{CaptureSizeType_Rate, {1, 1}},
+	{CaptureSizeType::Rate, {1, 4}},
+	{CaptureSizeType::Rate, {1, 3}},
+	{CaptureSizeType::Rate, {1, 2}},
+	{CaptureSizeType::Rate, {2, 3}},
+	{CaptureSizeType::Rate, {3, 4}},
+	{CaptureSizeType::Rate, {1, 1}},
 	// 16:9
-	{CaptureSizeType_Size, { 320,  180}},
-	{CaptureSizeType_Size, { 640,  360}},
-	{CaptureSizeType_Size, { 800,  450}},
-	{CaptureSizeType_Size, { 960,  540}},
-	{CaptureSizeType_Size, {1280,  720}},
-	{CaptureSizeType_Size, {1440,  810}},
-	{CaptureSizeType_Size, {1920, 1080}},
+	{CaptureSizeType::Size, { 320,  180}},
+	{CaptureSizeType::Size, { 640,  360}},
+	{CaptureSizeType::Size, { 800,  450}},
+	{CaptureSizeType::Size, { 960,  540}},
+	{CaptureSizeType::Size, {1280,  720}},
+	{CaptureSizeType::Size, {1440,  810}},
+	{CaptureSizeType::Size, {1920, 1080}},
 	// 4:3
-	{CaptureSizeType_Size, { 320,  240}},
-	{CaptureSizeType_Size, { 640,  480}},
-	{CaptureSizeType_Size, { 720,  540}},
-	{CaptureSizeType_Size, { 800,  600}},
-	{CaptureSizeType_Size, {1024,  768}},
-	{CaptureSizeType_Size, {1280,  960}},
-	{CaptureSizeType_Size, {1440, 1080}},
+	{CaptureSizeType::Size, { 320,  240}},
+	{CaptureSizeType::Size, { 640,  480}},
+	{CaptureSizeType::Size, { 720,  540}},
+	{CaptureSizeType::Size, { 800,  600}},
+	{CaptureSizeType::Size, {1024,  768}},
+	{CaptureSizeType::Size, {1280,  960}},
+	{CaptureSizeType::Size, {1440, 1080}},
 };
 
 // 表示倍率のリスト
 const CMemoryCapture::CaptureSizeInfo CMemoryCapture::m_ZoomRateList[] =
 {
-	{CaptureSizeType_Rate, {1, 4}},
-	{CaptureSizeType_Rate, {1, 3}},
-	{CaptureSizeType_Rate, {1, 2}},
-	{CaptureSizeType_Rate, {2, 3}},
-	{CaptureSizeType_Rate, {3, 4}},
-	{CaptureSizeType_Rate, {1, 1}},
-	{CaptureSizeType_Rate, {3, 2}},
-	{CaptureSizeType_Rate, {2, 1}},
+	{CaptureSizeType::Rate, {1, 4}},
+	{CaptureSizeType::Rate, {1, 3}},
+	{CaptureSizeType::Rate, {1, 2}},
+	{CaptureSizeType::Rate, {2, 3}},
+	{CaptureSizeType::Rate, {3, 4}},
+	{CaptureSizeType::Rate, {1, 1}},
+	{CaptureSizeType::Rate, {3, 2}},
+	{CaptureSizeType::Rate, {2, 1}},
 };
 
 
 CMemoryCapture::CMemoryCapture()
-	: m_fInitialized(false)
-	, m_hwnd(nullptr)
-	, m_fFitWindowToImage(true)
-	, m_fAccumulateAlways(false)
-	, m_SkipFrames(10)
-	, m_CurFrame(-1)
-	, m_SeekCommand(0)
-	, m_WheelDelta(0)
-	, m_WheelTime(0)
-	, m_Resample(CImage::Resample_Lanczos3)
-	, m_Deinterlace(CVideoDecoder::Deinterlace_Blend)
-
-	, m_VideoMemorySizeInMB(2)
-	, m_pStreamBuffer(nullptr)
-	, m_StreamSize(0)
-	, m_StreamAvail(0)
-	, m_StreamPos(0)
-	, m_StreamFormat(0)
-
-	, m_pDecodeBuffer(nullptr)
-	, m_DecodeSize(0)
-	, m_hDecodeThread(nullptr)
-
-	, m_SaveFormat(CImageCodec::Format_JPEG)
-	, m_LastSaveFormat(CImageCodec::Format_JPEG)
 {
-	m_CaptureSize.Type = CaptureSizeType_Rate;
+	m_CaptureSize.Type = CaptureSizeType::Rate;
 	m_CaptureSize.Rate.Num = 1;
 	m_CaptureSize.Rate.Denom = 1;
 }
@@ -437,8 +417,8 @@ bool CMemoryCapture::EnablePlugin(bool fEnable)
 		}
 
 		if (m_hwnd == nullptr) {
-			static const DWORD Style = WS_OVERLAPPEDWINDOW;
-			static const DWORD ExStyle = 0;
+			constexpr DWORD Style = WS_OVERLAPPEDWINDOW;
+			constexpr DWORD ExStyle = 0;
 
 			// プライマリモニタの DPI を取得
 			m_DPI = m_pApp->GetDPIFromPoint(0, 0);
@@ -567,7 +547,7 @@ void CMemoryCapture::SaveSettings()
 	::WritePrivateProfileString(
 		TEXT("Settings"), TEXT("CaptureSizeType"),
 		IntString((int)m_CaptureSize.Type), szIniFileName);
-	if (m_CaptureSize.Type == CaptureSizeType_Size) {
+	if (m_CaptureSize.Type == CaptureSizeType::Size) {
 		::WritePrivateProfileString(
 			TEXT("Settings"), TEXT("CaptureWidth"),
 			IntString(m_CaptureSize.Size.Width), szIniFileName);
@@ -641,14 +621,14 @@ void CMemoryCapture::LoadSettings()
 	CaptureSizeInfo CaptureSize;
 	CaptureSize.Type = (CaptureSizeType)
 		::GetPrivateProfileInt(TEXT("Settings"), TEXT("CaptureSizeType"), -1, szIniFileName);
-	if (CaptureSize.Type == CaptureSizeType_Size) {
+	if (CaptureSize.Type == CaptureSizeType::Size) {
 		CaptureSize.Size.Width =
 			::GetPrivateProfileInt(TEXT("Settings"), TEXT("CaptureWidth"), 0, szIniFileName);
 		CaptureSize.Size.Height =
 			::GetPrivateProfileInt(TEXT("Settings"), TEXT("CaptureHeight"), 0, szIniFileName);
 		if (CaptureSize.Size.Width > 0 && CaptureSize.Size.Height > 0)
 			m_CaptureSize = CaptureSize;
-	} else if (CaptureSize.Type == CaptureSizeType_Rate) {
+	} else if (CaptureSize.Type == CaptureSizeType::Rate) {
 		CaptureSize.Rate.Num =
 			::GetPrivateProfileInt(TEXT("Settings"), TEXT("CaptureRateNum"), 0, szIniFileName);
 		CaptureSize.Rate.Denom =
@@ -685,7 +665,7 @@ void CMemoryCapture::LoadAppSettings()
 		WCHAR szFormat[8];
 		if (::GetPrivateProfileStringW(L"Settings", L"CaptureSaveFormat", L"", szFormat, _countof(szFormat), szIniPath) > 0) {
 			CImageCodec::FormatType Format = m_Codec.ParseFormatName(szFormat);
-			if (Format != CImageCodec::Format_Invalid)
+			if (Format != CImageCodec::FormatType::Invalid)
 				m_SaveFormat = Format;
 		}
 
@@ -739,7 +719,7 @@ void CMemoryCapture::FreeStreamBuffer()
 
 
 // ストリームの受け取り
-void CMemoryCapture::InputStream(DWORD Format, const void *pData, SIZE_T Size)
+void CMemoryCapture::InputStream(DWORD Format, const void *pData, std::size_t Size)
 {
 	CBlockLock Lock(m_StreamLock);
 
@@ -753,17 +733,17 @@ void CMemoryCapture::InputStream(DWORD Format, const void *pData, SIZE_T Size)
 
 		// リングバッファに保存する
 		if (Size >= m_StreamSize) {
-			::CopyMemory(m_pStreamBuffer, static_cast<const BYTE*>(pData) + (Size - m_StreamSize), Size);
+			std::memcpy(m_pStreamBuffer, static_cast<const BYTE*>(pData) + (Size - m_StreamSize), Size);
 			m_StreamPos = 0;
 			m_StreamAvail = Size;
 		} else {
 			std::size_t EndPos = (m_StreamPos + m_StreamAvail) % m_StreamSize;
-			std::size_t Remain = min(m_StreamSize - EndPos, Size);
+			std::size_t Remain = std::min(m_StreamSize - EndPos, Size);
 
 			if (Remain > 0)
-				::CopyMemory(m_pStreamBuffer + EndPos, pData, Remain);
+				std::memcpy(m_pStreamBuffer + EndPos, pData, Remain);
 			if (Remain < Size)
-				::CopyMemory(m_pStreamBuffer, static_cast<const BYTE*>(pData) + Remain, Size - Remain);
+				std::memcpy(m_pStreamBuffer, static_cast<const BYTE*>(pData) + Remain, Size - Remain);
 
 			if (m_StreamAvail + Size <= m_StreamSize) {
 				m_StreamAvail += Size;
@@ -817,10 +797,10 @@ bool CMemoryCapture::StartCapture(bool fAdd)
 		}
 		m_DecodeSize = m_StreamAvail;
 
-		std::size_t Size = min(m_StreamSize - m_StreamPos, m_StreamAvail);
-		::CopyMemory(m_pDecodeBuffer, m_pStreamBuffer + m_StreamPos, Size);
+		std::size_t Size = std::min(m_StreamSize - m_StreamPos, m_StreamAvail);
+		std::memcpy(m_pDecodeBuffer, m_pStreamBuffer + m_StreamPos, Size);
 		if (Size < m_StreamAvail)
-			::CopyMemory(m_pDecodeBuffer + Size, m_pStreamBuffer, m_StreamAvail - Size);
+			std::memcpy(m_pDecodeBuffer + Size, m_pStreamBuffer, m_StreamAvail - Size);
 	}
 
 	// 前回デコードできなかった場合
@@ -1011,7 +991,7 @@ void CMemoryCapture::GetCaptureImageSize(const CImage *pImage, int *pWidth, int 
 {
 	int Width, Height;
 
-	if (m_CaptureSize.Type == CaptureSizeType_Rate) {
+	if (m_CaptureSize.Type == CaptureSizeType::Rate) {
 		Width = ::MulDiv(pImage->GetDisplayWidth(), m_CaptureSize.Rate.Num, m_CaptureSize.Rate.Denom);
 		Height = ::MulDiv(pImage->GetDisplayHeight(), m_CaptureSize.Rate.Num, m_CaptureSize.Rate.Denom);
 	} else {
@@ -1085,11 +1065,11 @@ void CMemoryCapture::AdjustWindowSize()
 	rc.bottom = rc.top + Height;
 	if (rc.right > mi.rcWork.right) {
 		rc.right = mi.rcWork.right;
-		rc.left = max(rc.right - Width, mi.rcWork.left);
+		rc.left = std::max(rc.right - Width, mi.rcWork.left);
 	}
 	if (rc.bottom > mi.rcWork.bottom) {
 		rc.bottom = mi.rcWork.bottom;
-		rc.top = max(rc.bottom - Height, mi.rcWork.top);
+		rc.top = std::max(rc.bottom - Height, mi.rcWork.top);
 	}
 
 	::SetWindowPos(
@@ -1213,7 +1193,7 @@ bool CMemoryCapture::GetSaveFileName(
 				DWORD Size = (::lstrlenW(szTemp) + 1) * sizeof(WCHAR);
 				*ppszString = static_cast<LPWSTR>(pParam->pApp->MemoryAlloc(Size));
 				if (*ppszString != nullptr)
-					::CopyMemory(*ppszString, szTemp, Size);
+					std::memcpy(*ppszString, szTemp, Size);
 				return TRUE;
 			}
 
@@ -1330,7 +1310,7 @@ bool CMemoryCapture::SaveAs()
 		TEXT("BMP ファイル (*.bmp)\0*.bmp\0")
 		TEXT("JPEG ファイル (*.jpg;*.jpeg;*.jpe)\0*.jpg;*.jpeg;*.jpe\0")
 		TEXT("PNG ファイル (*.png)\0*.png\0");
-	ofn.nFilterIndex = (int)(m_LastSaveFormat + 1);
+	ofn.nFilterIndex = static_cast<int>(m_LastSaveFormat) + 1;
 	if (!m_LastSaveFileName.empty())
 		::lstrcpyn(szFileName, m_LastSaveFileName.c_str(), _countof(szFileName));
 	else
@@ -1542,14 +1522,14 @@ void CMemoryCapture::OnCommand(int Command, int NotifyCode)
 
 	case CM_SKIP_BACKWARD_FRAME:
 		// フレームを後方にスキップ
-		SetCurFrame(max(m_CurFrame - m_SkipFrames, 0));
+		SetCurFrame(std::max(m_CurFrame - m_SkipFrames, 0));
 		return;
 
 	case CM_SKIP_FORWARD_FRAME:
 		// フレームを前方にスキップ
 		{
 			CBlockLock Lock(m_ImageLock);
-			SetCurFrame(min(m_CurFrame + m_SkipFrames, (int)m_ImageList.size() - 1));
+			SetCurFrame(std::min(m_CurFrame + m_SkipFrames, (int)m_ImageList.size() - 1));
 		}
 		return;
 
@@ -1688,7 +1668,7 @@ void CMemoryCapture::ShowContextMenu(int x, int y)
 	int CurSize = -1;
 	for (std::size_t i = 0; i < _countof(m_CaptureSizeList); i++) {
 		TCHAR szText[64];
-		if (m_CaptureSizeList[i].Type == CaptureSizeType_Size) {
+		if (m_CaptureSizeList[i].Type == CaptureSizeType::Size) {
 			::StringCchPrintf(
 				szText, _countof(szText), TEXT("%d x %d"),
 				m_CaptureSizeList[i].Size.Width, m_CaptureSizeList[i].Size.Height);
@@ -1749,7 +1729,7 @@ bool CMemoryCapture::OnFrame(const CVideoDecoder::FrameInfo &Frame)
 	std::size_t RowBytes = (Frame.Width * Frame.BitsPerPixel + 7) / 8;
 
 	for (int y = 0; y < Frame.Height; y++) {
-		::CopyMemory(pImage->GetRowPixels(y), Frame.Buffer + y * Frame.Pitch, RowBytes);
+		std::memcpy(pImage->GetRowPixels(y), Frame.Buffer + y * Frame.Pitch, RowBytes);
 	}
 
 	std::size_t FrameIndex;
@@ -1991,7 +1971,7 @@ LRESULT CALLBACK CMemoryCapture::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LP
 			else
 				pThis->m_WheelDelta += Delta;
 
-			if (abs(pThis->m_WheelDelta) >= WHEEL_DELTA) {
+			if (std::abs(pThis->m_WheelDelta) >= WHEEL_DELTA) {
 				CBlockLock Lock(pThis->m_ImageLock);
 				int Delta = pThis->m_WheelDelta / WHEEL_DELTA;
 				int Frame = pThis->m_CurFrame - Delta;

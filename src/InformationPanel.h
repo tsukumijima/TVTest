@@ -94,7 +94,7 @@ namespace TVTest
 			: public CItem
 		{
 		public:
-			static const int ID = id;
+			static constexpr int ID = id;
 			CItemTemplate(CInformationPanel *pPanel, bool fVisible, int PropertyID = 0)
 				: CItem(pPanel, fVisible, PropertyID) {}
 
@@ -113,12 +113,19 @@ namespace TVTest
 			void Draw(HDC hdc, const RECT &Rect) override;
 
 		private:
-			int m_OriginalVideoWidth;
-			int m_OriginalVideoHeight;
-			int m_DisplayVideoWidth;
-			int m_DisplayVideoHeight;
-			int m_AspectX;
-			int m_AspectY;
+			struct VideoInfo
+			{
+				int OriginalWidth;
+				int OriginalHeight;
+				int DisplayWidth;
+				int DisplayHeight;
+				int AspectX;
+				int AspectY;
+
+				bool operator==(const VideoInfo &rhs) const noexcept = default;
+			};
+
+			VideoInfo m_VideoInfo;
 		};
 
 		class CVideoDecoderItem
@@ -179,7 +186,7 @@ namespace TVTest
 			void ShowSignalLevel(bool fShow);
 
 		private:
-			bool m_fShowSignalLevel;
+			bool m_fShowSignalLevel = true;
 			float m_SignalLevel;
 			DWORD m_BitRate;
 		};
@@ -258,7 +265,7 @@ namespace TVTest
 			CProgramInfoItem(CInformationPanel *pPanel, bool fVisible);
 
 			LPCTSTR GetName() const override { return TEXT("ProgramInfo"); }
-			bool IsSingleRow() const { return false; }
+			bool IsSingleRow() const override { return false; }
 			void Reset() override;
 			bool Update() override;
 			void Draw(HDC hdc, const RECT &Rect) override;
@@ -270,7 +277,7 @@ namespace TVTest
 			bool GetButtonRect(int Button, RECT *pRect) const override;
 			bool IsButtonEnabled(int Button) const override;
 			bool OnButtonPushed(int Button) override;
-			bool GetButtonTipText(int Button, LPTSTR pszText, int MaxText) const;
+			bool GetButtonTipText(int Button, LPTSTR pszText, int MaxText) const override;
 			const String &GetInfoText() const { return m_InfoText; }
 			void SetNext(bool fNext);
 			bool IsNext() const { return m_fNext; }
@@ -324,12 +331,10 @@ namespace TVTest
 	private:
 		struct InformationPanelStyle
 		{
-			Style::Size ButtonSize;
-			Style::IntValue LineSpacing;
-			Style::Margins ItemButtonMargin;
-			Style::Margins ItemButtonPadding;
-
-			InformationPanelStyle();
+			Style::Size ButtonSize{16, 16};
+			Style::IntValue LineSpacing{1};
+			Style::Margins ItemButtonMargin{4, 0, 0, 0};
+			Style::Margins ItemButtonPadding{2};
 
 			void SetStyle(const Style::CStyleManager *pStyleManager);
 			void NormalizeStyle(
@@ -348,7 +353,7 @@ namespace TVTest
 		template<typename T> void RegisterItem(bool fVisible = true)
 		{
 			T *pItem = new T(this, fVisible);
-			m_ItemList[pItem->GetID()] = pItem;
+			m_ItemList[pItem->GetID()].reset(pItem);
 		}
 
 		class CProgramInfoSubclass
@@ -365,10 +370,10 @@ namespace TVTest
 
 		struct ItemButtonNumber
 		{
-			int Item;
-			int Button;
+			int Item = -1;
+			int Button = -1;
 
-			ItemButtonNumber() : Item(-1), Button(-1) {}
+			ItemButtonNumber() = default;
 			ItemButtonNumber(int item, int button) : Item(item), Button(button) {}
 
 			bool operator==(const ItemButtonNumber &rhs) const noexcept = default;
@@ -379,23 +384,23 @@ namespace TVTest
 		static const LPCTSTR m_pszClassName;
 		static HINSTANCE m_hinst;
 
-		CItem *m_ItemList[NUM_ITEMS];
+		std::unique_ptr<CItem> m_ItemList[NUM_ITEMS];
 		InformationPanelStyle m_Style;
 		InformationPanelTheme m_Theme;
 		DrawUtil::CBrush m_BackBrush;
 		DrawUtil::CBrush m_ProgramInfoBackBrush;
 		Style::Font m_StyleFont;
 		DrawUtil::CFont m_Font;
-		int m_FontHeight;
+		int m_FontHeight = 0;
 		DrawUtil::CFont m_IconFont;
 		DrawUtil::COffscreen m_Offscreen;
 		CTooltip m_Tooltip;
-		int m_ItemButtonWidth;
+		int m_ItemButtonWidth = 0;
 
-		HWND m_hwndProgramInfo;
-		CProgramInfoSubclass m_ProgramInfoSubclass;
+		HWND m_hwndProgramInfo = nullptr;
+		CProgramInfoSubclass m_ProgramInfoSubclass{this};
 		CRichEditUtil m_RichEditUtil;
-		bool m_fUseRichEdit;
+		bool m_fUseRichEdit = true;
 		CRichEditLinkHandler m_RichEditLink;
 		ItemButtonNumber m_HotButton;
 

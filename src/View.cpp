@@ -43,16 +43,6 @@ const LPCTSTR VIDEO_CONTAINER_WINDOW_CLASS = APP_NAME TEXT(" Video Container");
 HINSTANCE CVideoContainerWindow::m_hinst = nullptr;
 
 
-CVideoContainerWindow::CVideoContainerWindow()
-	: m_pViewer(nullptr)
-	, m_pDisplayBase(nullptr)
-	, m_pEventHandler(nullptr)
-{
-	m_ClientSize.cx = 0;
-	m_ClientSize.cy = 0;
-}
-
-
 CVideoContainerWindow::~CVideoContainerWindow()
 {
 	Destroy();
@@ -90,16 +80,16 @@ LRESULT CVideoContainerWindow::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LP
 	case WM_PAINT:
 		{
 			PAINTSTRUCT ps;
-			RECT rcDest, rc;
-			HBRUSH hbr;
+			RECT rcDest;
 
 			::BeginPaint(hwnd, &ps);
-			hbr = static_cast<HBRUSH>(::GetStockObject(BLACK_BRUSH));
+			const HBRUSH hbr = static_cast<HBRUSH>(::GetStockObject(BLACK_BRUSH));
 			if (!m_pViewer->GetDestRect(&rcDest)
 					|| ::IsRectEmpty(&rcDest)) {
 				::FillRect(ps.hdc, &ps.rcPaint, hbr);
 			} else {
 				m_pViewer->RepaintVideo(hwnd, ps.hdc);
+				RECT rc;
 				::GetClientRect(hwnd, &rc);
 				if (rc != rcDest)
 					DrawUtil::FillBorder(ps.hdc, &rc, &rcDest, &ps.rcPaint, hbr);
@@ -110,16 +100,17 @@ LRESULT CVideoContainerWindow::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LP
 
 	case WM_MOVE:
 		{
-			LibISDB::DirectShow::VideoRenderer::RendererType Renderer =
+			const LibISDB::DirectShow::VideoRenderer::RendererType Renderer =
 				m_pViewer->GetVideoRendererType();
 
 			if (Renderer != LibISDB::DirectShow::VideoRenderer::RendererType::VMR7
 					&& Renderer != LibISDB::DirectShow::VideoRenderer::RendererType::VMR9)
 				break;
 		}
+		[[fallthrough]];
 	case WM_SIZE:
 		{
-			int Width = LOWORD(lParam), Height = HIWORD(lParam);
+			const int Width = LOWORD(lParam), Height = HIWORD(lParam);
 
 			m_pViewer->SetViewSize(Width, Height);
 			if (m_pDisplayBase != nullptr)
@@ -145,12 +136,9 @@ LRESULT CVideoContainerWindow::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LP
 	case WM_MBUTTONDBLCLK:
 	case WM_MOUSEMOVE:
 		{
-			POINT pt;
-
 			if (uMsg == WM_LBUTTONDOWN || uMsg == WM_RBUTTONDOWN || uMsg == WM_MBUTTONDOWN)
 				::SetFocus(hwnd);
-			pt.x = GET_X_LPARAM(lParam);
-			pt.y = GET_Y_LPARAM(lParam);
+			POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
 			::MapWindowPoints(hwnd, ::GetParent(hwnd), &pt, 1);
 			return ::SendMessage(::GetParent(hwnd), uMsg, wParam, MAKELONG(pt.x, pt.y));
 		}
@@ -204,12 +192,6 @@ void CVideoContainerWindow::SetEventHandler(CEventHandler *pEventHandler)
 
 
 
-CVideoContainerWindow::CEventHandler::CEventHandler()
-	: m_pVideoContainer(nullptr)
-{
-}
-
-
 CVideoContainerWindow::CEventHandler::~CEventHandler()
 {
 	if (m_pVideoContainer != nullptr)
@@ -242,17 +224,6 @@ bool CViewWindow::Initialize(HINSTANCE hinst)
 		m_hinst = hinst;
 	}
 	return true;
-}
-
-
-CViewWindow::CViewWindow()
-	: m_pVideoContainer(nullptr)
-	, m_hwndMessage(nullptr)
-	, m_pEventHandler(nullptr)
-	, m_hbmLogo(nullptr)
-	, m_BorderStyle(Theme::BorderType::None, RGB(128, 128, 128))
-	, m_fShowCursor(true)
-{
 }
 
 
@@ -342,23 +313,9 @@ void CViewWindow::SetMargin(const Style::Margins &Margin)
 }
 
 
-void CViewWindow::ShowCursor(bool fShow)
+void CViewWindow::SetShowCursor(bool fShow)
 {
-	if (m_fShowCursor != fShow) {
-		m_fShowCursor = fShow;
-		if (m_hwnd != nullptr) {
-			POINT pt;
-			HWND hwnd;
-
-			::GetCursorPos(&pt);
-			::ScreenToClient(m_hwnd, &pt);
-			hwnd = ::ChildWindowFromPointEx(m_hwnd, pt, CWP_SKIPINVISIBLE);
-			if (hwnd == m_hwnd
-					|| (m_pVideoContainer != nullptr
-						&& hwnd == m_pVideoContainer->GetHandle()))
-				::SetCursor(fShow ?::LoadCursor(nullptr, IDC_ARROW) : nullptr);
-		}
-	}
+	m_fShowCursor = fShow;
 }
 
 
@@ -412,7 +369,7 @@ LRESULT CViewWindow::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 		{
 			PAINTSTRUCT ps;
 			RECT rcClient;
-			HBRUSH hbr = static_cast<HBRUSH>(::GetStockObject(BLACK_BRUSH));
+			const HBRUSH hbr = static_cast<HBRUSH>(::GetStockObject(BLACK_BRUSH));
 
 			::BeginPaint(hwnd, &ps);
 			::GetClientRect(hwnd, &rcClient);
@@ -452,10 +409,7 @@ LRESULT CViewWindow::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 	case WM_MBUTTONDBLCLK:
 	case WM_MOUSEMOVE:
 		if (m_hwndMessage != nullptr) {
-			POINT pt;
-
-			pt.x = GET_X_LPARAM(lParam);
-			pt.y = GET_Y_LPARAM(lParam);
+			POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
 			::MapWindowPoints(hwnd, m_hwndMessage, &pt, 1);
 			return ::SendMessage(m_hwndMessage, uMsg, wParam, MAKELONG(pt.x, pt.y));
 		}
@@ -470,8 +424,8 @@ LRESULT CViewWindow::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 		break;
 
 	case WM_SETCURSOR:
-		if (LOWORD(lParam) == HTCLIENT) {
-			HWND hwndCursor = reinterpret_cast<HWND>(wParam);
+		if (LOWORD(lParam) == HTCLIENT && HIWORD(lParam) != 0) {
+			const HWND hwndCursor = reinterpret_cast<HWND>(wParam);
 
 			if (hwndCursor == hwnd
 					|| (m_pVideoContainer != nullptr
@@ -488,12 +442,6 @@ LRESULT CViewWindow::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 
 
 
-CViewWindow::CEventHandler::CEventHandler()
-	: m_pView(nullptr)
-{
-}
-
-
 CViewWindow::CEventHandler::~CEventHandler()
 {
 	if (m_pView != nullptr)
@@ -501,13 +449,6 @@ CViewWindow::CEventHandler::~CEventHandler()
 }
 
 
-
-
-CDisplayView::CDisplayView()
-	: m_pDisplayBase(nullptr)
-	, m_pEventHandler(nullptr)
-{
-}
 
 
 CDisplayView::~CDisplayView() = default;
@@ -573,13 +514,10 @@ bool CDisplayView::GetCloseButtonRect(RECT *pRect) const
 bool CDisplayView::CloseButtonHitTest(int x, int y) const
 {
 	RECT rc;
-	POINT pt;
 
 	if (!GetCloseButtonRect(&rc))
 		return false;
-	pt.x = x;
-	pt.y = y;
-	return ::PtInRect(&rc, pt) != FALSE;
+	return ::PtInRect(&rc, POINT{x, y}) != FALSE;
 }
 
 
@@ -676,15 +614,15 @@ bool CDisplayView::GetBackgroundStyle(BackgroundType Type, Theme::BackgroundStyl
 int CDisplayView::GetDefaultFontSize(int Width, int Height) const
 {
 	int Size = std::min(Width / m_Style.TextSizeRatioHorz, Height / m_Style.TextSizeRatioVert);
-	double DPI = (double)m_pStyleScaling->GetDPI();
-	double Points = (double)Size * 72.0 / DPI;
-	const double BasePoints = 9.0;
+	const double DPI = static_cast<double>(m_pStyleScaling->GetDPI());
+	double Points = static_cast<double>(Size) * 72.0 / DPI;
+	constexpr double BasePoints = 9.0;
 	if (Points > BasePoints && m_Style.TextSizeScaleBase > 0) {
-		Points = (int)
+		Points = static_cast<int>(
 			(std::log(Points - (BasePoints - 1.0)) /
-			 std::log((double)m_Style.TextSizeScaleBase * 0.01) +
-			 ((BasePoints - 1.0) + 0.5));
-		Size = (int)(Points * DPI / 72.0 + 0.5);
+			 std::log(static_cast<double>(m_Style.TextSizeScaleBase) * 0.01) +
+			 ((BasePoints - 1.0) + 0.5)));
+		Size = static_cast<int>(Points * DPI / 72.0 + 0.5);
 	}
 	if (Size < m_Style.TextSizeMin)
 		Size = m_Style.TextSizeMin;
@@ -734,20 +672,6 @@ LRESULT CDisplayView::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
 CDisplayView::CEventHandler::~CEventHandler() = default;
 
 
-CDisplayView::DisplayViewStyle::DisplayViewStyle()
-	: TextSizeRatioHorz(50)
-	, TextSizeRatioVert(30)
-	, TextSizeScaleBase(140)
-	, TextSizeMin(12)
-	, TextSizeMax(72)
-	, ContentMargin(8, 16, 18, 16)
-	, CategoriesMargin(8, 32, 8, 32)
-	, CloseButtonSize(14, 14)
-	, CloseButtonMargin(2)
-{
-}
-
-
 void CDisplayView::DisplayViewStyle::SetStyle(const Style::CStyleManager *pStyleManager)
 {
 	Style::IntValue Value;
@@ -780,20 +704,6 @@ void CDisplayView::DisplayViewStyle::NormalizeStyle(
 }
 
 
-
-
-CDisplayBase::CDisplayBase()
-	: m_pParentWindow(nullptr)
-	, m_pDisplayView(nullptr)
-	, m_pEventHandler(nullptr)
-	, m_fVisible(false)
-{
-}
-
-
-CDisplayBase::~CDisplayBase()
-{
-}
 
 
 void CDisplayBase::SetEventHandler(CEventHandler *pHandler)
@@ -830,7 +740,7 @@ bool CDisplayBase::SetVisible(bool fVisible)
 	if (m_fVisible == fVisible)
 		return true;
 
-	bool fFocus = !fVisible && m_pDisplayView->GetHandle() == ::GetFocus();
+	const bool fFocus = !fVisible && m_pDisplayView->GetHandle() == ::GetFocus();
 
 	if (m_pEventHandler != nullptr && !m_pEventHandler->OnVisibleChange(fVisible))
 		return false;
@@ -910,7 +820,7 @@ void CDisplayEventHandlerBase::RelayMouseMessage(CDisplayView *pView, UINT Messa
 {
 	if (pView == nullptr)
 		return;
-	HWND hwndParent = pView->GetParent();
+	const HWND hwndParent = pView->GetParent();
 	POINT pt = {x, y};
 	::MapWindowPoints(pView->GetHandle(), hwndParent, &pt, 1);
 	::SendMessage(hwndParent, Message, 0, MAKELPARAM(pt.x, pt.y));

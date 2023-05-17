@@ -28,41 +28,6 @@ namespace TVTest
 {
 
 
-CCoreEngine::CCoreEngine()
-	: m_DriverType(DriverType::Unknown)
-
-	, m_fEnableTSProcessor(true)
-
-	, m_fPacketBuffering(false)
-
-	, m_OriginalVideoWidth(0)
-	, m_OriginalVideoHeight(0)
-	, m_DisplayVideoWidth(0)
-	, m_DisplayVideoHeight(0)
-	, m_NumAudioChannels(LibISDB::ViewerFilter::AudioChannelCount_Invalid)
-	, m_NumAudioStreams(0)
-	, m_AudioComponentType(0)
-	, m_fMute(false)
-	, m_Volume(50)
-	, m_AudioGain(100)
-	, m_SurroundAudioGain(100)
-	, m_DualMonoMode(LibISDB::DirectShow::AudioDecoderFilter::DualMonoMode::Main)
-	, m_fSPDIFPassthrough(false)
-	, m_ErrorPacketCount(0)
-	, m_ContinuityErrorPacketCount(0)
-	, m_ScrambledPacketCount(0)
-	, m_SignalLevel(0.0)
-	, m_BitRate(0)
-	, m_PacketBufferFillPercentage(0)
-	, m_StreamRemain(0)
-	, m_TimerResolution(0)
-	, m_fNoEpg(false)
-
-	, m_AsyncStatusUpdatedFlags(0)
-{
-}
-
-
 CCoreEngine::~CCoreEngine()
 {
 	Close();
@@ -140,7 +105,7 @@ bool CCoreEngine::BuildEngine()
 	ConnectFilter(&ConnectionList, m_FilterGraph.GetFilterID<LibISDB::AnalyzerFilter>(), &FilterID);
 	ConnectTSProcessor(&ConnectionList, TSProcessorConnectPosition::Postprocessing, &FilterID);
 	ConnectFilter(&ConnectionList, m_FilterGraph.GetFilterID<LibISDB::TeeFilter>(), &FilterID);
-	LibISDB::FilterGraph::IDType TeeFilterID = FilterID;
+	const LibISDB::FilterGraph::IDType TeeFilterID = FilterID;
 	if (!m_fNoEpg) {
 		ConnectFilter(&ConnectionList, m_FilterGraph.GetFilterID<LibISDB::EPGDatabaseFilter>(), &FilterID, 0);
 	}
@@ -252,7 +217,7 @@ bool CCoreEngine::BuildMediaViewer(const LibISDB::ViewerFilter::OpenSettings &Se
 	m_pViewer->SetVolume(m_fMute ? -100.0f : LevelToDeciBel(m_Volume));
 	m_pViewer->SetAudioGainControl(
 		m_AudioGain != 100 || m_SurroundAudioGain != 100,
-		(float)m_AudioGain / 100.0f, (float)m_SurroundAudioGain / 100.0f);
+		static_cast<float>(m_AudioGain) / 100.0f, static_cast<float>(m_SurroundAudioGain) / 100.0f);
 	m_pViewer->SetDualMonoMode(m_DualMonoMode);
 	m_pViewer->SetSPDIFOptions(m_SPDIFOptions);
 
@@ -315,7 +280,7 @@ bool CCoreEngine::GetDriverDirectoryPath(String *pDirectory) const
 		}
 	} else {
 		TCHAR szDir[MAX_PATH];
-		DWORD Length = ::GetModuleFileName(nullptr, szDir, lengthof(szDir));
+		const DWORD Length = ::GetModuleFileName(nullptr, szDir, lengthof(szDir));
 		if (Length == 0 || Length >= lengthof(szDir) - 1)
 			return false;
 		::PathRemoveFileSpec(szDir);
@@ -545,7 +510,7 @@ bool CCoreEngine::SetAudioGainControl(int Gain, int SurroundGain)
 		if (m_pViewer != nullptr) {
 			m_pViewer->SetAudioGainControl(
 				Gain != 100 || SurroundGain != 100,
-				(float)Gain / 100.0f, (float)SurroundGain / 100.0f);
+				static_cast<float>(Gain) / 100.0f, static_cast<float>(SurroundGain) / 100.0f);
 		}
 		m_AudioGain = Gain;
 		m_SurroundAudioGain = SurroundGain;
@@ -623,35 +588,35 @@ CCoreEngine::StatusFlag CCoreEngine::UpdateAsyncStatus()
 			}
 		}
 
-		int NumAudioChannels = m_pViewer->GetAudioChannelCount();
+		const int NumAudioChannels = m_pViewer->GetAudioChannelCount();
 		if (NumAudioChannels != m_NumAudioChannels) {
 			m_NumAudioChannels = NumAudioChannels;
 			Updated |= StatusFlag::AudioChannels;
-			TRACE(TEXT("Audio channels = %dch\n"), NumAudioChannels);
+			TRACE(TEXT("Audio channels = {}ch\n"), NumAudioChannels);
 		}
 
-		bool fSPDIFPassthrough = m_pViewer->IsSPDIFPassthrough();
+		const bool fSPDIFPassthrough = m_pViewer->IsSPDIFPassthrough();
 		if (fSPDIFPassthrough != m_fSPDIFPassthrough) {
 			m_fSPDIFPassthrough = fSPDIFPassthrough;
 			Updated |= StatusFlag::SPDIFPassthrough;
-			TRACE(TEXT("S/PDIF passthrough %s\n"), fSPDIFPassthrough ? TEXT("ON") : TEXT("OFF"));
+			TRACE(TEXT("S/PDIF passthrough {}\n"), fSPDIFPassthrough ? TEXT("ON") : TEXT("OFF"));
 		}
 	}
 
-	int NumAudioStreams = GetAudioStreamCount();
+	const int NumAudioStreams = GetAudioStreamCount();
 	if (NumAudioStreams != m_NumAudioStreams) {
 		m_NumAudioStreams = NumAudioStreams;
 		Updated |= StatusFlag::AudioStreams;
-		TRACE(TEXT("Audio streams = %dch\n"), NumAudioStreams);
+		TRACE(TEXT("Audio streams = {}ch\n"), NumAudioStreams);
 	}
 
 	if (m_pAnalyzer != nullptr) {
-		BYTE AudioComponentType = m_pAnalyzer->GetAudioComponentType(
+		const BYTE AudioComponentType = m_pAnalyzer->GetAudioComponentType(
 			m_pAnalyzer->GetServiceIndexByID(m_CurServiceID), m_CurAudioStream);
 		if (AudioComponentType != m_AudioComponentType) {
 			m_AudioComponentType = AudioComponentType;
 			Updated |= StatusFlag::AudioComponentType;
-			TRACE(TEXT("AudioComponentType = %x\n"), AudioComponentType);
+			TRACE(TEXT("AudioComponentType = {:x}\n"), AudioComponentType);
 		}
 	}
 
@@ -686,7 +651,7 @@ CCoreEngine::StatisticsFlag CCoreEngine::UpdateStatistics()
 
 	const LibISDB::TSPacketCounterFilter *pCounter = GetFilter<LibISDB::TSPacketCounterFilter>();
 	if (pCounter != nullptr) {
-		unsigned long long ScrambledCount = pCounter->GetScrambledPacketCount();
+		const unsigned long long ScrambledCount = pCounter->GetScrambledPacketCount();
 		if (ScrambledCount != m_ScrambledPacketCount) {
 			m_ScrambledPacketCount = ScrambledCount;
 			Updated |= StatisticsFlag::ScrambledPacketCount;
@@ -755,7 +720,7 @@ int CCoreEngine::GetSignalLevelText(LPTSTR pszText, int MaxLength) const
 
 int CCoreEngine::GetSignalLevelText(float SignalLevel, LPTSTR pszText, int MaxLength) const
 {
-	return StringPrintf(pszText, MaxLength, TEXT("%.2f dB"), SignalLevel);
+	return static_cast<int>(StringFormat(pszText, MaxLength, TEXT("{:.2f} dB"), SignalLevel));
 }
 
 
@@ -773,7 +738,7 @@ int CCoreEngine::GetBitRateText(unsigned long BitRate, LPTSTR pszText, int MaxLe
 
 int CCoreEngine::GetBitRateText(float BitRate, LPTSTR pszText, int MaxLength, int Precision) const
 {
-	return StringPrintf(pszText, MaxLength, TEXT("%.*f Mbps"), Precision, BitRate);
+	return static_cast<int>(StringFormat(pszText, MaxLength, TEXT("{:.{}f} Mbps"), BitRate, Precision));
 }
 
 
@@ -794,7 +759,7 @@ bool CCoreEngine::GetCurrentEventInfo(LibISDB::EventInfo *pInfo, uint16_t Servic
 		ServiceID = m_CurServiceID;
 	}
 
-	int ServiceIndex = m_pAnalyzer->GetServiceIndexByID(ServiceID);
+	const int ServiceIndex = m_pAnalyzer->GetServiceIndexByID(ServiceID);
 	if (ServiceIndex < 0)
 		return false;
 
@@ -807,7 +772,7 @@ LibISDB::COMMemoryPointer<> CCoreEngine::GetCurrentImage()
 	if (m_pViewer == nullptr)
 		return nullptr;
 
-	bool fPause = m_pViewer->GetVideoRendererType() == LibISDB::DirectShow::VideoRenderer::RendererType::Default;
+	const bool fPause = m_pViewer->GetVideoRendererType() == LibISDB::DirectShow::VideoRenderer::RendererType::Default;
 
 	if (fPause)
 		m_pViewer->Pause();
@@ -832,7 +797,7 @@ bool CCoreEngine::SetMinTimerResolution(bool fMin)
 			if (::timeBeginPeriod(tc.wPeriodMin) != TIMERR_NOERROR)
 				return false;
 			m_TimerResolution = tc.wPeriodMin;
-			TRACE(TEXT("CCoreEngine::SetMinTimerResolution() Set %u\n"), m_TimerResolution);
+			TRACE(TEXT("CCoreEngine::SetMinTimerResolution() Set {}\n"), m_TimerResolution);
 		} else {
 			::timeEndPeriod(m_TimerResolution);
 			m_TimerResolution = 0;

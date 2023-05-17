@@ -43,22 +43,12 @@ constexpr DWORD LOG_FILE_ADVISORY_LOCK_WAIT_TIMEOUT = 5000;
 
 
 
-CLogItem::CLogItem()
-{
-}
-
-
-CLogItem::CLogItem(LogType Type, LPCTSTR pszText, DWORD SerialNumber)
+CLogItem::CLogItem(LogType Type, StringView Text, DWORD SerialNumber)
 	: m_Type(Type)
-	, m_Text(pszText)
+	, m_Text(Text)
 	, m_SerialNumber(SerialNumber)
 {
 	::GetSystemTimeAsFileTime(&m_Time);
-}
-
-
-CLogItem::~CLogItem()
-{
 }
 
 
@@ -73,12 +63,10 @@ void CLogItem::GetTime(SYSTEMTIME *pTime) const
 
 int CLogItem::Format(char *pszText, int MaxLength) const
 {
-	int Length;
-
-	Length = FormatTime(pszText, MaxLength);
-	Length += StringPrintf(pszText + Length, MaxLength - Length, " [%u]>", ::GetCurrentProcessId());
+	int Length = FormatTime(pszText, MaxLength);
+	Length += static_cast<int>(StringFormat(pszText + Length, MaxLength - Length, " [{}]>", ::GetCurrentProcessId()));
 	Length += ::WideCharToMultiByte(
-		CP_ACP, 0, m_Text.data(), (int)m_Text.length(),
+		CP_ACP, 0, m_Text.data(), static_cast<int>(m_Text.length()),
 		pszText + Length, MaxLength - Length - 1, nullptr, nullptr);
 	pszText[Length] = '\0';
 	return Length;
@@ -87,10 +75,8 @@ int CLogItem::Format(char *pszText, int MaxLength) const
 
 int CLogItem::Format(WCHAR *pszText, int MaxLength) const
 {
-	int Length;
-
-	Length = FormatTime(pszText, MaxLength);
-	Length += StringPrintf(pszText + Length, MaxLength - Length, L" [%u]>", ::GetCurrentProcessId());
+	int Length = FormatTime(pszText, MaxLength);
+	Length += static_cast<int>(StringFormat(pszText + Length, MaxLength - Length, L" [{}]>", ::GetCurrentProcessId()));
 	StringCopy(pszText + Length, m_Text.c_str(), MaxLength - Length);
 	Length += ::lstrlenW(pszText + Length);
 	return Length;
@@ -100,10 +86,9 @@ int CLogItem::Format(WCHAR *pszText, int MaxLength) const
 int CLogItem::FormatTime(char *pszText, int MaxLength) const
 {
 	SYSTEMTIME st;
-	int Length;
 
 	GetTime(&st);
-	Length = ::GetDateFormatA(
+	int Length = ::GetDateFormatA(
 		LOCALE_USER_DEFAULT, DATE_SHORTDATE,
 		&st, nullptr, pszText, MaxLength - 1);
 	if (Length < 1)
@@ -123,10 +108,9 @@ int CLogItem::FormatTime(char *pszText, int MaxLength) const
 int CLogItem::FormatTime(WCHAR *pszText, int MaxLength) const
 {
 	SYSTEMTIME st;
-	int Length;
 
 	GetTime(&st);
-	Length = ::GetDateFormatW(
+	int Length = ::GetDateFormatW(
 		LOCALE_USER_DEFAULT, DATE_SHORTDATE,
 		&st, nullptr, pszText, MaxLength - 1);
 	if (Length < 1)
@@ -146,12 +130,9 @@ int CLogItem::FormatTime(WCHAR *pszText, int MaxLength) const
 
 
 CLogger::CLogger()
-	: m_SerialNumber(0)
-	, m_fOutputToFile(false)
-	, m_hFile(INVALID_HANDLE_VALUE)
 {
 	TCHAR szFileName[MAX_PATH];
-	DWORD Result = ::GetModuleFileName(nullptr, szFileName, lengthof(szFileName));
+	const DWORD Result = ::GetModuleFileName(nullptr, szFileName, lengthof(szFileName));
 	if ((Result > 0) && (Result < MAX_PATH)) {
 		m_DefaultLogFileName = szFileName;
 		m_DefaultLogFileName += TEXT(".log");
@@ -194,42 +175,29 @@ bool CLogger::Create(HWND hwndOwner)
 }
 
 
-bool CLogger::AddLog(CLogItem::LogType Type, LPCTSTR pszText, ...)
+bool CLogger::AddLogV(CLogItem::LogType Type, StringView Format, FormatArgs Args)
 {
-	if (pszText == nullptr)
-		return false;
-
-	va_list Args;
-	va_start(Args, pszText);
-	AddLogV(Type, pszText, Args);
-	va_end(Args);
-	return true;
-}
-
-
-bool CLogger::AddLogV(CLogItem::LogType Type, LPCTSTR pszText, va_list Args)
-{
-	if (pszText == nullptr)
+	if (Format.empty())
 		return false;
 
 	TCHAR szText[MAX_LOG_TEXT_LENGTH];
-	StringPrintfV(szText, pszText, Args);
+	StringVFormatArgs(szText, std::size(szText), Format, Args);
 	AddLogRaw(Type, szText);
 
 	return true;
 }
 
 
-bool CLogger::AddLogRaw(CLogItem::LogType Type, LPCTSTR pszText)
+bool CLogger::AddLogRaw(CLogItem::LogType Type, StringView Text)
 {
-	if (pszText == nullptr)
+	if (Text.empty())
 		return false;
 
 	BlockLock Lock(m_Lock);
 
-	CLogItem *pLogItem = new CLogItem(Type, pszText, m_SerialNumber++);
+	CLogItem *pLogItem = new CLogItem(Type, Text, m_SerialNumber++);
 	m_LogList.emplace_back(pLogItem);
-	TRACE(TEXT("Log : %s\n"), pszText);
+	TRACE(TEXT("Log : {}\n"), Text);
 
 	if (m_fOutputToFile && !m_DefaultLogFileName.empty()) {
 		if (m_hFile == INVALID_HANDLE_VALUE) {
@@ -240,9 +208,7 @@ bool CLogger::AddLogRaw(CLogItem::LogType Type, LPCTSTR pszText)
 
 		if (m_hFile != INVALID_HANDLE_VALUE) {
 			WCHAR szText[MAX_LOG_TEXT_LENGTH];
-			DWORD Length;
-
-			Length = pLogItem->Format(szText, lengthof(szText) - 1);
+			DWORD Length = pLogItem->Format(szText, lengthof(szText) - 1);
 			szText[Length++] = L'\r';
 			szText[Length++] = L'\n';
 
@@ -316,7 +282,7 @@ bool CLogger::GetLogBySerialNumber(DWORD SerialNumber, CLogItem *pItem) const
 	if (m_LogList.empty())
 		return false;
 
-	DWORD FirstSerial = m_LogList.front()->GetSerialNumber();
+	const DWORD FirstSerial = m_LogList.front()->GetSerialNumber();
 	if (SerialNumber < FirstSerial || SerialNumber >= FirstSerial + m_LogList.size())
 		return false;
 
@@ -337,9 +303,7 @@ bool CLogger::SetOutputToFile(bool fOutput)
 
 bool CLogger::SaveToFile(LPCTSTR pszFileName, bool fAppend)
 {
-	HANDLE hFile;
-
-	hFile = ::CreateFile(
+	const HANDLE hFile = ::CreateFile(
 		pszFileName != nullptr ? pszFileName : m_DefaultLogFileName.c_str(),
 		GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr,
 		OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
@@ -372,7 +336,7 @@ bool CLogger::SaveToFile(LPCTSTR pszFileName, bool fAppend)
 
 				::WriteFile(hFile, &BOM, 2, &Size, nullptr);
 			}
-			::WriteFile(hFile, Text.data(), (DWORD)(Text.length() * sizeof(WCHAR)), &Size, nullptr);
+			::WriteFile(hFile, Text.data(), static_cast<DWORD>(Text.length() * sizeof(WCHAR)), &Size, nullptr);
 		}
 	}
 
@@ -425,7 +389,7 @@ INT_PTR CLogger::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 	switch (uMsg) {
 	case WM_INITDIALOG:
 		{
-			HWND hwndList = GetDlgItem(hDlg, IDC_LOG_LIST);
+			const HWND hwndList = GetDlgItem(hDlg, IDC_LOG_LIST);
 
 			ListView_SetExtendedListViewStyle(
 				hwndList, LVS_EX_FULLROWSELECT | LVS_EX_LABELTIP | LVS_EX_SUBITEMIMAGES);
@@ -438,11 +402,11 @@ INT_PTR CLogger::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			};
 			const int IconWidth = GetSystemMetricsWithDPI(SM_CXSMICON, m_CurrentDPI);
 			const int IconHeight = GetSystemMetricsWithDPI(SM_CYSMICON, m_CurrentDPI);
-			HIMAGELIST himl = ::ImageList_Create(
+			const HIMAGELIST himl = ::ImageList_Create(
 				IconWidth, IconHeight,
 				ILC_COLOR32, lengthof(IconList), 1);
-			for (LPCTSTR pszIcon : IconList) {
-				HICON hico = LoadSystemIcon(pszIcon, IconWidth, IconHeight);
+			for (const LPCTSTR pszIcon : IconList) {
+				const HICON hico = LoadSystemIcon(pszIcon, IconWidth, IconHeight);
 				::ImageList_AddIcon(himl, hico);
 				::DestroyIcon(hico);
 			}
@@ -465,7 +429,7 @@ INT_PTR CLogger::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			LVITEM lvi;
 			lvi.iItem = 0;
 			m_Lock.Lock();
-			ListView_SetItemCount(hwndList, (int)m_LogList.size());
+			ListView_SetItemCount(hwndList, static_cast<int>(m_LogList.size()));
 			for (const auto &e : m_LogList) {
 				TCHAR szTime[64];
 
@@ -482,7 +446,7 @@ INT_PTR CLogger::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 				lvi.mask = LVIF_TEXT | LVIF_IMAGE;
 				lvi.iSubItem = COLUMN_TEXT;
-				lvi.iImage = (int)e->GetType();
+				lvi.iImage = static_cast<int>(e->GetType());
 				lvi.pszText = const_cast<LPTSTR>(e->GetText());
 				ListView_SetItem(hwndList, &lvi);
 
@@ -491,7 +455,7 @@ INT_PTR CLogger::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 			for (int i = 1; i < NUM_COLUMNS; i++)
 				ListView_SetColumnWidth(hwndList, i, LVSCW_AUTOSIZE_USEHEADER);
 			if (!m_LogList.empty())
-				ListView_EnsureVisible(hwndList, (int)m_LogList.size() - 1, FALSE);
+				ListView_EnsureVisible(hwndList, static_cast<int>(m_LogList.size()) - 1, FALSE);
 			m_Lock.Unlock();
 
 			DlgCheckBox_Check(hDlg, IDC_LOG_OUTPUTTOFILE, m_fOutputToFile);
@@ -524,9 +488,9 @@ INT_PTR CLogger::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 				} else {
 					TCHAR szMessage[MAX_PATH + 64];
 
-					StringPrintf(
+					StringFormat(
 						szMessage,
-						TEXT("ログを \"%s\" に保存しました。"), m_DefaultLogFileName.c_str());
+						TEXT("ログを \"{}\" に保存しました。"), m_DefaultLogFileName);
 					::MessageBox(hDlg, szMessage, TEXT("ログ保存"), MB_OK | MB_ICONINFORMATION);
 				}
 			}
@@ -535,11 +499,11 @@ INT_PTR CLogger::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 		return TRUE;
 
 	case WM_NOTIFY:
-		switch (((LPNMHDR)lParam)->code) {
+		switch (reinterpret_cast<LPNMHDR>(lParam)->code) {
 		case NM_CUSTOMDRAW:
 			// ダミーの列が描画されないようにする
 			{
-				LPNMLVCUSTOMDRAW pnmlvcd = reinterpret_cast<LPNMLVCUSTOMDRAW>(lParam);
+				const NMLVCUSTOMDRAW *pnmlvcd = reinterpret_cast<const NMLVCUSTOMDRAW*>(lParam);
 
 				if (pnmlvcd->nmcd.hdr.idFrom == IDC_LOG_LIST) {
 					LRESULT Result = CDRF_DODEFAULT;
@@ -567,7 +531,7 @@ INT_PTR CLogger::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam)
 
 		case PSN_APPLY:
 			{
-				bool fOutput = DlgCheckBox_IsChecked(hDlg, IDC_LOG_OUTPUTTOFILE);
+				const bool fOutput = DlgCheckBox_IsChecked(hDlg, IDC_LOG_OUTPUTTOFILE);
 
 				if (fOutput != m_fOutputToFile) {
 					BlockLock Lock(m_Lock);
@@ -594,7 +558,7 @@ void CLogger::RealizeStyle()
 	CBasicDialog::RealizeStyle();
 
 	if (m_hDlg != nullptr) {
-		HWND hwndList = ::GetDlgItem(m_hDlg, IDC_LOG_LIST);
+		const HWND hwndList = ::GetDlgItem(m_hDlg, IDC_LOG_LIST);
 
 		for (int i = 1; i < NUM_COLUMNS; i++)
 			ListView_SetColumnWidth(hwndList, i, LVSCW_AUTOSIZE_USEHEADER);

@@ -36,12 +36,6 @@ Style::Font CUIBase::m_DefaultFont;
 bool CUIBase::m_fValidDefaultFont = false;
 
 
-CUIBase::CUIBase()
-	: m_pStyleScaling(nullptr)
-{
-}
-
-
 CUIBase::~CUIBase() = default;
 
 
@@ -282,14 +276,14 @@ void CUIBase::RegisterUIChild(CUIBase *pChild)
 {
 	if (pChild == nullptr)
 		return;
-	if (std::find(m_UIChildList.begin(), m_UIChildList.end(), pChild) == m_UIChildList.end())
+	if (std::ranges::find(m_UIChildList, pChild) == m_UIChildList.end())
 		m_UIChildList.push_back(pChild);
 }
 
 
 void CUIBase::RemoveUIChild(CUIBase *pChild)
 {
-	auto it = std::find(m_UIChildList.begin(), m_UIChildList.end(), pChild);
+	auto it = std::ranges::find(m_UIChildList, pChild);
 	if (it != m_UIChildList.end())
 		m_UIChildList.erase(it);
 }
@@ -313,7 +307,7 @@ void CUIBase::InitStyleScaling(HWND hwnd, bool fNonClientScaling)
 
 void CUIBase::OnDPIChanged(HWND hwnd, WPARAM wParam, LPARAM lParam)
 {
-	TRACE(TEXT("DPI changed : %dx%d\n"), LOWORD(wParam), HIWORD(wParam));
+	TRACE(TEXT("DPI changed : {}x{}\n"), LOWORD(wParam), HIWORD(wParam));
 
 	if (GetStyleManager()->IsHandleDPIChanged() && m_pStyleScaling != nullptr) {
 		m_pStyleScaling->SetDPI(HIWORD(wParam));

@@ -14,13 +14,18 @@
 */
 
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include <windows.h>
 #include <windowsx.h>
 #include <shlwapi.h>
 #include <commctrl.h>
 #include <tchar.h>
+#include <algorithm>
 #include <string>
 #include <vector>
+
 #define TVTEST_PLUGIN_CLASS_IMPLEMENT
 #include "TVTestPlugin.h"
 #include "resource.h"
@@ -45,33 +50,32 @@ static void OffsetFileTime(FILETIME *pTime, LONGLONG Offset)
 class CTunerPanel : public TVTest::CTVTestPlugin
 {
 public:
-	CTunerPanel();
 	bool GetPluginInfo(TVTest::PluginInfo *pInfo) override;
 	bool Initialize() override;
 	bool Finalize() override;
 
 private:
-	enum ViewModeType {
-		VIEW_MODE_LIST,
-		VIEW_MODE_LOGO
+	enum class ViewModeType {
+		List,
+		Logo,
+		First_ = List,
+		Last_ = Logo
 	};
-	static const ViewModeType VIEW_MODE_FIRST = VIEW_MODE_LIST;
-	static const ViewModeType VIEW_MODE_LAST  = VIEW_MODE_LOGO;
 
-	enum LogoSizeType {
-		LOGO_SIZE_SMALL,
-		LOGO_SIZE_MEDIUM,
-		LOGO_SIZE_LARGE,
-		LOGL_SIZE_EXTRALARGE
+	enum class LogoSizeType {
+		Small,
+		Medium,
+		Large,
+		ExtraLarge,
+		First_ = Small,
+		Last_ = ExtraLarge
 	};
-	static const LogoSizeType LOGO_SIZE_FIRST = LOGO_SIZE_SMALL;
-	static const LogoSizeType LOGO_SIZE_LAST  = LOGL_SIZE_EXTRALARGE;
 
 	struct Bitmap
 	{
-		Bitmap() : m_hbm(nullptr) {}
+		Bitmap() = default;
 		~Bitmap() { Delete(); }
-		Bitmap(const Bitmap &Src) : m_hbm(nullptr) { *this = Src; }
+		Bitmap(const Bitmap &Src) { *this = Src; }
 		Bitmap & operator=(const Bitmap &Src) {
 			if (&Src != this) {
 				Delete();
@@ -95,7 +99,7 @@ private:
 		}
 
 	private:
-		HBITMAP m_hbm;
+		HBITMAP m_hbm = nullptr;
 	};
 
 	struct ChannelInfo
@@ -126,16 +130,14 @@ private:
 
 	struct Margins
 	{
-		int Left, Top, Right, Bottom;
-
-		Margins() : Left(0), Top(0), Right(0), Bottom(0) {}
+		int Left = 0, Top = 0, Right = 0, Bottom = 0;
 	};
 
-	enum PartType {
-		PART_NONE,
-		PART_TUNER,
-		PART_CHANNEL,
-		PART_CHEVRON
+	enum class PartType {
+		None,
+		Tuner,
+		Channel,
+		Chevron,
 	};
 
 	struct HitTestInfo
@@ -146,19 +148,19 @@ private:
 		int Channel;
 	};
 
-	static const int PANEL_ID = 1;
+	static constexpr int PANEL_ID = 1;
 	static const LPCTSTR WINDOW_CLASS_NAME;
 
 	WCHAR m_szIniFileName[MAX_PATH];
 	std::vector<TunerInfo> m_TunerList;
 	std::vector<std::wstring> m_ExpandedTunerList;
-	ViewModeType m_ViewMode;
-	LogoSizeType m_LogoSize;
-	bool m_fEnableByPlugin;
-	HWND m_hwnd;
-	HWND m_hwndToolTips;
+	ViewModeType m_ViewMode = ViewModeType::List;
+	LogoSizeType m_LogoSize = LogoSizeType::Medium;
+	bool m_fEnableByPlugin = false;
+	HWND m_hwnd = nullptr;
+	HWND m_hwndToolTips = nullptr;
 	int m_DPI;
-	HFONT m_hFont;
+	HFONT m_hFont = nullptr;
 	int m_FontHeight;
 	int m_ScrollPos;
 	Margins m_TunerItemMargin;
@@ -205,16 +207,6 @@ private:
 
 
 const LPCTSTR CTunerPanel::WINDOW_CLASS_NAME = TEXT("Tuner Panel Window");
-
-
-CTunerPanel::CTunerPanel()
-	: m_ViewMode(VIEW_MODE_LIST)
-	, m_LogoSize(LOGO_SIZE_MEDIUM)
-	, m_fEnableByPlugin(false)
-	, m_hwnd(nullptr)
-	, m_hwndToolTips(nullptr)
-{
-}
 
 
 // プラグインの情報を返す
@@ -273,10 +265,10 @@ bool CTunerPanel::Initialize()
 
 	// 設定を読み込む
 	int ViewMode = ::GetPrivateProfileIntW(L"Settings", L"ViewMode", (int)m_ViewMode, m_szIniFileName);
-	if (ViewMode >= VIEW_MODE_FIRST && ViewMode <= VIEW_MODE_LAST)
+	if ((ViewModeType)ViewMode >= ViewModeType::First_ && (ViewModeType)ViewMode <= ViewModeType::Last_)
 		m_ViewMode = (ViewModeType)ViewMode;
 	int LogoSize = ::GetPrivateProfileIntW(L"Settings", L"LogoSize", (int)m_LogoSize, m_szIniFileName);
-	if (LogoSize >= LOGO_SIZE_FIRST && LogoSize <= LOGO_SIZE_LAST)
+	if ((LogoSizeType)LogoSize >= LogoSizeType::First_ && (LogoSizeType)LogoSize <= LogoSizeType::Last_)
 		m_LogoSize = (LogoSizeType)LogoSize;
 
 	for (int i = 0; ; i++) {
@@ -625,12 +617,12 @@ LRESULT CTunerPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 
 			if (HitTest(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam), &Info)) {
 				switch (Info.Part) {
-				case PART_TUNER:
+				case PartType::Tuner:
 					// チューナー
 					m_pApp->SetDriverName(m_TunerList[Info.Tuner].Name.c_str());
 					break;
 
-				case PART_CHANNEL:
+				case PartType::Channel:
 					// チャンネル
 					{
 						const ChannelInfo &Channel =
@@ -649,7 +641,7 @@ LRESULT CTunerPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 					}
 					break;
 
-				case PART_CHEVRON:
+				case PartType::Chevron:
 					// シェブロン
 					{
 						TunerInfo &Tuner = m_TunerList[Info.Tuner];
@@ -675,7 +667,7 @@ LRESULT CTunerPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 
 			::CheckMenuRadioItem(
 				hmenu, CM_VIEW_LIST, CM_VIEW_LOGO,
-				m_ViewMode == VIEW_MODE_LIST ? CM_VIEW_LIST : CM_VIEW_LOGO,
+				m_ViewMode == ViewModeType::List ? CM_VIEW_LIST : CM_VIEW_LOGO,
 				MF_BYCOMMAND);
 			::CheckMenuRadioItem(
 				hmenu, CM_LOGOSIZE_SMALL, CM_LOGOSIZE_EXTRALARGE,
@@ -701,11 +693,11 @@ LRESULT CTunerPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 					|| HotItem.Channel != m_HotItem.Channel) {
 				RECT rc;
 
-				if (m_HotItem.Part == PART_CHANNEL && m_HotItem.Channel >= 0
+				if (m_HotItem.Part == PartType::Channel && m_HotItem.Channel >= 0
 						&& GetItemRect(m_HotItem.Tuner, m_HotItem.Space, m_HotItem.Channel, &rc))
 					::InvalidateRect(hwnd, &rc, TRUE);
 				m_HotItem = HotItem;
-				if (m_HotItem.Part == PART_CHANNEL && m_HotItem.Channel >= 0
+				if (m_HotItem.Part == PartType::Channel && m_HotItem.Channel >= 0
 						&& GetItemRect(m_HotItem.Tuner, m_HotItem.Space, m_HotItem.Channel, &rc))
 					::InvalidateRect(hwnd, &rc, TRUE);
 			}
@@ -722,11 +714,11 @@ LRESULT CTunerPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPara
 		{
 			RECT rc;
 
-			if (m_HotItem.Part == PART_CHANNEL && m_HotItem.Channel >= 0
+			if (m_HotItem.Part == PartType::Channel && m_HotItem.Channel >= 0
 					&& GetItemRect(m_HotItem.Tuner, m_HotItem.Space, m_HotItem.Channel, &rc))
 				::InvalidateRect(hwnd, &rc, TRUE);
 
-			m_HotItem.Part = PART_NONE;
+			m_HotItem.Part = PartType::None;
 		}
 		return 0;
 
@@ -891,7 +883,7 @@ void CTunerPanel::OnCommand(int ID)
 
 			if (Size != m_LogoSize) {
 				m_LogoSize = Size;
-				if (m_ViewMode == VIEW_MODE_LOGO) {
+				if (m_ViewMode == ViewModeType::Logo) {
 					UpdateItemSize();
 					UpdateScroll();
 					::InvalidateRect(m_hwnd, nullptr, TRUE);
@@ -981,7 +973,7 @@ void CTunerPanel::InitializePanel()
 	UpdateItemSize();
 
 	m_fPointCursor = false;
-	m_HotItem.Part = PART_NONE;
+	m_HotItem.Part = PartType::None;
 }
 
 
@@ -1024,7 +1016,7 @@ void CTunerPanel::Draw(HDC hdc, const RECT &PaintRect)
 	rcItem.right = rcClient.right;
 	rcItem.top = -m_ScrollPos;
 
-	for (size_t i = 0; i < m_TunerList.size() && rcItem.top < PaintRect.bottom; i++) {
+	for (std::size_t i = 0; i < m_TunerList.size() && rcItem.top < PaintRect.bottom; i++) {
 		const TunerInfo &Tuner = m_TunerList[i];
 		const bool fCurrentTuner = ::lstrcmpiW(Tuner.Name.c_str(), szCurTuner) == 0;
 
@@ -1065,7 +1057,7 @@ void CTunerPanel::Draw(HDC hdc, const RECT &PaintRect)
 		}
 
 		if (Tuner.fExpanded) {
-			for (size_t j = 0; j < Tuner.TuningSpaceList.size(); j++) {
+			for (std::size_t j = 0; j < Tuner.TuningSpaceList.size(); j++) {
 				const TuningSpaceInfo &TuningSpace = Tuner.TuningSpaceList[j];
 				const int ChannelCount = (int)TuningSpace.ChannelList.size();
 
@@ -1087,7 +1079,7 @@ void CTunerPanel::Draw(HDC hdc, const RECT &PaintRect)
 							&& CurChannel.ServiceID == Channel.ServiceID;
 
 					LPCWSTR pszStyle;
-					if (m_HotItem.Part == PART_CHANNEL
+					if (m_HotItem.Part == PartType::Channel
 							&& m_HotItem.Tuner == (int)i
 							&& m_HotItem.Space == (int)j
 							&& m_HotItem.Channel == k) {
@@ -1100,7 +1092,7 @@ void CTunerPanel::Draw(HDC hdc, const RECT &PaintRect)
 						pszStyle = L"panel.content";
 					}
 
-					if (m_ViewMode == VIEW_MODE_LIST) {
+					if (m_ViewMode == ViewModeType::List) {
 						int Offset = m_ChannelItemMargin.Top - m_ChannelItemMargin.Bottom;
 						if (Offset >= 0)
 							rc.top += Offset;
@@ -1115,13 +1107,13 @@ void CTunerPanel::Draw(HDC hdc, const RECT &PaintRect)
 						BITMAP bm;
 						::GetObject(hbmLogo, sizeof(BITMAP), &bm);
 						::SelectObject(hdcMemory, hbmLogo);
-						if (m_ViewMode == VIEW_MODE_LIST) {
+						if (m_ViewMode == ViewModeType::List) {
 							::StretchBlt(hdc,
 								rc.left, rc.top + ((rc.bottom - rc.top) - LogoHeight) / 2,
 								LogoWidth, LogoHeight,
 								hdcMemory, 0, 0, bm.bmWidth, bm.bmHeight, SRCCOPY);
 							rc.left += LogoWidth + 4;
-						} else if (m_ViewMode == VIEW_MODE_LOGO) {
+						} else if (m_ViewMode == ViewModeType::Logo) {
 							::StretchBlt(hdc,
 								rc.left + m_LogoMargin.Left, rc.top + m_LogoMargin.Top,
 								m_LogoWidth, m_LogoHeight,
@@ -1129,7 +1121,7 @@ void CTunerPanel::Draw(HDC hdc, const RECT &PaintRect)
 						}
 					}
 
-					if (m_ViewMode == VIEW_MODE_LIST) {
+					if (m_ViewMode == ViewModeType::List) {
 						WCHAR szText[256];
 						::wnsprintfW(
 							szText, _countof(szText), L"%d: %s",
@@ -1137,7 +1129,7 @@ void CTunerPanel::Draw(HDC hdc, const RECT &PaintRect)
 						m_pApp->ThemeDrawText(
 							pszStyle, hdc, szText, rc,
 							DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS | DT_NOPREFIX);
-					} else if (m_ViewMode == VIEW_MODE_LOGO) {
+					} else if (m_ViewMode == ViewModeType::Logo) {
 						if (!Channel.LogoBitmap) {
 							WCHAR szText[16];
 							::wnsprintfW(szText, _countof(szText), L"%d", Channel.RemoteControlKeyID);
@@ -1167,11 +1159,11 @@ int CTunerPanel::CalcVertExtent() const
 {
 	int Extent = (int)m_TunerList.size() * m_TunerItemHeight;
 
-	for (size_t i = 0; i < m_TunerList.size(); i++) {
+	for (std::size_t i = 0; i < m_TunerList.size(); i++) {
 		const TunerInfo &Tuner = m_TunerList[i];
 
 		if (Tuner.fExpanded) {
-			for (size_t j = 0; j < Tuner.TuningSpaceList.size(); j++) {
+			for (std::size_t j = 0; j < Tuner.TuningSpaceList.size(); j++) {
 				const int ChannelCount = (int)Tuner.TuningSpaceList[j].ChannelList.size();
 
 				Extent += CalcChannelItemRows(ChannelCount) * m_ItemHeight;
@@ -1186,12 +1178,12 @@ int CTunerPanel::CalcVertExtent() const
 // チャンネル項目のカラム数を取得する
 int CTunerPanel::GetColumnCount() const
 {
-	if (m_ViewMode == VIEW_MODE_LOGO) {
+	if (m_ViewMode == ViewModeType::Logo) {
 		RECT rc;
 
 		::GetClientRect(m_hwnd, &rc);
 		int Columns = rc.right / m_ItemWidth;
-		return max(Columns, 1);
+		return std::max(Columns, 1);
 	}
 
 	return 1;
@@ -1213,12 +1205,12 @@ SIZE CTunerPanel::GetLogoSize(LogoSizeType Type) const
 // チャンネル項目の大きさを更新する
 void CTunerPanel::UpdateItemSize()
 {
-	if (m_ViewMode == VIEW_MODE_LIST) {
+	if (m_ViewMode == ViewModeType::List) {
 		RECT rc;
 		::GetClientRect(m_hwnd, &rc);
-		m_ItemWidth = max(rc.right, 1);
+		m_ItemWidth = std::max<int>(rc.right, 1);
 		m_ItemHeight = m_ChannelItemHeight;
-	} else if (m_ViewMode == VIEW_MODE_LOGO) {
+	} else if (m_ViewMode == ViewModeType::Logo) {
 		SIZE LogoSize = GetLogoSize(m_LogoSize);
 		m_LogoWidth = LogoSize.cx;
 		m_LogoHeight = LogoSize.cy;
@@ -1276,7 +1268,7 @@ void CTunerPanel::SetScrollPos(int Pos)
 		Pos = 0;
 	} else {
 		int Height = CalcVertExtent();
-		int Max = max(Height - rc.bottom, 0);
+		int Max = std::max<int>(Height - rc.bottom, 0);
 		if (Pos > Max)
 			Pos = Max;
 	}
@@ -1361,7 +1353,7 @@ int CTunerPanel::CalcChannelItemRows(int Channels) const
 // 指定位置の項目を取得する
 bool CTunerPanel::HitTest(int x, int y, HitTestInfo *pInfo) const
 {
-	pInfo->Part = PART_NONE;
+	pInfo->Part = PartType::None;
 	pInfo->Tuner = -1;
 	pInfo->Space = -1;
 	pInfo->Channel = -1;
@@ -1372,14 +1364,14 @@ bool CTunerPanel::HitTest(int x, int y, HitTestInfo *pInfo) const
 	::GetClientRect(m_hwnd, &rc);
 	rc.top = -m_ScrollPos;
 
-	for (size_t i = 0; i < m_TunerList.size() && rc.top < y; i++) {
+	for (std::size_t i = 0; i < m_TunerList.size() && rc.top < y; i++) {
 		rc.bottom = rc.top + m_TunerItemHeight;
 
 		if (::PtInRect(&rc, pt)) {
 			if (m_TunerList[i].fExpandable && x >= rc.right - m_ChevronWidth)
-				pInfo->Part = PART_CHEVRON;
+				pInfo->Part = PartType::Chevron;
 			else if (x < rc.right - (m_ChevronMargin + m_ChevronWidth))
-				pInfo->Part = PART_TUNER;
+				pInfo->Part = PartType::Tuner;
 			else
 				return false;
 			pInfo->Tuner = (int)i;
@@ -1389,7 +1381,7 @@ bool CTunerPanel::HitTest(int x, int y, HitTestInfo *pInfo) const
 		const TunerInfo &Tuner = m_TunerList[i];
 
 		if (Tuner.fExpanded) {
-			for (size_t j = 0; j < Tuner.TuningSpaceList.size(); j++) {
+			for (std::size_t j = 0; j < Tuner.TuningSpaceList.size(); j++) {
 				const TuningSpaceInfo &TuningSpace = Tuner.TuningSpaceList[j];
 				const int ChannelCount = (int)TuningSpace.ChannelList.size();
 
@@ -1401,7 +1393,7 @@ bool CTunerPanel::HitTest(int x, int y, HitTestInfo *pInfo) const
 						int Item = (((y - rc.top) / m_ItemHeight) * m_ColumnCount) + ((x - rc.left) / m_ItemWidth);
 						if (Item >= ChannelCount)
 							return false;
-						pInfo->Part = PART_CHANNEL;
+						pInfo->Part = PartType::Channel;
 						pInfo->Tuner = (int)i;
 						pInfo->Space = (int)j;
 						pInfo->Channel = Item;

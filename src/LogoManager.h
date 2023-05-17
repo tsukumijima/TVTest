@@ -25,6 +25,7 @@
 #include <map>
 #include <memory>
 #include "LibISDB/LibISDB/Filters/LogoDownloaderFilter.hpp"
+#include "DrawUtil.h"
 #include "Graphics.h"
 #include "Image.h"
 
@@ -44,8 +45,6 @@ namespace TVTest
 			BYTE LogoType;
 			FILETIME UpdatedTime;
 		};
-
-		CLogoManager();
 
 		void Clear();
 		bool SetLogoDirectory(LPCTSTR pszDirectory);
@@ -96,13 +95,12 @@ namespace TVTest
 			WORD m_DataSize;
 			std::unique_ptr<BYTE[]> m_Data;
 			LibISDB::DateTime m_Time;
-			HBITMAP m_hbm;
+			DrawUtil::CBitmap m_Bitmap;
 			Graphics::CImage m_Image;
 
 		public:
 			CLogoData(const LibISDB::LogoDownloaderFilter::LogoData *pData);
 			CLogoData(const CLogoData &Src);
-			~CLogoData();
 
 			CLogoData &operator=(const CLogoData &Src);
 
@@ -121,25 +119,25 @@ namespace TVTest
 		};
 
 		static inline ULONGLONG GetMapKey(WORD NID, WORD LogoID, BYTE LogoType) {
-			return ((ULONGLONG)NID << 24) | ((ULONGLONG)LogoID << 8) | LogoType;
+			return (static_cast<ULONGLONG>(NID) << 24) | (static_cast<ULONGLONG>(LogoID) << 8) | LogoType;
 		}
 		typedef std::map<ULONGLONG, std::unique_ptr<CLogoData>> LogoMap;
 		static inline DWORD GetIDMapKey(WORD NID, WORD SID) {
-			return ((DWORD)NID << 16) | (DWORD)SID;
+			return (static_cast<DWORD>(NID) << 16) | static_cast<DWORD>(SID);
 		}
 		typedef std::map<DWORD, WORD> LogoIDMap;
 
-		CFilePath m_LogoDirectory;
-		bool m_fSaveLogo;
-		bool m_fSaveBmp;
+		CFilePath m_LogoDirectory{TEXT(".\\Logo")};
+		bool m_fSaveLogo = false;
+		bool m_fSaveBmp = false;
 		LogoMap m_LogoMap;
 		LogoIDMap m_LogoIDMap;
 		CImageCodec m_ImageCodec;
 		mutable MutexLock m_Lock;
-		bool m_fLogoUpdated;
-		bool m_fLogoIDMapUpdated;
-		FILETIME m_LogoFileLastWriteTime;
-		FILETIME m_LogoIDMapFileLastWriteTime;
+		bool m_fLogoUpdated = false;
+		bool m_fLogoIDMapUpdated = false;
+		FILETIME m_LogoFileLastWriteTime{};
+		FILETIME m_LogoIDMapFileLastWriteTime{};
 
 		bool SetLogoIDMap(WORD NetworkID, WORD ServiceID, WORD LogoID, bool fUpdate = true);
 		CLogoData *LoadLogoData(WORD NetworkID, WORD LogoID, BYTE LogoType);

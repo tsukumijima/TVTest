@@ -11,8 +11,12 @@
 */
 
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include <windows.h>
 #include <tchar.h>
+
 #define TVTEST_PLUGIN_CLASS_IMPLEMENT
 #include "TVTestPlugin.h"
 #include "resource.h"
@@ -21,8 +25,8 @@
 // プラグインクラス
 class CTSInfo : public TVTest::CTVTestPlugin
 {
-	HWND m_hwnd;
-	HBRUSH m_hbrBack;
+	HWND m_hwnd = nullptr;
+	HBRUSH m_hbrBack = nullptr;
 	COLORREF m_crTextColor;
 
 	static const LPCTSTR PROP_NAME;
@@ -34,14 +38,9 @@ class CTSInfo : public TVTest::CTVTestPlugin
 	static INT_PTR CALLBACK DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam, void *pClientData);
 
 public:
-	CTSInfo()
-		: m_hwnd(nullptr)
-		, m_hbrBack(nullptr)
-	{
-	}
-	virtual bool GetPluginInfo(TVTest::PluginInfo *pInfo);
-	virtual bool Initialize();
-	virtual bool Finalize();
+	bool GetPluginInfo(TVTest::PluginInfo *pInfo) override;
+	bool Initialize() override;
+	bool Finalize() override;
 };
 
 

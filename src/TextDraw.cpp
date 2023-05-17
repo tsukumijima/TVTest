@@ -38,18 +38,6 @@ const LPCWSTR CTextDraw::m_pszEndProhibitChars =
 	L"(（[［｢「『【〈《“#＃▽▼";
 
 
-CTextDraw::CTextDraw()
-	: m_pEngine(nullptr)
-	, m_Flags(Flag::None)
-{
-}
-
-
-CTextDraw::~CTextDraw()
-{
-}
-
-
 bool CTextDraw::SetEngine(CTextDrawEngine *pEngine)
 {
 	if (pEngine != nullptr) {
@@ -102,15 +90,15 @@ bool CTextDraw::SetFont(const LOGFONT &Font)
 	if (m_pEngine == nullptr)
 		return false;
 
-	HFONT hfont = ::CreateFontIndirect(&Font);
+	const HFONT hfont = ::CreateFontIndirect(&Font);
 	if (hfont == nullptr)
 		return false;
 
-	bool fOK = m_pEngine->SetFont(hfont);
+	const bool fOK = m_pEngine->SetFont(hfont);
 
 	::DeleteObject(hfont);
 
-	return true;
+	return fOK;
 }
 
 
@@ -193,12 +181,12 @@ bool CTextDraw::Draw(LPCWSTR pszText, const RECT &Rect, int LineHeight, DrawFlag
 			const size_t BufferLength = Fit + lengthof(szEllipses);
 			m_StringBuffer.clear();
 			m_StringBuffer.resize(std::max(BufferLength, 256_z));
-			LPWSTR pszBuffer = &m_StringBuffer[0];
-			::CopyMemory(pszBuffer, p, Fit * sizeof(WCHAR));
+			const LPWSTR pszBuffer = &m_StringBuffer[0];
+			std::memcpy(pszBuffer, p, Fit * sizeof(WCHAR));
 			LPWSTR pszCur = pszBuffer + Fit;
 			for (;;) {
 				StringCopy(pszCur, szEllipses);
-				Length = (int)(pszCur - pszBuffer) + (lengthof(szEllipses) - 1);
+				Length = static_cast<int>(pszCur - pszBuffer) + (lengthof(szEllipses) - 1);
 				Fit = GetFitCharCount(pszBuffer, Length, Width);
 				if (Fit >= Length || pszCur == pszBuffer)
 					break;
@@ -272,7 +260,7 @@ int CTextDraw::GetLineLength(LPCWSTR pszText)
 	LPCWSTR p = pszText;
 	while (*p != L'\0' && *p != L'\r' && *p != '\n')
 		p++;
-	return (int)(p - pszText);
+	return static_cast<int>(p - pszText);
 }
 
 
@@ -288,7 +276,7 @@ int CTextDraw::AdjustLineLength(LPCWSTR pszText, int Length)
 			p--;
 			while (p >= pszText) {
 				if (!IsEndProhibitChar(*p)) {
-					Length = (int)(p - pszText) + 1;
+					Length = static_cast<int>(p - pszText) + 1;
 					break;
 				}
 				p--;
@@ -300,13 +288,13 @@ int CTextDraw::AdjustLineLength(LPCWSTR pszText, int Length)
 						p--;
 						while (p >= pszText) {
 							if (!IsEndProhibitChar(*p)) {
-								Length = (int)(p - pszText) + 1;
+								Length = static_cast<int>(p - pszText) + 1;
 								break;
 							}
 							p--;
 						}
 					} else {
-						Length = (int)(p - pszText);
+						Length = static_cast<int>(p - pszText);
 					}
 					break;
 				}
@@ -383,13 +371,6 @@ bool CTextDrawEngine::OnWindowPosChanged()
 }
 
 
-
-
-CTextDrawEngine_GDI::CTextDrawEngine_GDI()
-	: m_hdc(nullptr)
-	, m_hfontOld(nullptr)
-{
-}
 
 
 CTextDrawEngine_GDI::~CTextDrawEngine_GDI()
@@ -471,7 +452,7 @@ bool CTextDrawEngine_GDI::DrawText(LPCWSTR pText, int Length, const RECT &Rect, 
 			return false;
 		int Prev = ::MulDiv(CharPos[0], Rect.right - Rect.left, sz.cx);
 		for (int i = 1; i < Length; i++) {
-			int Pos = ::MulDiv(CharPos[i], Rect.right - Rect.left, sz.cx);
+			const int Pos = ::MulDiv(CharPos[i], Rect.right - Rect.left, sz.cx);
 			CharPos[i] = Pos - Prev;
 			Prev = Pos;
 		}
@@ -567,8 +548,6 @@ void CTextDrawEngine_GDI::UnbindDC()
 
 CTextDrawEngine_DirectWrite::CTextDrawEngine_DirectWrite(CDirectWriteRenderer &Renderer)
 	: m_Renderer(Renderer)
-	, m_pFont(nullptr)
-	, m_MaxFontCache(4)
 {
 }
 
@@ -593,7 +572,7 @@ bool CTextDrawEngine_DirectWrite::BeginDraw(HDC hdc, const RECT &Rect)
 
 bool CTextDrawEngine_DirectWrite::EndDraw()
 {
-	bool fOK = m_Renderer.EndDraw();
+	const bool fOK = m_Renderer.EndDraw();
 	m_pFont = nullptr;
 	m_Brush.Destroy();
 	if (m_Renderer.IsNeedRecreate())

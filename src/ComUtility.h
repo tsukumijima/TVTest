@@ -39,21 +39,19 @@ namespace TVTest
 	class CIUnknownImpl
 	{
 	public:
-		CIUnknownImpl() : m_RefCount(1) {}
-
 		ULONG AddRefImpl() {
 			return ::InterlockedIncrement(&m_RefCount);
 		}
 
 		ULONG ReleaseImpl() {
-			LONG Count = ::InterlockedDecrement(&m_RefCount);
+			const LONG Count = ::InterlockedDecrement(&m_RefCount);
 			if (Count == 0)
 				delete this;
 			return Count;
 		}
 
 	protected:
-		LONG m_RefCount;
+		LONG m_RefCount = 1;
 
 		virtual ~CIUnknownImpl() = default;
 	};
@@ -85,8 +83,6 @@ namespace TVTest
 	public:
 		typedef std::map<String, CVariant> PropertyListType;
 
-		CPropertyBag();
-
 		// IUnknown
 		STDMETHODIMP QueryInterface(REFIID riid, void **ppvObject) override;
 		STDMETHODIMP_(ULONG) AddRef() override { return AddRefImpl(); }
@@ -103,7 +99,7 @@ namespace TVTest
 	protected:
 		PropertyListType m_Properties;
 
-		~CPropertyBag();
+		~CPropertyBag() = default;
 	};
 
 

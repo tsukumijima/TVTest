@@ -14,18 +14,18 @@
 */
 
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include <windows.h>
 #include <tchar.h>
+#include <algorithm>
+#include <memory>
 #include <vector>
+
 #define TVTEST_PLUGIN_CLASS_IMPLEMENT // クラスとして実装
 #include "TVTestPlugin.h"
 
-
-// ウィンドウクラス名
-#define LOGO_LIST_WINDOW_CLASS TEXT("TV Logo List Window")
-
-// 更新用タイマーの識別子
-#define TIMER_UPDATELOGO 1
 
 // ロゴの大きさ
 static const struct {
@@ -45,8 +45,7 @@ class CLogoList : public TVTest::CTVTestPlugin
 {
 	struct Position
 	{
-		int Left,Top,Width,Height;
-		Position() : Left(0), Top(0), Width(0), Height(0) {}
+		int Left = 0, Top = 0, Width = 0, Height = 0;
 	};
 
 	class CServiceInfo
@@ -60,8 +59,15 @@ class CLogoList : public TVTest::CTVTestPlugin
 		~CServiceInfo();
 	};
 
-	HWND m_hwnd;
-	HWND m_hwndList;
+	// ウィンドウクラス名
+	static const LPCTSTR LOGO_LIST_WINDOW_CLASS;
+
+	// 更新用タイマーの識別子
+	static constexpr UINT TIMER_UPDATELOGO = 1;
+
+	bool m_fInitialized = false;
+	HWND m_hwnd = nullptr;
+	HWND m_hwndList = nullptr;
 	Position m_WindowPosition;
 	COLORREF m_crBackColor;
 	COLORREF m_crTextColor;
@@ -71,9 +77,9 @@ class CLogoList : public TVTest::CTVTestPlugin
 	int m_ServiceNameWidth;
 	int m_ItemWidth;
 	int m_ItemHeight;
-	HFONT m_hfont;
-	HBRUSH m_hbrBack;
-	std::vector<CServiceInfo*> m_ServiceList;
+	HFONT m_hfont = nullptr;
+	HBRUSH m_hbrBack = nullptr;
+	std::vector<std::unique_ptr<CServiceInfo>> m_ServiceList;
 
 	bool Enable(bool fEnable);
 	void GetServiceList();
@@ -87,20 +93,13 @@ class CLogoList : public TVTest::CTVTestPlugin
 	static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 public:
-	CLogoList();
-	virtual bool GetPluginInfo(TVTest::PluginInfo *pInfo);
-	virtual bool Initialize();
-	virtual bool Finalize();
+	bool GetPluginInfo(TVTest::PluginInfo *pInfo) override;
+	bool Initialize() override;
+	bool Finalize() override;
 };
 
 
-CLogoList::CLogoList()
-	: m_hwnd(nullptr)
-	, m_hwndList(nullptr)
-	, m_hfont(nullptr)
-	, m_hbrBack(nullptr)
-{
-}
+const LPCTSTR CLogoList::LOGO_LIST_WINDOW_CLASS = TEXT("TV Logo List Window");
 
 
 // プラグインの情報を返す
@@ -182,9 +181,7 @@ LRESULT CALLBACK CLogoList::EventCallback(UINT Event, LPARAM lParam1, LPARAM lPa
 bool CLogoList::Enable(bool fEnable)
 {
 	if (fEnable) {
-		static bool fInitialized = false;
-
-		if (!fInitialized) {
+		if (!m_fInitialized) {
 			// ウィンドウクラスの登録
 			WNDCLASS wc;
 
@@ -200,7 +197,7 @@ bool CLogoList::Enable(bool fEnable)
 			wc.lpszClassName = LOGO_LIST_WINDOW_CLASS;
 			if (::RegisterClass(&wc) == 0)
 				return false;
-			fInitialized = true;
+			m_fInitialized = true;
 		}
 
 		if (m_hwnd == nullptr) {
@@ -260,19 +257,16 @@ void CLogoList::GetServiceList()
 	int CurTuningSpace = m_pApp->GetTuningSpace(&NumSpaces);
 
 	TVTest::ChannelInfo ChInfo;
-	CServiceInfo *pServiceInfo;
 	if (CurTuningSpace >= 0) {
 		// 現在のチューニング空間のチャンネルを取得する
 		for (int Channel = 0; m_pApp->GetChannelInfo(CurTuningSpace, Channel, &ChInfo); Channel++) {
-			pServiceInfo = new CServiceInfo(ChInfo);
-			m_ServiceList.push_back(pServiceInfo);
+			m_ServiceList.emplace_back(std::make_unique<CServiceInfo>(ChInfo));
 		}
 	} else {
 		// 全てのチューニング空間のチャンネルを取得する
 		for (int Space = 0; Space < NumSpaces; Space++) {
 			for (int Channel = 0; m_pApp->GetChannelInfo(Space, Channel, &ChInfo); Channel++) {
-				pServiceInfo = new CServiceInfo(ChInfo);
-				m_ServiceList.push_back(pServiceInfo);
+				m_ServiceList.emplace_back(std::make_unique<CServiceInfo>(ChInfo));
 			}
 		}
 	}
@@ -287,8 +281,8 @@ bool CLogoList::UpdateLogo()
 {
 	bool fUpdated = false;
 
-	for (size_t i = 0; i < m_ServiceList.size(); i++) {
-		CServiceInfo *pServiceInfo = m_ServiceList[i];
+	for (std::size_t i = 0; i < m_ServiceList.size(); i++) {
+		CServiceInfo *pServiceInfo = m_ServiceList[i].get();
 
 		UINT ExistsType = 0;
 		for (BYTE j = 0; j < 6; j++) {
@@ -321,8 +315,6 @@ bool CLogoList::UpdateLogo()
 // サービスのリストをクリアする
 void CLogoList::ClearServiceList()
 {
-	for (size_t i = 0; i < m_ServiceList.size(); i++)
-		delete m_ServiceList[i];
 	m_ServiceList.clear();
 }
 
@@ -366,7 +358,7 @@ void CLogoList::CalcMetrics()
 	for (int i = 0; i < 6; i++)
 		LogoWidth += LogoSizeList[i].Width;
 	m_ItemWidth = m_ServiceNameWidth + (m_ItemMargin * 2) + (m_LogoMargin * 6) + LogoWidth;
-	m_ItemHeight = max(36, tm.tmHeight) + (m_ItemMargin * 2);
+	m_ItemHeight = std::max<int>(36, tm.tmHeight) + (m_ItemMargin * 2);
 }
 
 
@@ -408,8 +400,8 @@ LRESULT CALLBACK CLogoList::WndProc(HWND hwnd,UINT uMsg,WPARAM wParam,LPARAM lPa
 			::SendMessage(pThis->m_hwndList, LB_SETITEMHEIGHT, 0, pThis->m_ItemHeight);
 			::SendMessage(pThis->m_hwndList, LB_SETHORIZONTALEXTENT, pThis->m_ItemWidth, 0);
 
-			for (size_t i = 0; i < pThis->m_ServiceList.size(); i++)
-				::SendMessage(pThis->m_hwndList, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(pThis->m_ServiceList[i]));
+			for (std::size_t i = 0; i < pThis->m_ServiceList.size(); i++)
+				::SendMessage(pThis->m_hwndList, LB_ADDSTRING, 0, reinterpret_cast<LPARAM>(pThis->m_ServiceList[i].get()));
 
 			// メインウィンドウがダークモードであればそれに合わせてダークモードにする
 			if (pThis->m_pApp->GetDarkModeStatus() & TVTest::DARK_MODE_STATUS_MAINWINDOW_DARK)
@@ -438,7 +430,7 @@ LRESULT CALLBACK CLogoList::WndProc(HWND hwnd,UINT uMsg,WPARAM wParam,LPARAM lPa
 			if ((int)pdis->itemID < 0 || pdis->itemID >= pThis->m_ServiceList.size())
 				return TRUE;
 
-			const CServiceInfo *pService = pThis->m_ServiceList[pdis->itemID];
+			const CServiceInfo *pService = pThis->m_ServiceList[pdis->itemID].get();
 
 			HFONT hfontOld = static_cast<HFONT>(::SelectObject(pdis->hDC, pThis->m_hfont));
 			int OldBkMode = ::SetBkMode(pdis->hDC, TRANSPARENT);

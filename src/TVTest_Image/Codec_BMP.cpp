@@ -20,6 +20,7 @@
 
 #include <windows.h>
 #include <tchar.h>
+#include <cstdlib>
 #include "ImageLib.h"
 #include "Codec_BMP.h"
 #include "ImageUtil.h"
@@ -34,39 +35,37 @@ namespace ImageLib
 
 bool SaveBMPFile(const ImageSaveInfo *pInfo)
 {
-	int Width, Height, BitsPerPixel;
-	HANDLE hFile;
-	DWORD dwWrite;
-	SIZE_T InfoBytes, RowBytes, BitsBytes;
-
-	Width = pInfo->pbmi->bmiHeader.biWidth;
-	Height = abs(pInfo->pbmi->bmiHeader.biHeight);
-	BitsPerPixel = pInfo->pbmi->bmiHeader.biBitCount;
-	InfoBytes = sizeof(BITMAPINFOHEADER);
+	const int Width = pInfo->pbmi->bmiHeader.biWidth;
+	const int Height = std::abs(pInfo->pbmi->bmiHeader.biHeight);
+	const int BitsPerPixel = pInfo->pbmi->bmiHeader.biBitCount;
+	size_t InfoBytes = sizeof(BITMAPINFOHEADER);
 	if (BitsPerPixel <= 8)
-		InfoBytes += ((SIZE_T)1 << BitsPerPixel) * sizeof(RGBQUAD);
+		InfoBytes += (static_cast<size_t>(1) << BitsPerPixel) * sizeof(RGBQUAD);
 	else if (pInfo->pbmi->bmiHeader.biCompression == BI_BITFIELDS)
 		InfoBytes += 3 * sizeof(DWORD);
-	RowBytes = DIB_ROW_BYTES(Width, BitsPerPixel);
-	BitsBytes = RowBytes * Height;
-	hFile = CreateFile(
+	const size_t RowBytes = DIB_ROW_BYTES(Width, BitsPerPixel);
+	const size_t BitsBytes = RowBytes * Height;
+	const HANDLE hFile = CreateFile(
 		pInfo->pszFileName, GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
 		FILE_ATTRIBUTE_NORMAL, nullptr);
 	if (hFile == INVALID_HANDLE_VALUE) {
 		return false;
 	}
+
 	/* BITMAPFILEHEADERの書き込み */
 	BITMAPFILEHEADER bmfh;
 
 	bmfh.bfType = 0x4D42;
-	bmfh.bfSize = (DWORD)(sizeof(BITMAPFILEHEADER) + InfoBytes + BitsBytes);
+	bmfh.bfSize = static_cast<DWORD>(sizeof(BITMAPFILEHEADER) + InfoBytes + BitsBytes);
 	bmfh.bfReserved1 = bmfh.bfReserved2 = 0;
-	bmfh.bfOffBits = (DWORD)(sizeof(BITMAPFILEHEADER) + InfoBytes);
+	bmfh.bfOffBits = static_cast<DWORD>(sizeof(BITMAPFILEHEADER) + InfoBytes);
+	DWORD dwWrite;
 	if (!WriteFile(hFile, &bmfh, sizeof(BITMAPFILEHEADER), &dwWrite, nullptr)
 			|| dwWrite != sizeof(BITMAPFILEHEADER)) {
 		CloseHandle(hFile);
 		return false;
 	}
+
 	/* ヘッダを書き込む */
 	BITMAPINFOHEADER bmih;
 
@@ -89,7 +88,7 @@ bool SaveBMPFile(const ImageSaveInfo *pInfo)
 		return false;
 	}
 	if (InfoBytes > sizeof(BITMAPINFOHEADER)) {
-		DWORD PalBytes = (DWORD)(InfoBytes - sizeof(BITMAPINFOHEADER));
+		const DWORD PalBytes = static_cast<DWORD>(InfoBytes - sizeof(BITMAPINFOHEADER));
 
 		if (!WriteFile(
 					hFile, pInfo->pbmi->bmiColors, PalBytes,
@@ -98,20 +97,19 @@ bool SaveBMPFile(const ImageSaveInfo *pInfo)
 			return false;
 		}
 	}
+
 	/* ビットデータを書き込む */
 	if (pInfo->pbmi->bmiHeader.biHeight > 0) {
-		if (!WriteFile(hFile, pInfo->pBits, (DWORD)BitsBytes, &dwWrite, nullptr)
+		if (!WriteFile(hFile, pInfo->pBits, static_cast<DWORD>(BitsBytes), &dwWrite, nullptr)
 				|| dwWrite != BitsBytes) {
 			CloseHandle(hFile);
 			return false;
 		}
 	} else {
-		int y;
-		const BYTE *p;
+		const BYTE *p = static_cast<const BYTE*>(pInfo->pBits) + (Height - 1) * RowBytes;
 
-		p = static_cast<const BYTE*>(pInfo->pBits) + (Height - 1) * RowBytes;
-		for (y = 0; y < Height; y++) {
-			if (!WriteFile(hFile, p, (DWORD)RowBytes, &dwWrite, nullptr)
+		for (int y = 0; y < Height; y++) {
+			if (!WriteFile(hFile, p, static_cast<DWORD>(RowBytes), &dwWrite, nullptr)
 					|| dwWrite != RowBytes) {
 				CloseHandle(hFile);
 				return false;
@@ -119,7 +117,9 @@ bool SaveBMPFile(const ImageSaveInfo *pInfo)
 			p -= RowBytes;
 		}
 	}
+
 	CloseHandle(hFile);
+
 	return true;
 }
 

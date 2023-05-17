@@ -8,15 +8,14 @@
 class CImageCodec
 {
 public:
-	enum FormatType
+	enum class FormatType
 	{
-		Format_Invalid = -1,
-		Format_BMP,
-		Format_JPEG,
-		Format_PNG
+		Invalid = -1,
+		BMP,
+		JPEG,
+		PNG,
 	};
 
-	CImageCodec();
 	~CImageCodec();
 
 	bool SaveImageToFile(const CImage *pImage, LPCWSTR pszFileName, FormatType Format);
@@ -26,9 +25,9 @@ public:
 	void SetPngCompressionLevel(int Level) { m_PngCompressionLevel = Level; }
 
 private:
-	HMODULE m_hLib;
-	int m_JpegQuality;
-	int m_PngCompressionLevel;
+	HMODULE m_hLib = nullptr;
+	int m_JpegQuality = 90;
+	int m_PngCompressionLevel = 6;
 
 	static const LPCTSTR m_FormatStringList[];
 

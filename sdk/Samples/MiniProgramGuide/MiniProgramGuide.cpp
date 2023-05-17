@@ -14,23 +14,16 @@
 */
 
 
+#define WIN32_LEAN_AND_MEAN
+#define NOMINMAX
+
 #include <windows.h>
 #include <tchar.h>
+#include <algorithm>
 #include <vector>
+
 #define TVTEST_PLUGIN_CLASS_IMPLEMENT // クラスとして実装
 #include "TVTestPlugin.h"
-
-
-// ウィンドウクラス名
-#define MINI_PROGRAM_GUIDE_WINDOW_CLASS TEXT("TV Mini Program Guide Window")
-
-// コントロールの識別子
-#define IDC_TUNERLIST   100
-#define IDC_CHANNELLIST 101
-#define IDC_EVENTLIST   102
-
-// 番組あたりの行数
-#define LINES_PER_EVENT 3
 
 
 // プラグインクラス
@@ -38,24 +31,34 @@ class CMiniProgramGuide : public TVTest::CTVTestPlugin
 {
 	struct Position
 	{
-		int Left,Top,Width,Height;
-		Position() : Left(0), Top(0), Width(0), Height(0) {}
+		int Left = 0, Top = 0, Width = 0, Height = 0;
 	};
 
-	HWND m_hwnd;
-	HWND m_hwndTunerList;
-	HWND m_hwndChannelList;
-	HWND m_hwndEventList;
+	// ウィンドウクラス名
+	static const LPCTSTR MINI_PROGRAM_GUIDE_WINDOW_CLASS;
+
+	// コントロールの識別子
+	static constexpr int IDC_TUNERLIST   = 100;
+	static constexpr int IDC_CHANNELLIST = 101;
+	static constexpr int IDC_EVENTLIST   = 102;
+
+	// 番組あたりの行数
+	static constexpr int LINES_PER_EVENT = 3;
+
+	HWND m_hwnd = nullptr;
+	HWND m_hwndTunerList = nullptr;
+	HWND m_hwndChannelList = nullptr;
+	HWND m_hwndEventList = nullptr;
 	Position m_WindowPosition;
 	COLORREF m_crBackColor;
 	COLORREF m_crTextColor;
-	HBRUSH m_hbrBackground;
-	HFONT m_hfont;
+	HBRUSH m_hbrBackground = nullptr;
+	HFONT m_hfont = nullptr;
 	int m_DPI;
 	int m_FontHeight;
 	int m_ItemMargin;
 	int m_ItemHeight;
-	TVTest::EpgEventList m_EventList;
+	TVTest::EpgEventList m_EventList{};
 
 	bool Enable(bool fEnable);
 	void SetTunerList();
@@ -70,24 +73,13 @@ class CMiniProgramGuide : public TVTest::CTVTestPlugin
 	static LRESULT CALLBACK WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 public:
-	CMiniProgramGuide();
-	virtual bool GetPluginInfo(TVTest::PluginInfo *pInfo);
-	virtual bool Initialize();
-	virtual bool Finalize();
+	bool GetPluginInfo(TVTest::PluginInfo *pInfo) override;
+	bool Initialize() override;
+	bool Finalize() override;
 };
 
 
-CMiniProgramGuide::CMiniProgramGuide()
-	: m_hwnd(nullptr)
-	, m_hwndTunerList(nullptr)
-	, m_hwndChannelList(nullptr)
-	, m_hwndEventList(nullptr)
-	, m_hbrBackground(nullptr)
-	, m_hfont(nullptr)
-{
-	m_EventList.NumEvents = 0;
-	m_EventList.EventList = nullptr;
-}
+const LPCTSTR CMiniProgramGuide::MINI_PROGRAM_GUIDE_WINDOW_CLASS = TEXT("TV Mini Program Guide Window");
 
 
 // プラグインの情報を返す
@@ -395,19 +387,19 @@ LRESULT CALLBACK CMiniProgramGuide::WndProc(HWND hwnd,UINT uMsg,WPARAM wParam,LP
 				0, TEXT("COMBOBOX"), nullptr,
 				WS_CHILD | WS_VISIBLE | WS_VSCROLL | CBS_DROPDOWNLIST,
 				0, 0, 0, pThis->m_FontHeight * 20,
-				hwnd, reinterpret_cast<HMENU>(IDC_TUNERLIST), g_hinstDLL, nullptr);
+				hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_TUNERLIST)), g_hinstDLL, nullptr);
 
 			pThis->m_hwndChannelList = ::CreateWindowEx(
 				0, TEXT("COMBOBOX"), nullptr,
 				WS_CHILD | WS_VISIBLE | WS_VSCROLL | CBS_DROPDOWNLIST,
 				0, 0, 0, pThis->m_FontHeight * 20,
-				hwnd, reinterpret_cast<HMENU>(IDC_CHANNELLIST), g_hinstDLL, nullptr);
+				hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_CHANNELLIST)), g_hinstDLL, nullptr);
 
 			pThis->m_hwndEventList = ::CreateWindowEx(
 				0, TEXT("LISTBOX"), nullptr,
 				WS_CHILD | WS_VISIBLE | WS_VSCROLL | WS_HSCROLL | LBS_OWNERDRAWFIXED | LBS_NOINTEGRALHEIGHT,
 				0, 0, 0, 0,
-				hwnd, reinterpret_cast<HMENU>(IDC_EVENTLIST), g_hinstDLL, nullptr);
+				hwnd, reinterpret_cast<HMENU>(static_cast<INT_PTR>(IDC_EVENTLIST)), g_hinstDLL, nullptr);
 
 			pThis->SetControlsFont();
 			pThis->GetColors();
@@ -435,7 +427,7 @@ LRESULT CALLBACK CMiniProgramGuide::WndProc(HWND hwnd,UINT uMsg,WPARAM wParam,LP
 			::GetWindowRect(pThis->m_hwndChannelList, &rc);
 			::MoveWindow(pThis->m_hwndChannelList, 0, y, Width, rc.bottom - rc.top, TRUE);
 			y += rc.bottom - rc.top;
-			::MoveWindow(pThis->m_hwndEventList, 0, y, Width, max(Height - y, 0), TRUE);
+			::MoveWindow(pThis->m_hwndEventList, 0, y, Width, std::max(Height - y, 0), TRUE);
 			::InvalidateRect(pThis->m_hwndEventList, nullptr, TRUE);
 		}
 		return 0;

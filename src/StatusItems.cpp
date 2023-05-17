@@ -36,32 +36,30 @@ CChannelStatusItem::CChannelStatusItem()
 {
 }
 
-void CChannelStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags)
+void CChannelStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags)
 {
-	if ((Flags & DRAW_PREVIEW) != 0) {
+	if (!!(Flags & DrawFlag::Preview)) {
 		DrawText(hdc, DrawRect, TEXT("アフリカ中央テレビ"));
 		return;
 	}
 
-	CAppMain &App = GetAppClass();
+	const CAppMain &App = GetAppClass();
 	const CChannelManager &ChannelManager = App.ChannelManager;
 	const CChannelInfo *pInfo;
 	TCHAR szText[4 + MAX_CHANNEL_NAME];
 
 	if (App.UICore.GetSkin()->IsWheelChannelChanging()) {
-		COLORREF crText, crBack;
-
-		crText = ::GetTextColor(hdc);
-		crBack = ::GetBkColor(hdc);
+		const COLORREF crText = ::GetTextColor(hdc);
+		const COLORREF crBack = ::GetBkColor(hdc);
 		::SetTextColor(hdc, MixColor(crText, crBack, 128));
 		pInfo = ChannelManager.GetChangingChannelInfo();
-		StringPrintf(
-			szText, TEXT("%d: %s"),
+		StringFormat(
+			szText, TEXT("{}: {}"),
 			pInfo->GetChannelNo(), pInfo->GetName());
 	} else if ((pInfo = ChannelManager.GetCurrentChannelInfo()) != nullptr) {
 		TCHAR szService[MAX_CHANNEL_NAME];
-		StringPrintf(
-			szText, TEXT("%d: %s"),
+		StringFormat(
+			szText, TEXT("{}: {}"),
 			pInfo->GetChannelNo(),
 			App.Core.GetCurrentServiceName(szService, lengthof(szService)) ? szService : pInfo->GetName());
 	} else {
@@ -100,9 +98,6 @@ bool CChannelStatusItem::OnMouseWheel(int x, int y, bool fHorz, int Delta, int *
 
 CVideoSizeStatusItem::CVideoSizeStatusItem()
 	: CStatusItem(STATUS_ITEM_VIDEOSIZE, SizeValue(11 * EM_FACTOR, SizeUnit::EM))
-	, m_OriginalVideoWidth(0)
-	, m_OriginalVideoHeight(0)
-	, m_ZoomPercentage(0)
 {
 }
 
@@ -126,13 +121,13 @@ bool CVideoSizeStatusItem::UpdateContent()
 	return true;
 }
 
-void CVideoSizeStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags)
+void CVideoSizeStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags)
 {
-	if ((Flags & DRAW_PREVIEW) == 0) {
+	if (!(Flags & DrawFlag::Preview)) {
 		TCHAR szText[64];
 
-		StringPrintf(
-			szText, TEXT("%d x %d (%d %%)"),
+		StringFormat(
+			szText, TEXT("{} x {} ({} %)"),
 			m_OriginalVideoWidth, m_OriginalVideoHeight,
 			m_ZoomPercentage);
 		DrawText(hdc, DrawRect, szText);
@@ -176,23 +171,17 @@ CVolumeStatusItem::CVolumeStatusItem()
 {
 }
 
-void CVolumeStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags)
+void CVolumeStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags)
 {
-	CUICore *pUICore = &GetAppClass().UICore;
-	LOGBRUSH lb;
-	HPEN hpen, hpenOld;
-	HBRUSH hbrOld;
-	RECT rc;
-	COLORREF crText = ::GetTextColor(hdc), crBar;
-
-	lb.lbStyle = BS_SOLID;
-	lb.lbColor = crText;
-	lb.lbHatch = 0;
-	hpen = ::ExtCreatePen(
+	const CUICore *pUICore = &GetAppClass().UICore;
+	const COLORREF crText = ::GetTextColor(hdc);
+	const LOGBRUSH lb = {BS_SOLID, crText, 0};
+	const HPEN hpen = ::ExtCreatePen(
 		PS_GEOMETRIC | PS_SOLID | PS_INSIDEFRAME | PS_JOIN_MITER,
 		m_Style.BarBorderWidth, &lb, 0, nullptr);
-	hpenOld = SelectPen(hdc, hpen);
-	hbrOld = SelectBrush(hdc, ::GetStockObject(NULL_BRUSH));
+	const HPEN hpenOld = SelectPen(hdc, hpen);
+	const HBRUSH hbrOld = SelectBrush(hdc, ::GetStockObject(NULL_BRUSH));
+	RECT rc;
 	rc.left = DrawRect.left;
 	rc.top = DrawRect.top + ((DrawRect.bottom - DrawRect.top) - m_Style.BarHeight) / 2;
 	rc.right = DrawRect.right;
@@ -201,6 +190,8 @@ void CVolumeStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect
 	::SelectObject(hdc, hbrOld);
 	::SelectObject(hdc, hpenOld);
 	::DeleteObject(hpen);
+
+	COLORREF crBar;
 	if (!pUICore->GetMute())
 		crBar = crText;
 	else
@@ -230,12 +221,11 @@ void CVolumeStatusItem::OnMouseMove(int x, int y)
 
 	CUICore *pUICore = &GetAppClass().UICore;
 	RECT rcItem, rcClient;
-	int Volume;
 
 	GetRect(&rcItem);
 	GetClientRect(&rcClient);
 	Style::Subtract(&rcClient, m_Style.BarPadding);
-	Volume = (x - (rcClient.left - rcItem.left)) * CCoreEngine::MAX_VOLUME / ((rcClient.right - rcClient.left) - 1);
+	int Volume = (x - (rcClient.left - rcItem.left)) * CCoreEngine::MAX_VOLUME / ((rcClient.right - rcClient.left) - 1);
 	if (Volume < 0)
 		Volume = 0;
 	else if (Volume > CCoreEngine::MAX_VOLUME)
@@ -267,32 +257,25 @@ void CVolumeStatusItem::NormalizeStyle(
 	pStyleScaling->ToPixels(&m_Style.BarBorderWidth);
 }
 
-CVolumeStatusItem::VolumeStatusStyle::VolumeStatusStyle()
-	: BarHeight(8)
-	, BarPadding(1)
-	, BarBorderWidth(1)
-{
-}
-
 
 CAudioChannelStatusItem::CAudioChannelStatusItem()
 	: CStatusItem(STATUS_ITEM_AUDIOCHANNEL, SizeValue(7 * EM_FACTOR, SizeUnit::EM))
 {
 }
 
-void CAudioChannelStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags)
+void CAudioChannelStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags)
 {
-	if ((Flags & DRAW_PREVIEW) != 0) {
+	if (!!(Flags & DrawFlag::Preview)) {
 		DrawText(hdc, DrawRect, TEXT("Stereo"));
 		return;
 	}
 
-	CAppMain &App = GetAppClass();
+	const CAppMain &App = GetAppClass();
 	RECT rc = DrawRect;
 
 	const LibISDB::ViewerFilter *pViewer = App.CoreEngine.GetFilter<LibISDB::ViewerFilter>();
 	if (pViewer != nullptr && pViewer->IsSPDIFPassthrough()) {
-		Style::Size IconSize = m_pStatus->GetIconSize();
+		const Style::Size IconSize = m_pStatus->GetIconSize();
 		if (!m_Icons.IsCreated()) {
 			static const Theme::IconList::ResourceInfo ResourceList[] = {
 				{MAKEINTRESOURCE(IDB_PASSTHROUGH16), 16, 16},
@@ -341,16 +324,14 @@ bool CAudioChannelStatusItem::OnMouseWheel(int x, int y, bool fHorz, int Delta, 
 
 CRecordStatusItem::CRecordStatusItem()
 	: CStatusItem(STATUS_ITEM_RECORD, SizeValue(6 * EM_FACTOR, SizeUnit::EM))
-	, m_fRemain(false)
-	, m_CircleColor(RGB(223, 63, 0))
 {
 }
 
-void CRecordStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags)
+void CRecordStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags)
 {
-	if ((Flags & DRAW_PREVIEW) != 0) {
+	if (!!(Flags & DrawFlag::Preview)) {
 		RECT rc = DrawRect;
-		COLORREF OldTextColor = ::SetTextColor(hdc, m_CircleColor);
+		const COLORREF OldTextColor = ::SetTextColor(hdc, m_CircleColor);
 		::DrawText(hdc, TEXT("●"), -1, &rc, DT_LEFT | DT_SINGLELINE | DT_VCENTER);
 		::SetTextColor(hdc, OldTextColor);
 		rc.left += m_pStatus->GetFontHeight() + 4;
@@ -360,13 +341,12 @@ void CRecordStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect
 
 	const CRecordManager &RecordManager = GetAppClass().RecordManager;
 	const int FontHeight = m_pStatus->GetFontHeight();
-	RECT rc;
+	RECT rc = DrawRect;
 	TCHAR szText[32];
 
-	rc = DrawRect;
 	if (RecordManager.IsRecording()) {
 		if (RecordManager.IsPaused()) {
-			HBRUSH hbr = ::CreateSolidBrush(::GetTextColor(hdc));
+			const HBRUSH hbr = ::CreateSolidBrush(::GetTextColor(hdc));
 			RECT rc1;
 
 			rc1.left = rc.left;
@@ -381,19 +361,16 @@ void CRecordStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect
 		} else {
 #if 0
 			// Ellipseで小さい丸を描くと汚い
-			HBRUSH hbr = ::CreateSolidBrush(m_CircleColor);
-			HBRUSH hbrOld;
-			HPEN hpenOld;
-
+			const HBRUSH hbr = ::CreateSolidBrush(m_CircleColor);
 			rc1.right = rc1.left + FontHeight;
-			hbrOld = SelectBrush(hdc, hbr);
-			hpenOld = SelectPen(hdc, ::GetStockObject(NULL_PEN));
+			const HBRUSH hbrOld = SelectBrush(hdc, hbr);
+			const HPEN hpenOld = SelectPen(hdc, ::GetStockObject(NULL_PEN));
 			::Ellipse(hdc, rc1.left, rc1.top, rc1.right, rc1.bottom);
 			SelectPen(hdc, hpenOld);
 			SelectBrush(hdc, hbrOld);
 			::DeleteObject(hbr);
 #else
-			COLORREF OldTextColor = ::SetTextColor(hdc, m_CircleColor);
+			const COLORREF OldTextColor = ::SetTextColor(hdc, m_CircleColor);
 			::DrawText(
 				hdc, TEXT("●"), -1, &rc,
 				DT_LEFT | DT_SINGLELINE | DT_VCENTER);
@@ -401,17 +378,17 @@ void CRecordStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect
 #endif
 		}
 		rc.left += FontHeight + 4;
-		bool fRemain = m_fRemain && RecordManager.IsStopTimeSpecified();
+		const bool fRemain = m_fRemain && RecordManager.IsStopTimeSpecified();
 		int RecordSec;
 		if (fRemain) {
-			RecordSec = (int)(RecordManager.GetRemainTime() / 1000);
+			RecordSec = static_cast<int>(RecordManager.GetRemainTime() / 1000);
 			if (RecordSec < 0)
 				RecordSec = 0;
 		} else {
-			RecordSec = (int)(RecordManager.GetRecordTime() / 1000);
+			RecordSec = static_cast<int>(RecordManager.GetRecordTime() / 1000);
 		}
-		StringPrintf(
-			szText, TEXT("%s%d:%02d:%02d"),
+		StringFormat(
+			szText, TEXT("{}{}:{:02}:{:02}"),
 			fRemain ? TEXT("-") : TEXT(""),
 			RecordSec / (60 * 60), (RecordSec / 60) % 60, RecordSec % 60);
 	} else if (RecordManager.IsReserved()) {
@@ -427,7 +404,7 @@ void CRecordStatusItem::OnLButtonDown(int x, int y)
 	CAppMain &App = GetAppClass();
 	const CRecordManager &RecordManager = App.RecordManager;
 	CUICore &UICore = App.UICore;
-	bool fRecording = RecordManager.IsRecording();
+	const bool fRecording = RecordManager.IsRecording();
 
 	if (fRecording && !RecordManager.IsPaused()) {
 		if (!UICore.ConfirmStopRecording())
@@ -474,35 +451,34 @@ bool CRecordStatusItem::OnMouseHover(int x, int y)
 	return true;
 }
 
-int CRecordStatusItem::GetTipText(LPTSTR pszText, int MaxLength)
+size_t CRecordStatusItem::GetTipText(LPTSTR pszText, size_t MaxLength)
 {
 	const CRecordManager &RecordManager = GetAppClass().RecordManager;
 
 	if (RecordManager.IsRecording()) {
 		const CRecordTask *pRecordTask = RecordManager.GetRecordTask();
-		int Length;
 
-		unsigned int RecordSec = (unsigned int)(pRecordTask->GetRecordTime() / 1000);
-		Length = StringPrintf(
+		const unsigned int RecordSec = static_cast<unsigned int>(pRecordTask->GetRecordTime() / 1000);
+		size_t Length = StringFormat(
 			pszText, MaxLength,
-			TEXT("● %d:%02d:%02d"),
+			TEXT("● {}:{:02}:{:02}"),
 			RecordSec / (60 * 60), (RecordSec / 60) % 60, RecordSec % 60);
 
-		LONGLONG WroteSize = pRecordTask->GetWroteSize();
+		const LONGLONG WroteSize = pRecordTask->GetWroteSize();
 		if (WroteSize >= 0) {
-			unsigned int Size = (unsigned int)(WroteSize / (1024 * 1024 / 100));
-			Length += StringPrintf(
+			const unsigned int Size = static_cast<unsigned int>(WroteSize / (1024 * 1024 / 100));
+			Length += StringFormat(
 				pszText + Length, MaxLength - Length,
-				TEXT("\r\nサイズ: %d.%02d MB"),
+				TEXT("\r\nサイズ: {}.{:02} MB"),
 				Size / 100, Size % 100);
 		}
 
-		LONGLONG DiskFreeSpace = pRecordTask->GetFreeSpace();
+		const LONGLONG DiskFreeSpace = pRecordTask->GetFreeSpace();
 		if (DiskFreeSpace > 0) {
-			unsigned int FreeSpace = (unsigned int)(DiskFreeSpace / (ULONGLONG)(1024 * 1024 * 1024 / 100));
-			Length += StringPrintf(
+			const unsigned int FreeSpace = static_cast<unsigned int>(DiskFreeSpace / static_cast<ULONGLONG>(1024 * 1024 * 1024 / 100));
+			Length += StringFormat(
 				pszText + Length, MaxLength - Length,
-				TEXT("\r\n空き容量: %d.%02d GB"),
+				TEXT("\r\n空き容量: {}.{:02} GB"),
 				FreeSpace / 100, FreeSpace % 100);
 		}
 
@@ -530,13 +506,12 @@ LRESULT CRecordStatusItem::OnNotifyMessage(LPNMHDR pnmh)
 	if (pnmh->hwndFrom == m_Tooltip.GetHandle()) {
 		if (pnmh->code == TTN_SHOW) {
 			RECT rc, rcTip;
-			int x, y;
 
 			GetRect(&rc);
 			MapWindowRect(m_pStatus->GetHandle(), nullptr, &rc);
 			::GetWindowRect(pnmh->hwndFrom, &rcTip);
-			x = rc.left + ((rc.right - rc.left) - (rcTip.right - rcTip.left)) / 2;
-			y = rc.top - (rcTip.bottom - rcTip.top);
+			const int x = rc.left + ((rc.right - rc.left) - (rcTip.right - rcTip.left)) / 2;
+			const int y = rc.top - (rcTip.bottom - rcTip.top);
 			::SendMessage(pnmh->hwndFrom, TTM_TRACKPOSITION, 0, MAKELONG(x, y));
 			::SetWindowPos(
 				pnmh->hwndFrom, nullptr, x, y, 0, 0,
@@ -580,14 +555,14 @@ CCaptureStatusItem::CCaptureStatusItem()
 {
 }
 
-void CCaptureStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags)
+void CCaptureStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags)
 {
 	if (!m_Icons.IsCreated()) {
 		static const Theme::IconList::ResourceInfo ResourceList[] = {
 			{MAKEINTRESOURCE(IDB_CAPTURE16), 16, 16},
 			{MAKEINTRESOURCE(IDB_CAPTURE32), 32, 32},
 		};
-		Style::Size IconSize = m_pStatus->GetIconSize();
+		const Style::Size IconSize = m_pStatus->GetIconSize();
 		m_Icons.Load(
 			GetAppClass().GetResourceInstance(),
 			IconSize.Width, IconSize.Height,
@@ -615,9 +590,6 @@ void CCaptureStatusItem::OnRButtonDown(int x, int y)
 
 CErrorStatusItem::CErrorStatusItem()
 	: CStatusItem(STATUS_ITEM_ERROR, SizeValue(11 * EM_FACTOR, SizeUnit::EM))
-	, m_ContinuityErrorPacketCount(0)
-	, m_ErrorPacketCount(0)
-	, m_ScramblePacketCount(0)
 {
 }
 
@@ -640,13 +612,13 @@ bool CErrorStatusItem::UpdateContent()
 	return true;
 }
 
-void CErrorStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags)
+void CErrorStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags)
 {
-	if ((Flags & DRAW_PREVIEW) == 0) {
+	if (!(Flags & DrawFlag::Preview)) {
 		TCHAR szText[80];
 
-		StringPrintf(
-			szText, TEXT("D %llu / E %llu / S %llu"),
+		StringFormat(
+			szText, TEXT("D {} / E {} / S {}"),
 			m_ContinuityErrorPacketCount,
 			m_ErrorPacketCount,
 			m_ScramblePacketCount);
@@ -675,9 +647,6 @@ void CErrorStatusItem::OnRButtonDown(int x, int y)
 
 CSignalLevelStatusItem::CSignalLevelStatusItem()
 	: CStatusItem(STATUS_ITEM_SIGNALLEVEL, SizeValue(11 * EM_FACTOR, SizeUnit::EM))
-	, m_fShowSignalLevel(true)
-	, m_SignalLevel(0.0f)
-	, m_BitRate(0)
 {
 }
 
@@ -697,26 +666,26 @@ bool CSignalLevelStatusItem::UpdateContent()
 	return true;
 }
 
-void CSignalLevelStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags)
+void CSignalLevelStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags)
 {
 	const CCoreEngine &CoreEngine = GetAppClass().CoreEngine;
 	TCHAR szText[64];
 
-	if ((Flags & DRAW_PREVIEW) == 0) {
-		int Length = 0;
+	if (!(Flags & DrawFlag::Preview)) {
+		size_t Length = 0;
 
 		if (m_fShowSignalLevel) {
 			TCHAR szSignalLevel[32];
 			CoreEngine.GetSignalLevelText(m_SignalLevel, szSignalLevel, lengthof(szSignalLevel));
-			Length = StringPrintf(szText, TEXT("%s / "), szSignalLevel);
+			Length = StringFormat(szText, TEXT("{} / "), szSignalLevel);
 		}
-		CoreEngine.GetBitRateText(m_BitRate, szText + Length, lengthof(szText) - Length);
+		CoreEngine.GetBitRateText(m_BitRate, szText + Length, static_cast<int>(lengthof(szText) - Length));
 	} else {
 		TCHAR szSignalLevel[32], szBitRate[32];
 
 		CoreEngine.GetSignalLevelText(24.52f, szSignalLevel, lengthof(szSignalLevel));
 		CoreEngine.GetBitRateText(16.73f, szBitRate, lengthof(szBitRate));
-		StringPrintf(szText, TEXT("%s / %s"), szSignalLevel, szBitRate);
+		StringFormat(szText, TEXT("{} / {}"), szSignalLevel, szBitRate);
 	}
 
 	DrawText(hdc, DrawRect, szText);
@@ -734,8 +703,6 @@ void CSignalLevelStatusItem::ShowSignalLevel(bool fShow)
 
 CClockStatusItem::CClockStatusItem()
 	: CStatusItem(STATUS_ITEM_CLOCK, SizeValue(5 * EM_FACTOR, SizeUnit::EM))
-	, m_fTOT(false)
-	, m_fInterpolateTOT(true)
 {
 }
 
@@ -770,13 +737,13 @@ bool CClockStatusItem::UpdateContent()
 	return true;
 }
 
-void CClockStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags)
+void CClockStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags)
 {
 	LibISDB::BlockLock Lock(m_Lock);
 
 	TCHAR szText[64];
 
-	if ((Flags & DRAW_PREVIEW) == 0) {
+	if (!(Flags & DrawFlag::Preview)) {
 		if (!m_Time.IsValid())
 			return;
 		FormatTime(m_Time, szText, lengthof(szText));
@@ -833,17 +800,17 @@ void CClockStatusItem::FormatTime(const LibISDB::DateTime &Time, LPTSTR pszText,
 {
 #if 0
 	if (m_fTOT) {
-		StringPrintf(
-			pszText, MaxLength, TEXT("TOT %d/%d/%d %d:%02d:%02d"),
+		StringFormat(
+			pszText, MaxLength, TEXT("TOT {}/{}/{} {}:{:02}:{:02}"),
 			Time.Year, Time.Month, Time.Day,
 			Time.Hour, Time.Minute, Time.Second);
 	} else {
-		StringPrintf(
-			pszText, MaxLength, TEXT("%d:%02d:%02d"),
+		StringFormat(
+			pszText, MaxLength, TEXT("{}:{:02}:{:02}"),
 			Time.Hour, Time.Minute, Time.Second);
 	}
 #else
-	SYSTEMTIME st = Time.ToSYSTEMTIME();
+	const SYSTEMTIME st = Time.ToSYSTEMTIME();
 	if (m_fTOT) {
 		TCHAR szDate[32], szTime[32];
 		if (::GetDateFormat(
@@ -855,9 +822,9 @@ void CClockStatusItem::FormatTime(const LibISDB::DateTime &Time, LPTSTR pszText,
 					TIME_FORCE24HOURFORMAT | TIME_NOTIMEMARKER,
 					&st, nullptr, szTime, lengthof(szTime)) == 0)
 			szTime[0] = _T('\0');
-		StringPrintf(
+		StringFormat(
 			pszText, MaxLength,
-			TEXT("TOT %s %s"), szDate, szTime);
+			TEXT("TOT {} {}"), szDate, szTime);
 	} else {
 		::GetTimeFormat(LOCALE_USER_DEFAULT, 0, &st, nullptr, pszText, MaxLength);
 	}
@@ -867,18 +834,12 @@ void CClockStatusItem::FormatTime(const LibISDB::DateTime &Time, LPTSTR pszText,
 
 CProgramInfoStatusItem::CProgramInfoStatusItem()
 	: CStatusItem(STATUS_ITEM_PROGRAMINFO, SizeValue(20 * EM_FACTOR, SizeUnit::EM))
-	, m_fNext(false)
-	, m_fShowProgress(true)
-	, m_fEnablePopupInfo(true)
-	, m_ProgressBackStyle(Theme::FillStyle(Theme::SolidStyle(Theme::ThemeColor(160, 160, 160))))
-	, m_ProgressElapsedStyle(Theme::FillStyle(Theme::SolidStyle(Theme::ThemeColor(0, 0, 128))))
-	, m_fValidProgress(false)
 {
 }
 
-void CProgramInfoStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags)
+void CProgramInfoStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags)
 {
-	if ((Flags & DRAW_PREVIEW) != 0) {
+	if (!!(Flags & DrawFlag::Preview)) {
 		DrawText(hdc, DrawRect, TEXT("1:00～1:30 今日のニュース"));
 		return;
 	}
@@ -888,12 +849,12 @@ void CProgramInfoStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &Dra
 		RECT rcProgress = DrawRect;
 		rcProgress.top = rcProgress.bottom - (DrawRect.bottom - DrawRect.top) / 3;
 		ThemeDraw.Draw(m_ProgressBackStyle, &rcProgress);
-		long long Elapsed = m_CurTime.DiffSeconds(m_EventInfo.StartTime);
+		const long long Elapsed = m_CurTime.DiffSeconds(m_EventInfo.StartTime);
 		if (Elapsed > 0) {
 			if (m_EventInfo.Duration > 0 && Elapsed < static_cast<long long>(m_EventInfo.Duration)) {
 				rcProgress.right =
 					rcProgress.left +
-					::MulDiv(rcProgress.right - rcProgress.left, (int)Elapsed, m_EventInfo.Duration);
+					::MulDiv(rcProgress.right - rcProgress.left, static_cast<int>(Elapsed), m_EventInfo.Duration);
 			}
 			ThemeDraw.Draw(m_ProgressElapsedStyle, rcProgress);
 		}
@@ -1031,7 +992,7 @@ bool CProgramInfoStatusItem::UpdateProgress()
 		const LibISDB::AnalyzerFilter *pAnalyzer =
 			GetAppClass().CoreEngine.GetFilter<LibISDB::AnalyzerFilter>();
 		LibISDB::DateTime CurTime;
-		bool fValid =
+		const bool fValid =
 			m_EventInfo.StartTime.IsValid() &&
 			pAnalyzer != nullptr &&
 			pAnalyzer->GetTOTTime(&CurTime);
@@ -1066,19 +1027,16 @@ void CProgramInfoStatusItem::ShowPopupInfo()
 		if (App.CoreEngine.GetCurrentEventInfo(
 					&EventInfo, ChInfo.GetServiceID(), m_fNext)) {
 			RECT rc;
-			POINT pt;
-			int Width, Height;
-
 			GetRect(&rc);
-			pt.x = rc.left;
-			pt.y = rc.top;
+			POINT pt = {rc.left, rc.top};
 			::ClientToScreen(m_pStatus->GetHandle(), &pt);
+			int Width, Height;
 			m_EventInfoPopup.GetSize(&Width, &Height);
 			::SetRect(&rc, pt.x, pt.y - Height, pt.x + Width, pt.y);
 
 			int IconWidth, IconHeight;
 			m_EventInfoPopup.GetPreferredIconSize(&IconWidth, &IconHeight);
-			HICON hIcon = App.LogoManager.CreateLogoIcon(
+			const HICON hIcon = App.LogoManager.CreateLogoIcon(
 				ChInfo.GetNetworkID(), ChInfo.GetServiceID(),
 				IconWidth, IconHeight);
 
@@ -1104,14 +1062,12 @@ void CProgramInfoStatusItem::GetPopupInfoSize(int *pWidth, int *pHeight) const
 
 CBufferingStatusItem::CBufferingStatusItem()
 	: CStatusItem(STATUS_ITEM_BUFFERING, SizeValue(7 * EM_FACTOR, SizeUnit::EM))
-	, m_StreamRemain(0)
-	, m_PacketBufferUsedPercentage(0)
 {
 }
 
 bool CBufferingStatusItem::UpdateContent()
 {
-	CCoreEngine &CoreEngine = GetAppClass().CoreEngine;
+	const CCoreEngine &CoreEngine = GetAppClass().CoreEngine;
 	const DWORD StreamRemain = CoreEngine.GetStreamRemain();
 	const int PacketBufferUsedPercentage = CoreEngine.GetPacketBufferUsedPercentage();
 
@@ -1125,18 +1081,18 @@ bool CBufferingStatusItem::UpdateContent()
 	return true;
 }
 
-void CBufferingStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags)
+void CBufferingStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags)
 {
-	if ((Flags & DRAW_PREVIEW) != 0) {
+	if (!!(Flags & DrawFlag::Preview)) {
 		DrawText(hdc, DrawRect, TEXT("R 2 / B 48%"));
 		return;
 	}
 
 	TCHAR szText[32];
 
-	StringPrintf(
-		szText, TEXT("R %u / B %d%%"),
-		static_cast<unsigned int>(m_StreamRemain),
+	StringFormat(
+		szText, TEXT("R {} / B {}%"),
+		m_StreamRemain,
 		m_PacketBufferUsedPercentage);
 	DrawText(hdc, DrawRect, szText);
 }
@@ -1158,9 +1114,9 @@ CTunerStatusItem::CTunerStatusItem()
 {
 }
 
-void CTunerStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags)
+void CTunerStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags)
 {
-	if ((Flags & DRAW_PREVIEW) != 0) {
+	if (!!(Flags & DrawFlag::Preview)) {
 		DrawText(hdc, DrawRect, TEXT("地デジ"));
 		return;
 	}
@@ -1208,8 +1164,6 @@ void CTunerStatusItem::OnRButtonDown(int x, int y)
 
 CMediaBitRateStatusItem::CMediaBitRateStatusItem()
 	: CStatusItem(STATUS_ITEM_MEDIABITRATE, SizeValue(13 * EM_FACTOR, SizeUnit::EM))
-	, m_VideoBitRate(0)
-	, m_AudioBitRate(0)
 {
 }
 
@@ -1236,30 +1190,30 @@ bool CMediaBitRateStatusItem::UpdateContent()
 	return true;
 }
 
-void CMediaBitRateStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags)
+void CMediaBitRateStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags)
 {
-	if ((Flags & DRAW_PREVIEW) != 0) {
+	if (!!(Flags & DrawFlag::Preview)) {
 		DrawText(hdc, DrawRect, TEXT("V 13.25 Mbps / A 185 kbps"));
 		return;
 	}
 
 	TCHAR szText[64];
-	int Length;
+	size_t Length;
 
 	if (m_VideoBitRate < 1000 * 1000) {
-		Length = StringPrintf(
+		Length = StringFormat(
 			szText,
-			TEXT("V %u kbps"),
+			TEXT("V {} kbps"),
 			(m_VideoBitRate + 500) / 1000);
 	} else {
-		Length = StringPrintf(
+		Length = StringFormat(
 			szText,
-			TEXT("V %.2f Mbps"),
-			(double)(m_VideoBitRate) / (double)(1000 * 1000));
+			TEXT("V {:.2f} Mbps"),
+			static_cast<double>(m_VideoBitRate) / static_cast<double>(1000 * 1000));
 	}
-	StringPrintf(
+	StringFormat(
 		szText + Length, lengthof(szText) - Length,
-		TEXT(" / A %u kbps"),
+		TEXT(" / A {} kbps"),
 		(m_AudioBitRate + 500) / 1000);
 
 	DrawText(hdc, DrawRect, szText);
@@ -1271,14 +1225,14 @@ CFavoritesStatusItem::CFavoritesStatusItem()
 {
 }
 
-void CFavoritesStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags)
+void CFavoritesStatusItem::Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags)
 {
 	if (!m_Icons.IsCreated()) {
 		static const Theme::IconList::ResourceInfo ResourceList[] = {
 			{MAKEINTRESOURCE(IDB_STATUSBAR_FAVORITES16), 16, 16},
 			{MAKEINTRESOURCE(IDB_STATUSBAR_FAVORITES32), 32, 32},
 		};
-		Style::Size IconSize = m_pStatus->GetIconSize();
+		const Style::Size IconSize = m_pStatus->GetIconSize();
 		m_Icons.Load(
 			GetAppClass().GetResourceInstance(),
 			IconSize.Width, IconSize.Height,

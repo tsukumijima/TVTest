@@ -47,6 +47,7 @@ namespace TVTest
 			Disabled = 0x0001U,
 			Checked  = 0x0002U,
 			Hot      = 0x0004U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 		struct SideBarItem
@@ -82,10 +83,9 @@ namespace TVTest
 		class ABSTRACT_CLASS(CEventHandler)
 		{
 		protected:
-			CSideBar *m_pSideBar;
+			CSideBar *m_pSideBar = nullptr;
 
 		public:
-			CEventHandler();
 			virtual ~CEventHandler();
 
 			virtual void OnCommand(int Command) {}
@@ -143,11 +143,10 @@ namespace TVTest
 	protected:
 		struct SideBarStyle
 		{
-			Style::Size IconSize;
-			Style::Margins ItemPadding;
-			Style::IntValue SeparatorWidth;
+			Style::Size IconSize{ICON_WIDTH, ICON_HEIGHT};
+			Style::Margins ItemPadding{3};
+			Style::IntValue SeparatorWidth{8};
 
-			SideBarStyle();
 			void SetStyle(const Style::CStyleManager *pStyleManager);
 			void NormalizeStyle(
 				const Style::CStyleManager *pStyleManager,
@@ -157,19 +156,19 @@ namespace TVTest
 		SideBarStyle m_Style;
 		CTooltip m_Tooltip;
 		DrawUtil::CFont m_TooltipFont;
-		bool m_fShowTooltips;
+		bool m_fShowTooltips = true;
 		DrawUtil::CMonoColorIconList m_Icons;
-		bool m_fVertical;
+		bool m_fVertical = true;
 		SideBarTheme m_Theme;
 		std::vector<SideBarItem> m_ItemList;
-		int m_HotItem;
-		int m_ClickItem;
+		int m_HotItem = -1;
+		int m_ClickItem = -1;
 		CMouseLeaveTrack m_MouseLeaveTrack;
-		CEventHandler *m_pEventHandler;
+		CEventHandler *m_pEventHandler = nullptr;
 		const CCommandManager *m_pCommandManager;
 
-		static const int ICON_WIDTH;
-		static const int ICON_HEIGHT;
+		static constexpr int ICON_WIDTH = 16;
+		static constexpr int ICON_HEIGHT = 16;
 		static const LPCTSTR CLASS_NAME;
 		static HINSTANCE m_hinst;
 
@@ -186,8 +185,6 @@ namespace TVTest
 	// CUIBase
 		void RealizeStyle() override;
 	};
-
-	TVTEST_ENUM_FLAGS(CSideBar::ItemState)
 
 }	// namespace TVTest
 

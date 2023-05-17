@@ -31,19 +31,11 @@ namespace TVTest
 {
 
 
-CAudioManager::CAudioManager()
-	: m_CurTransportStreamID(LibISDB::TRANSPORT_STREAM_ID_INVALID)
-	, m_CurServiceID(LibISDB::SERVICE_ID_INVALID)
-	, m_CurEventID(LibISDB::EVENT_ID_INVALID)
-{
-}
-
-
 int CAudioManager::GetAudioCount() const
 {
 	LibISDB::BlockLock Lock(m_Lock);
 
-	return (int)m_AudioList.size();
+	return static_cast<int>(m_AudioList.size());
 }
 
 
@@ -51,7 +43,7 @@ bool CAudioManager::GetAudioInfo(int Index, AudioInfo *pInfo) const
 {
 	LibISDB::BlockLock Lock(m_Lock);
 
-	if (Index < 0 || (size_t)Index >= m_AudioList.size() || pInfo == nullptr)
+	if (Index < 0 || static_cast<size_t>(Index) >= m_AudioList.size() || pInfo == nullptr)
 		return false;
 
 	*pInfo = m_AudioList[Index];
@@ -79,7 +71,7 @@ int CAudioManager::FindAudioInfoByID(IDType ID) const
 
 	for (auto it = m_AudioList.begin(); it != m_AudioList.end(); ++it) {
 		if (it->ID == ID)
-			return (int)std::distance(m_AudioList.begin(), it);
+			return static_cast<int>(std::distance(m_AudioList.begin(), it));
 	}
 
 	return -1;
@@ -94,7 +86,6 @@ int CAudioManager::GetDefaultAudio(AudioSelectInfo *pSelectInfo) const
 		return -1;
 
 	const CAudioOptions &AudioOptions = GetAppClass().AudioOptions;
-	bool fDefault = true;
 
 	if (AudioOptions.GetEnableLanguagePriority()) {
 		const CAudioOptions::AudioLanguageList &PriorityList = AudioOptions.GetLanguagePriority();
@@ -111,7 +102,7 @@ int CAudioManager::GetDefaultAudio(AudioSelectInfo *pSelectInfo) const
 								pSelectInfo->ID = itAudio->ID;
 								pSelectInfo->DualMono = itAudio->DualMono;
 							}
-							return (int)std::distance(m_AudioList.begin(), itAudio);
+							return static_cast<int>(std::distance(m_AudioList.begin(), itAudio));
 						}
 					}
 				}
@@ -197,7 +188,7 @@ int CAudioManager::FindSelectedAudio() const
 	for (auto it = m_AudioList.begin(); it != m_AudioList.end(); ++it) {
 		if (it->ID == m_SelectedAudio.ID
 				&& it->DualMono == m_SelectedAudio.DualMono)
-			return (int)std::distance(m_AudioList.begin(), it);
+			return static_cast<int>(std::distance(m_AudioList.begin(), it));
 	}
 
 	return -1;
@@ -245,8 +236,8 @@ bool CAudioManager::OnServiceUpdated()
 {
 	// PMT の情報から音声のリストを作成
 	LibISDB::BlockLock Lock(m_Lock);
-	CCoreEngine &Engine = GetAppClass().CoreEngine;
-	LibISDB::AnalyzerFilter *pAnalyzer = Engine.GetFilter<LibISDB::AnalyzerFilter>();
+	const CCoreEngine &Engine = GetAppClass().CoreEngine;
+	const LibISDB::AnalyzerFilter *pAnalyzer = Engine.GetFilter<LibISDB::AnalyzerFilter>();
 
 	if (pAnalyzer == nullptr)
 		return false;
@@ -260,9 +251,8 @@ bool CAudioManager::OnServiceUpdated()
 	for (int i = 0; i < StreamCount; i++)
 		ComponentList[i] = MakeID(i, pAnalyzer->GetAudioComponentTag(ServiceIndex, i));
 
-	WORD TransportStreamID, ServiceID;
-	TransportStreamID = Engine.GetTransportStreamID();
-	ServiceID = Engine.GetServiceID();
+	const WORD TransportStreamID = Engine.GetTransportStreamID();
+	const WORD ServiceID = Engine.GetServiceID();
 	const bool fServiceChanged =
 		TransportStreamID != m_CurTransportStreamID || ServiceID != m_CurServiceID;
 
@@ -302,9 +292,8 @@ bool CAudioManager::OnServiceUpdated()
 	} else {
 		// 選択されていたIDのストリームが無くなったらリセット
 		if (m_SelectedAudio.ID != ID_INVALID) {
-			if (std::find(
-						m_AudioComponentList.begin(),
-						m_AudioComponentList.end(),
+			if (std::ranges::find(
+						m_AudioComponentList,
 						m_SelectedAudio.ID) == m_AudioComponentList.end())
 				SetSelectedAudio(nullptr);
 		}
@@ -318,7 +307,7 @@ bool CAudioManager::OnEventUpdated()
 {
 	// EIT の情報から音声のリストを作成
 	LibISDB::BlockLock Lock(m_Lock);
-	CCoreEngine &Engine = GetAppClass().CoreEngine;
+	const CCoreEngine &Engine = GetAppClass().CoreEngine;
 	const LibISDB::AnalyzerFilter *pAnalyzer = Engine.GetFilter<LibISDB::AnalyzerFilter>();
 	AudioList EventAudioList;
 

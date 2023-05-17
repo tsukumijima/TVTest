@@ -24,6 +24,7 @@
 
 #include <vector>
 #include <memory>
+#define TVTEST_PLUGIN_USE_NAMED_ENUM
 #include "TVTestPlugin.h"
 #include "AppEvent.h"
 #include "Options.h"
@@ -41,9 +42,9 @@ namespace TVTest
 		class CPluginCommandInfo
 		{
 			int m_ID;
-			int m_Command;
-			unsigned int m_Flags;
-			unsigned int m_State;
+			int m_Command = 0;
+			PluginCommandFlag m_Flags = PLUGIN_COMMAND_FLAG_NONE;
+			PluginCommandState m_State = PLUGIN_COMMAND_STATE_NONE;
 			String m_Text;
 			String m_Name;
 			Theme::ThemeBitmap m_Icon;
@@ -57,15 +58,15 @@ namespace TVTest
 			int GetID() const { return m_ID; }
 			int GetCommand() const { return m_Command; }
 			void SetCommand(int Command) { m_Command = Command; }
-			unsigned int GetFlags() const { return m_Flags; }
-			unsigned int GetState() const { return m_State; }
-			void SetState(unsigned int State) { m_State = State; }
+			PluginCommandFlag GetFlags() const { return m_Flags; }
+			PluginCommandState GetState() const { return m_State; }
+			void SetState(PluginCommandState State) { m_State = State; }
 			LPCWSTR GetText() const { return m_Text.c_str(); }
 			LPCWSTR GetName() const { return m_Name.c_str(); }
 			Theme::ThemeBitmap &GetIcon() { return m_Icon; }
 		};
 
-		CPlugin();
+		CPlugin() = default;
 		~CPlugin();
 
 		CPlugin(const CPlugin &) = delete;
@@ -81,7 +82,7 @@ namespace TVTest
 		LPCTSTR GetPluginName() const { return m_PluginName.c_str(); }
 		LPCTSTR GetCopyright() const { return m_Copyright.c_str(); }
 		LPCTSTR GetDescription() const { return m_Description.c_str(); }
-		LRESULT SendEvent(UINT Event, LPARAM lParam1 = 0, LPARAM lParam2 = 0);
+		LRESULT SendEvent(EventCode Event, LPARAM lParam1 = 0, LPARAM lParam2 = 0);
 		bool OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam, LRESULT *pResult);
 		bool Settings(HWND hwndOwner);
 		bool HasSettings() const { return (m_Flags & PLUGIN_FLAG_HASSETTINGS) != 0; }
@@ -102,7 +103,7 @@ namespace TVTest
 		int NumProgramGuideCommands() const;
 		bool GetProgramGuideCommandInfo(int Index, ProgramGuideCommandInfo *pInfo) const;
 		bool NotifyProgramGuideCommand(
-			LPCTSTR pszCommand, UINT Action, const LibISDB::EventInfo *pEvent,
+			LPCTSTR pszCommand, ProgramGuideCommandAction Action, const LibISDB::EventInfo *pEvent,
 			const POINT *pCursorPos, const RECT *pItemRect);
 		bool IsDisableOnStart() const;
 		bool IsProgramGuideEventEnabled(UINT EventFlag) const { return (m_ProgramGuideEventFlags & EventFlag) != 0; }
@@ -118,12 +119,12 @@ namespace TVTest
 		class CProgramGuideCommand
 			: public CPluginCommandInfo
 		{
-			UINT m_Type;
+			ProgramGuideCommandType m_Type;
 
 		public:
 			CProgramGuideCommand(const ProgramGuideCommandInfo &Info);
 
-			UINT GetType() const { return m_Type; }
+			ProgramGuideCommandType GetType() const { return m_Type; }
 		};
 
 		class CStreamGrabber
@@ -147,7 +148,7 @@ namespace TVTest
 
 		struct StatusItem
 		{
-			DWORD Flags;
+			StatusItemFlag Flags;
 			int ID;
 			String IDText;
 			String Name;
@@ -156,8 +157,8 @@ namespace TVTest
 			int DefaultWidth;
 			int MinHeight;
 			int ItemID;
-			DWORD Style;
-			DWORD State;
+			StatusItemStyle Style;
+			StatusItemState State;
 			CPluginStatusItem *pItem;
 		};
 
@@ -171,7 +172,7 @@ namespace TVTest
 		// CStatusItem
 			LPCTSTR GetIDText() const override { return m_IDText.c_str(); }
 			LPCTSTR GetName() const override { return m_pItem->Name.c_str(); }
-			void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags) override;
+			void Draw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags) override;
 			void OnLButtonDown(int x, int y) override;
 			void OnLButtonUp(int x, int y) override;
 			void OnLButtonDoubleClick(int x, int y) override;
@@ -202,8 +203,8 @@ namespace TVTest
 		// CUIBase
 			void RealizeStyle() override;
 
-			void NotifyDraw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, unsigned int Flags);
-			LRESULT NotifyMouseEvent(UINT Action, int x, int y, int WheelDelta = 0);
+			void NotifyDraw(HDC hdc, const RECT &ItemRect, const RECT &DrawRect, DrawFlag Flags);
+			LRESULT NotifyMouseEvent(StatusItemMouseAction Action, int x, int y, int WheelDelta = 0);
 		};
 
 		class CPluginPanelItem;
@@ -213,9 +214,9 @@ namespace TVTest
 			int ID;
 			String IDText;
 			String Title;
-			DWORD StateMask;
-			DWORD State;
-			DWORD Style;
+			PanelItemState StateMask;
+			PanelItemState State;
+			PanelItemStyle Style;
 			int ItemID;
 			CPluginPanelItem *pItem;
 			Theme::ThemeBitmap Icon;
@@ -247,7 +248,7 @@ namespace TVTest
 
 			CPlugin *m_pPlugin;
 			PanelItem *m_pItem;
-			HWND m_hwndItem;
+			HWND m_hwndItem = nullptr;
 
 			static bool m_fInitialized;
 		};
@@ -270,23 +271,23 @@ namespace TVTest
 			String Text;
 		};
 
-		HMODULE m_hLib;
+		HMODULE m_hLib = nullptr;
 		String m_FileName;
 		PluginParam m_PluginParam;
-		DWORD m_Version;
-		DWORD m_Type;
-		DWORD m_Flags;
+		DWORD m_Version = 0;
+		PluginType m_Type = PLUGIN_TYPE_NORMAL;
+		PluginFlag m_Flags = PLUGIN_FLAG_NONE;
 		String m_PluginName;
 		String m_Copyright;
 		String m_Description;
-		bool m_fEnabled;
-		bool m_fSetting;
-		int m_Command;
+		bool m_fEnabled = false;
+		bool m_fSetting = false;
+		int m_Command = 0;
 		Theme::ThemeBitmap m_PluginIcon;
-		EventCallbackFunc m_pEventCallback;
+		EventCallbackFunc m_pEventCallback = nullptr;
 		void *m_pEventCallbackClientData;
-		UINT m_ProgramGuideEventFlags;
-		WindowMessageCallbackFunc m_pMessageCallback;
+		UINT m_ProgramGuideEventFlags = 0;
+		WindowMessageCallbackFunc m_pMessageCallback = nullptr;
 		void *m_pMessageCallbackClientData;
 		std::vector<std::unique_ptr<CStreamGrabber>> m_StreamGrabberList;
 		MutexLock m_GrabberLock;
@@ -295,7 +296,7 @@ namespace TVTest
 		std::vector<String> m_ControllerList;
 		std::vector<std::unique_ptr<StatusItem>> m_StatusItemList;
 		std::vector<std::unique_ptr<PanelItem>> m_PanelItemList;
-		CGetVariable m_GetVariable;
+		CGetVariable m_GetVariable{this};
 		std::vector<AppCommand> m_AppCommandList;
 
 		static HWND m_hwndMessage;
@@ -349,13 +350,13 @@ namespace TVTest
 
 		static CAudioSampleCallback m_AudioSampleCallback;
 
-		static LRESULT CALLBACK Callback(PluginParam *pParam, UINT Message, LPARAM lParam1, LPARAM lParam2);
+		static LRESULT CALLBACK Callback(PluginParam *pParam, MessageCode Message, LPARAM lParam1, LPARAM lParam2);
 
 	// CPlugin
 		LRESULT SendPluginMessage(
-			PluginParam *pParam, UINT Message, LPARAM lParam1, LPARAM lParam2,
+			PluginParam *pParam, MessageCode Message, LPARAM lParam1, LPARAM lParam2,
 			LRESULT FailedResult = 0);
-		LRESULT OnCallback(PluginParam *pParam, UINT Message, LPARAM lParam1, LPARAM lParam2);
+		LRESULT OnCallback(PluginParam *pParam, MessageCode Message, LPARAM lParam1, LPARAM lParam2);
 		bool OnGetSetting(SettingInfo *pSetting) const;
 		void CreateAppCommandList();
 	};
@@ -377,10 +378,10 @@ namespace TVTest
 		static bool CompareName(
 			const std::unique_ptr<CPlugin> &Plugin1,
 			const std::unique_ptr<CPlugin> &Plugin2);
-		bool SendEvent(UINT Event, LPARAM lParam1 = 0, LPARAM lParam2 = 0);
-		bool SendProgramGuideEvent(UINT Event, LPARAM Param1 = 0, LPARAM Param2 = 0);
-		bool SendProgramGuideProgramEvent(UINT Event, const LibISDB::EventInfo &EventInfo, LPARAM Param);
-		bool SendFilterGraphEvent(UINT Event, LibISDB::ViewerFilter *pMediaViewer, IGraphBuilder *pGraphBuilder);
+		bool SendEvent(EventCode Event, LPARAM lParam1 = 0, LPARAM lParam2 = 0);
+		bool SendProgramGuideEvent(EventCode Event, LPARAM Param1 = 0, LPARAM Param2 = 0);
+		bool SendProgramGuideProgramEvent(EventCode Event, const LibISDB::EventInfo &EventInfo, LPARAM Param);
+		bool SendFilterGraphEvent(EventCode Event, LibISDB::ViewerFilter *pMediaViewer, IGraphBuilder *pGraphBuilder);
 		void OnRecordingStateChanged();
 
 	// CAppEventHandler
@@ -417,14 +418,15 @@ namespace TVTest
 		void OnDarkModeChanged(bool fDarkMode) override;
 		void OnMainWindowDarkModeChanged(bool fDarkMode) override;
 		void OnProgramGuideDarkModeChanged(bool fDarkMode) override;
+		void OnEventChanged() override;
+		void OnEventInfoChanged() override;
 
 	public:
-		CPluginManager();
 		~CPluginManager();
 
 		bool LoadPlugins(LPCTSTR pszDirectory, const std::vector<LPCTSTR> *pExcludePlugins = nullptr);
 		void FreePlugins();
-		int NumPlugins() const { return (int)m_PluginList.size(); }
+		int NumPlugins() const { return static_cast<int>(m_PluginList.size()); }
 		CPlugin *GetPlugin(int Index);
 		const CPlugin *GetPlugin(int Index) const;
 		bool EnablePlugins(bool fEnable = true);
@@ -437,7 +439,7 @@ namespace TVTest
 		bool SetMenu(HMENU hmenu) const;
 		bool OnPluginCommand(LPCTSTR pszCommand);
 		bool OnProgramGuideCommand(
-			LPCTSTR pszCommand, UINT Action, const LibISDB::EventInfo *pEvent = nullptr,
+			LPCTSTR pszCommand, ProgramGuideCommandAction Action, const LibISDB::EventInfo *pEvent = nullptr,
 			const POINT *pCursorPos = nullptr, const RECT *pItemRect = nullptr);
 		bool SendProgramGuideInitializeEvent(HWND hwnd);
 		bool SendProgramGuideFinalizeEvent(HWND hwnd);

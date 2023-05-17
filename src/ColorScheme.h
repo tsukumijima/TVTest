@@ -24,6 +24,7 @@
 
 #include <vector>
 #include <memory>
+#include <bitset>
 #include "Theme.h"
 #include "Settings.h"
 
@@ -220,6 +221,7 @@ namespace TVTest
 			COLOR_PROGRAMGUIDE_CHANNELBACK1,
 			COLOR_PROGRAMGUIDE_CHANNELBACK2,
 			COLOR_PROGRAMGUIDE_CHANNELTEXT,
+			COLOR_PROGRAMGUIDE_CHANNELHIGHLIGHTTEXT,
 			COLOR_PROGRAMGUIDE_CURCHANNELBACK1,
 			COLOR_PROGRAMGUIDE_CURCHANNELBACK2,
 			COLOR_PROGRAMGUIDE_CURCHANNELTEXT,
@@ -419,11 +421,11 @@ namespace TVTest
 			None      = 0x0000U,
 			NoDefault = 0x0001U,	// デフォルトと同じ設定を保存しない
 			NoName    = 0x0002U,	// 名前を保存しない
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 		CColorScheme();
 		CColorScheme(const CColorScheme &ColorScheme);
-		~CColorScheme();
 
 		COLORREF GetColor(int Type) const;
 		COLORREF GetColor(LPCTSTR pszText) const;
@@ -491,7 +493,7 @@ namespace TVTest
 			int Color;
 		};
 
-		DWORD m_LoadedFlags[(NUM_COLORS + 31) / 32];
+		std::bitset<NUM_COLORS> m_LoadedFlags;
 		void SetLoadedFlag(int Color);
 		static const ColorInfo m_ColorInfoList[NUM_COLORS];
 		static const GradientInfo m_GradientInfoList[NUM_GRADIENTS];
@@ -499,12 +501,10 @@ namespace TVTest
 		static const Theme::BorderType m_CustomDefaultBorderList[NUM_BORDERS];
 	};
 
-	TVTEST_ENUM_FLAGS(CColorScheme::SaveFlag)
-
 	class CColorSchemeList
 	{
 	public:
-		int NumColorSchemes() const { return (int)m_List.size(); }
+		int NumColorSchemes() const { return static_cast<int>(m_List.size()); }
 		bool Add(CColorScheme *pColorScheme);
 		bool Insert(int Index, CColorScheme *pColorScheme);
 		bool Load(LPCTSTR pszDirectory);

@@ -52,7 +52,7 @@ bool CNotificationBar::Initialize(HINSTANCE hinst)
 		wc.cbWndExtra = 0;
 		wc.hInstance = hinst;
 		wc.hIcon = nullptr;
-		wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
+		wc.hCursor = nullptr;
 		wc.hbrBackground = nullptr;
 		wc.lpszMenuName = nullptr;
 		wc.lpszClassName = NOTIFICATION_BAR_WINDOW_CLASS;
@@ -65,18 +65,10 @@ bool CNotificationBar::Initialize(HINSTANCE hinst)
 
 
 CNotificationBar::CNotificationBar()
-	: m_fAnimate(true)
-	, m_BarHeight(0)
-	, m_TimerCount(0)
 {
 	GetSystemFont(DrawUtil::FontType::Message, &m_StyleFont);
 	m_StyleFont.LogFont.lfHeight = ::MulDiv(m_StyleFont.LogFont.lfHeight, 12, 10);
 	m_StyleFont.Size.Value = ::MulDiv(m_StyleFont.Size.Value, 12, 10);
-}
-
-
-CNotificationBar::~CNotificationBar()
-{
 }
 
 
@@ -106,11 +98,11 @@ void CNotificationBar::SetTheme(const Theme::CThemeManager *pThemeManager)
 {
 	pThemeManager->GetBackgroundStyle(Theme::CThemeManager::STYLE_NOTIFICATIONBAR, &m_BackStyle);
 
-	m_TextColor[(int)MessageType::Info] =
+	m_TextColor[static_cast<int>(MessageType::Info)] =
 		pThemeManager->GetColor(CColorScheme::COLOR_NOTIFICATIONBARTEXT);
-	m_TextColor[(int)MessageType::Warning] =
+	m_TextColor[static_cast<int>(MessageType::Warning)] =
 		pThemeManager->GetColor(CColorScheme::COLOR_NOTIFICATIONBARWARNINGTEXT);
-	m_TextColor[(int)MessageType::Error] =
+	m_TextColor[static_cast<int>(MessageType::Error)] =
 		pThemeManager->GetColor(CColorScheme::COLOR_NOTIFICATIONBARERRORTEXT);
 
 	if (m_hwnd != nullptr)
@@ -207,10 +199,10 @@ bool CNotificationBar::SetFont(const Style::Font &Font)
 
 void CNotificationBar::CalcBarHeight()
 {
-	int FontHeight = Style::GetFontHeight(
+	const int FontHeight = Style::GetFontHeight(
 		m_hwnd, m_Font.GetHandle(), m_Style.TextExtraHeight);
-	int IconHeight = m_Style.IconSize.Height + m_Style.IconMargin.Vert();
-	int TextHeight = FontHeight + m_Style.TextMargin.Vert();
+	const int IconHeight = m_Style.IconSize.Height + m_Style.IconMargin.Vert();
+	const int TextHeight = FontHeight + m_Style.TextMargin.Vert();
 
 	m_BarHeight = std::max(IconHeight, TextHeight) + m_Style.Padding.Vert();
 }
@@ -233,7 +225,7 @@ void CNotificationBar::GetAnimatedBarPosition(RECT *pRect, int Frame, int NumFra
 void CNotificationBar::SetHideTimer()
 {
 	if (!m_MessageQueue.empty()) {
-		DWORD Timeout = m_MessageQueue.front().Timeout;
+		const DWORD Timeout = m_MessageQueue.front().Timeout;
 		if (Timeout != 0)
 			BeginTimer(TIMER_ID_HIDE, Timeout);
 		else
@@ -359,14 +351,15 @@ LRESULT CNotificationBar::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM 
 	case WM_MBUTTONDBLCLK:
 	case WM_MOUSEMOVE:
 		{
-			POINT pt;
-			HWND hwndParent = ::GetParent(hwnd);
+			POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+			const HWND hwndParent = ::GetParent(hwnd);
 
-			pt.x = GET_X_LPARAM(lParam);
-			pt.y = GET_Y_LPARAM(lParam);
 			::MapWindowPoints(hwnd, hwndParent, &pt, 1);
 			return ::SendMessage(hwndParent, uMsg, wParam, MAKELPARAM(pt.x, pt.y));
 		}
+
+	case WM_NCHITTEST:
+		return HTTRANSPARENT;
 	}
 
 	return CCustomWindow::OnMessage(hwnd, uMsg, wParam, lParam);
@@ -381,28 +374,18 @@ void CNotificationBar::ApplyStyle()
 	CreateDrawFont(m_StyleFont, &m_Font);
 
 	/*
-	m_Icons[(int)MessageType::Info].Attach(
+	m_Icons[static_cast<int>(MessageType::Info)].Attach(
 		LoadSystemIcon(IDI_INFORMATION, m_Style.IconSize.Width, m_Style.IconSize.Height));
 	*/
-	m_Icons[(int)MessageType::Warning].Attach(
+	m_Icons[static_cast<int>(MessageType::Warning)].Attach(
 		LoadSystemIcon(IDI_WARNING, m_Style.IconSize.Width, m_Style.IconSize.Height));
-	m_Icons[(int)MessageType::Error].Attach(
+	m_Icons[static_cast<int>(MessageType::Error)].Attach(
 		LoadSystemIcon(IDI_ERROR, m_Style.IconSize.Width, m_Style.IconSize.Height));
 
 	CalcBarHeight();
 }
 
 
-
-
-CNotificationBar::NotificationBarStyle::NotificationBarStyle()
-	: Padding(4, 2, 4, 2)
-	, IconSize(::GetSystemMetrics(SM_CXSMICON), ::GetSystemMetrics(SM_CYSMICON))
-	, IconMargin(0, 0, 4, 0)
-	, TextMargin(0)
-	, TextExtraHeight(4)
-{
-}
 
 
 void CNotificationBar::NotificationBarStyle::SetStyle(const Style::CStyleManager *pStyleManager)

@@ -38,7 +38,6 @@ namespace TVTest
 	{
 	public:
 		CTSProcessorOptions(CTSProcessorManager &TSProcessorManager);
-		~CTSProcessorOptions();
 
 	// CSettingsBase
 		bool ReadSettings(CSettings &Settings) override;
@@ -67,11 +66,11 @@ namespace TVTest
 			INT_PTR DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lParam) override;
 		};
 
-		static const UINT WM_APP_UPDATEDEVICEFILTERLIST = WM_APP;
+		static constexpr UINT WM_APP_UPDATEDEVICEFILTERLIST = WM_APP;
 
 		CTSProcessorManager &m_TSProcessorManager;
 		std::vector<std::unique_ptr<CTSProcessorManager::CTSProcessorSettings>> m_SettingsList;
-		CTSProcessorManager::CTSProcessorSettings *m_pCurSettings;
+		CTSProcessorManager::CTSProcessorSettings *m_pCurSettings = nullptr;
 		CListView m_TunerMapListView;
 		std::vector<String> m_ModuleList;
 		std::map<String, ModuleInfo, StringFunctional::LessNoCase> m_ModuleInfoMap;

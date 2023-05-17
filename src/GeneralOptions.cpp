@@ -33,16 +33,6 @@ namespace TVTest
 {
 
 
-CGeneralOptions::CGeneralOptions()
-	: m_DefaultDriverType(DefaultDriverType::Last)
-	, m_fResident(false)
-	, m_fKeepSingleTask(false)
-	, m_fStandaloneProgramGuide(false)
-	, m_fEnable1SegFallback(true)
-{
-}
-
-
 CGeneralOptions::~CGeneralOptions()
 {
 	Destroy();
@@ -97,7 +87,7 @@ bool CGeneralOptions::ReadSettings(CSettings &Settings)
 bool CGeneralOptions::WriteSettings(CSettings &Settings)
 {
 	Settings.Write(TEXT("DriverDirectory"), m_BonDriverDirectory);
-	Settings.Write(TEXT("DefaultDriverType"), (int)m_DefaultDriverType);
+	Settings.Write(TEXT("DefaultDriverType"), static_cast<int>(m_DefaultDriverType));
 	Settings.Write(TEXT("DefaultDriver"), m_DefaultBonDriverName);
 	Settings.Write(TEXT("Driver"), GetAppClass().CoreEngine.GetDriverFileName());
 	Settings.Write(TEXT("Resident"), m_fResident);
@@ -175,7 +165,7 @@ INT_PTR CGeneralOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPa
 	switch (uMsg) {
 	case WM_INITDIALOG:
 		{
-			CAppMain &App = GetAppClass();
+			const CAppMain &App = GetAppClass();
 
 			::SendDlgItemMessage(hDlg, IDC_OPTIONS_DRIVERDIRECTORY, EM_LIMITTEXT, MAX_PATH - 1, 0);
 			::SetDlgItemText(hDlg, IDC_OPTIONS_DRIVERDIRECTORY, m_BonDriverDirectory.c_str());
@@ -184,7 +174,7 @@ INT_PTR CGeneralOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPa
 			::CheckRadioButton(
 				hDlg, IDC_OPTIONS_DEFAULTDRIVER_NONE,
 				IDC_OPTIONS_DEFAULTDRIVER_CUSTOM,
-				(int)m_DefaultDriverType + IDC_OPTIONS_DEFAULTDRIVER_NONE);
+				static_cast<int>(m_DefaultDriverType) + IDC_OPTIONS_DEFAULTDRIVER_NONE);
 			EnableDlgItems(
 				hDlg, IDC_OPTIONS_DEFAULTDRIVER,
 				IDC_OPTIONS_DEFAULTDRIVER_BROWSE,
@@ -292,7 +282,7 @@ INT_PTR CGeneralOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPa
 		return TRUE;
 
 	case WM_NOTIFY:
-		switch (((LPNMHDR)lParam)->code) {
+		switch (reinterpret_cast<LPNMHDR>(lParam)->code) {
 		case PSN_APPLY:
 			{
 				TCHAR szDirectory[MAX_PATH];
@@ -301,8 +291,8 @@ INT_PTR CGeneralOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPa
 					szDirectory, lengthof(szDirectory));
 				m_BonDriverDirectory = szDirectory;
 
-				m_DefaultDriverType = (DefaultDriverType)
-					(GetCheckedRadioButton(
+				m_DefaultDriverType = static_cast<DefaultDriverType>(
+					GetCheckedRadioButton(
 						hDlg,
 						IDC_OPTIONS_DEFAULTDRIVER_NONE,
 						IDC_OPTIONS_DEFAULTDRIVER_CUSTOM) -
@@ -314,7 +304,7 @@ INT_PTR CGeneralOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPa
 					szDefaultBonDriver, lengthof(szDefaultBonDriver));
 				m_DefaultBonDriverName = szDefaultBonDriver;
 
-				bool fResident = DlgCheckBox_IsChecked(hDlg, IDC_OPTIONS_RESIDENT);
+				const bool fResident = DlgCheckBox_IsChecked(hDlg, IDC_OPTIONS_RESIDENT);
 				if (fResident != m_fResident) {
 					m_fResident = fResident;
 					SetUpdateFlag(UPDATE_RESIDENT);
@@ -326,7 +316,7 @@ INT_PTR CGeneralOptions::DlgProc(HWND hDlg, UINT uMsg, WPARAM wParam, LPARAM lPa
 				m_fStandaloneProgramGuide =
 					DlgCheckBox_IsChecked(hDlg, IDC_OPTIONS_STANDALONEPROGRAMGUIDE);
 
-				bool fEnable1SegFallback =
+				const bool fEnable1SegFallback =
 					DlgCheckBox_IsChecked(hDlg, IDC_OPTIONS_ENABLE1SEGFALLBACK);
 				if (fEnable1SegFallback != m_fEnable1SegFallback) {
 					m_fEnable1SegFallback = fEnable1SegFallback;

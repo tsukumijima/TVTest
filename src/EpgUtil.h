@@ -51,8 +51,8 @@ namespace TVTest
 			Year          = 0x0008U,
 			UndecidedText = 0x0010U,
 			NoConvert     = 0x0020U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
-		TVTEST_ENUM_FLAGS(FormatEventTimeFlag)
 
 		static constexpr int MAX_EVENT_TIME_LENGTH = 64;
 
@@ -142,7 +142,7 @@ namespace TVTest
 
 		static UINT IconFlag(int Icon) { return 1 << Icon; }
 
-		CEpgIcons();
+		CEpgIcons() = default;
 		~CEpgIcons();
 
 		CEpgIcons(const CEpgIcons &) = delete;
@@ -163,12 +163,12 @@ namespace TVTest
 		static unsigned int GetEventIcons(const LibISDB::EventInfo *pEventInfo);
 
 	protected:
-		HDC m_hdc;
-		HBITMAP m_hbmOld;
-		int m_IconWidth;
-		int m_IconHeight;
+		HDC m_hdc = nullptr;
+		HBITMAP m_hbmOld = nullptr;
+		int m_IconWidth = 0;
+		int m_IconHeight = 0;
 		DrawUtil::COffscreen m_StretchBuffer;
-		unsigned int m_StretchedIcons;
+		unsigned int m_StretchedIcons = 0;
 	};
 
 	class CEpgTheme
@@ -200,6 +200,7 @@ namespace TVTest
 			None     = 0x0000U,
 			Current  = 0x0001U,
 			NoBorder = 0x0002U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 		enum class DrawContentBackgroundFlag : unsigned int {
@@ -207,6 +208,7 @@ namespace TVTest
 			Current   = 0x0001U,
 			Separator = 0x0002U,
 			NoBorder  = 0x0004U,
+			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
 		CEpgTheme();
@@ -231,9 +233,6 @@ namespace TVTest
 
 		Theme::ThemeColor m_ColorList[NUM_COLORS];
 	};
-
-	TVTEST_ENUM_FLAGS(CEpgTheme::ContentStyleFlag)
-	TVTEST_ENUM_FLAGS(CEpgTheme::DrawContentBackgroundFlag)
 
 }	// namespace TVTest
 

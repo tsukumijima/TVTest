@@ -54,15 +54,6 @@ static int MyTrackPopupMenu(
 
 
 
-CMainMenu::CMainMenu()
-	: m_hmenu(nullptr)
-	, m_hmenuPopup(nullptr)
-	, m_hmenuShow(nullptr)
-	, m_fPopup(false)
-{
-}
-
-
 CMainMenu::~CMainMenu()
 {
 	Destroy();
@@ -104,7 +95,7 @@ bool CMainMenu::Show(UINT Flags, int x, int y, HWND hwnd, bool fToggle, const st
 
 		if (pItemList != nullptr && !pItemList->empty()) {
 			hmenuCustom = ::CreatePopupMenu();
-			int OrigItemCount = ::GetMenuItemCount(m_hmenuPopup);
+			const int OrigItemCount = ::GetMenuItemCount(m_hmenuPopup);
 			const CCommandManager &CommandManager = GetAppClass().CommandManager;
 
 			MENUITEMINFO mii;
@@ -114,14 +105,14 @@ bool CMainMenu::Show(UINT Flags, int x, int y, HWND hwnd, bool fToggle, const st
 			mii.fMask = MIIM_FTYPE | MIIM_STATE | MIIM_ID | MIIM_SUBMENU | MIIM_STRING;
 			mii.dwTypeData = szText;
 
-			for (int ID : *pItemList) {
+			for (const int ID : *pItemList) {
 				if (ID < 0) {
 					::AppendMenu(hmenuCustom, MF_SEPARATOR, 0, nullptr);
 				} else if (ID >= CM_COMMAND_FIRST) {
 					// トップレベルの項目にあればコピー
 					int i;
 					for (i = 0; i < OrigItemCount; i++) {
-						if (::GetMenuItemID(m_hmenuPopup, i) == (UINT)ID)
+						if (::GetMenuItemID(m_hmenuPopup, i) == static_cast<UINT>(ID))
 							break;
 					}
 					if (i < OrigItemCount) {
@@ -129,7 +120,7 @@ bool CMainMenu::Show(UINT Flags, int x, int y, HWND hwnd, bool fToggle, const st
 						if (::GetMenuItemInfo(m_hmenuPopup, i, TRUE, &mii))
 							::InsertMenuItem(hmenuCustom, ::GetMenuItemCount(hmenuCustom), TRUE, &mii);
 					} else if (CommandManager.GetCommandShortText(ID, szText, lengthof(szText)) > 0) {
-						CCommandManager::CommandState State = CommandManager.GetCommandState(ID);
+						const CCommandManager::CommandState State = CommandManager.GetCommandState(ID);
 						UINT Flags = MF_STRING;
 						if (!!(State & CCommandManager::CommandState::Disabled))
 							Flags |= MF_GRAYED;
@@ -175,7 +166,7 @@ bool CMainMenu::Show(UINT Flags, int x, int y, HWND hwnd, bool fToggle, const st
 bool CMainMenu::PopupSubMenu(
 	int SubMenu, UINT Flags, HWND hwnd, const POINT *pPos, bool fToggle, const RECT *pExcludeRect)
 {
-	HMENU hmenu = GetSubMenu(SubMenu);
+	const HMENU hmenu = GetSubMenu(SubMenu);
 
 	if (hmenu == nullptr)
 		return false;
@@ -249,19 +240,6 @@ bool CMainMenu::SetAccelerator(CAccelerator *pAccelerator)
 
 
 
-CMenuPainter::CMenuPainter()
-	: m_hwnd(nullptr)
-	, m_DPI(0)
-	, m_fFlatMenu(false)
-{
-}
-
-
-CMenuPainter::~CMenuPainter()
-{
-}
-
-
 void CMenuPainter::Initialize(HWND hwnd, int DPI)
 {
 	m_hwnd = hwnd;
@@ -327,7 +305,7 @@ void CMenuPainter::DrawItemBackground(HDC hdc, const RECT &Rect, UINT State)
 		m_UxTheme.DrawBackground(
 			hdc, MENU_POPUPITEM, ItemStateToID(State), MENU_POPUPBACKGROUND, 0, &Rect);
 	} else {
-		bool fSelected = (State & ODS_SELECTED) != 0;
+		const bool fSelected = (State & ODS_SELECTED) != 0;
 		if (m_fFlatMenu) {
 			::FillRect(
 				hdc, &Rect,
@@ -497,8 +475,8 @@ void CMenuPainter::DrawSeparator(HDC hdc, const RECT &Rect)
 
 int CMenuPainter::ItemStateToID(UINT State) const
 {
-	bool fDisabled = (State & (ODS_INACTIVE | ODS_DISABLED)) != 0;
-	bool fHot = (State & (ODS_HOTLIGHT | ODS_SELECTED)) != 0;
+	const bool fDisabled = (State & (ODS_INACTIVE | ODS_DISABLED)) != 0;
+	const bool fHot = (State & (ODS_HOTLIGHT | ODS_SELECTED)) != 0;
 	int StateID;
 	if (fDisabled) {
 		StateID = fHot ? MPI_DISABLEDHOT : MPI_DISABLED;
@@ -517,14 +495,6 @@ bool CMenuPainter::IsThemed() const
 }
 
 
-
-
-CChannelMenuLogo::CChannelMenuLogo()
-	: m_LogoWidth(26)
-	, m_LogoHeight(16)
-	, m_fNoFrame(false)
-{
-}
 
 
 bool CChannelMenuLogo::Initialize(int IconHeight, InitializeFlag Flags)
@@ -553,7 +523,7 @@ bool CChannelMenuLogo::Initialize(int IconHeight, InitializeFlag Flags)
 
 bool CChannelMenuLogo::DrawLogo(HDC hdc, int x, int y, const CChannelInfo &Channel)
 {
-	HBITMAP hbmLogo = GetAppClass().LogoManager.GetAssociatedLogoBitmap(
+	const HBITMAP hbmLogo = GetAppClass().LogoManager.GetAssociatedLogoBitmap(
 		Channel.GetNetworkID(), Channel.GetServiceID(),
 		m_LogoHeight <= 24 ? CLogoManager::LOGOTYPE_SMALL : CLogoManager::LOGOTYPE_BIG);
 	if (hbmLogo == nullptr)
@@ -612,9 +582,8 @@ class CChannelMenuItem
 	const CChannelInfo *m_pChannelInfo;
 	struct Event
 	{
-		bool fValid;
+		bool fValid = false;
 		LibISDB::EventInfo EventInfo;
-		Event() : fValid(false) {}
 	};
 	Event m_EventList[2];
 
@@ -688,18 +657,6 @@ const LibISDB::EventInfo *CChannelMenuItem::GetEventInfo(int Index) const
 }
 
 
-CChannelMenu::CChannelMenu()
-	: m_Flags(CreateFlag::None)
-	, m_hwnd(nullptr)
-	, m_hmenu(nullptr)
-	, m_TextHeight(0)
-	, m_ChannelNameWidth(0)
-	, m_EventNameWidth(0)
-	, m_MenuLogoMargin(3)
-{
-}
-
-
 CChannelMenu::~CChannelMenu()
 {
 	Destroy();
@@ -738,10 +695,10 @@ bool CChannelMenu::Create(
 	if (m_Margins.cxRightWidth < 2)
 		m_Margins.cxRightWidth = 2;
 
-	HDC hdc = ::GetDC(hwnd);
+	const HDC hdc = ::GetDC(hwnd);
 
 	CreateFont(hdc);
-	HFONT hfontOld = DrawUtil::SelectObject(hdc, m_Font);
+	const HFONT hfontOld = DrawUtil::SelectObject(hdc, m_Font);
 
 	LibISDB::EPGDatabase &EPGDatabase = GetAppClass().EPGDatabase;
 	const bool fCurServices = !!(Flags & CreateFlag::CurrentServices);
@@ -771,8 +728,8 @@ bool CChannelMenu::Create(
 
 		if (i == CurChannel)
 			DrawUtil::SelectObject(hdc, m_FontCurrent);
-		StringPrintf(
-			szText, TEXT("%d: %s"),
+		StringFormat(
+			szText, TEXT("{}: {}"),
 			pChInfo->GetChannelNo(), pChInfo->GetName());
 		/*
 		m_MenuPainter.GetItemTextExtent(
@@ -918,12 +875,12 @@ bool CChannelMenu::OnDrawItem(HWND hwnd, WPARAM wParam, LPARAM lParam)
 	TCHAR szText[256];
 
 	m_MenuPainter.DrawItemBackground(pdis->hDC, pdis->rcItem, pdis->itemState);
-	COLORREF crTextColor = m_MenuPainter.GetTextColor(pdis->itemState);
+	const COLORREF crTextColor = m_MenuPainter.GetTextColor(pdis->itemState);
 
-	HFONT hfontOld = DrawUtil::SelectObject(
+	const HFONT hfontOld = DrawUtil::SelectObject(
 		pdis->hDC, (pdis->itemState & ODS_CHECKED) == 0 ? m_Font : m_FontCurrent);
-	int OldBkMode = ::SetBkMode(pdis->hDC, TRANSPARENT);
-	COLORREF crOldTextColor = ::SetTextColor(pdis->hDC, crTextColor);
+	const int OldBkMode = ::SetBkMode(pdis->hDC, TRANSPARENT);
+	const COLORREF crOldTextColor = ::SetTextColor(pdis->hDC, crTextColor);
 
 	RECT rc;
 	rc.left = pdis->rcItem.left + m_Margins.cxLeftWidth;
@@ -940,8 +897,8 @@ bool CChannelMenu::OnDrawItem(HWND hwnd, WPARAM wParam, LPARAM lParam)
 	}
 
 	rc.right = rc.left + m_ChannelNameWidth;
-	StringPrintf(
-		szText, TEXT("%d: %s"),
+	StringFormat(
+		szText, TEXT("{}: {}"),
 		pChInfo->GetChannelNo(), pChInfo->GetName());
 	::DrawText(
 		pdis->hDC, szText, -1, &rc,
@@ -950,7 +907,7 @@ bool CChannelMenu::OnDrawItem(HWND hwnd, WPARAM wParam, LPARAM lParam)
 	if (!!(m_Flags & CreateFlag::ShowEventInfo)) {
 		const LibISDB::EventInfo *pEventInfo = pItem->GetEventInfo(0);
 		if (pEventInfo != nullptr) {
-			int Length = GetEventText(pEventInfo, szText, lengthof(szText));
+			const int Length = GetEventText(pEventInfo, szText, lengthof(szText));
 			rc.left = rc.right + m_TextHeight;
 			rc.right = pdis->rcItem.right - m_Margins.cxRightWidth;
 			::DrawText(
@@ -969,8 +926,8 @@ bool CChannelMenu::OnDrawItem(HWND hwnd, WPARAM wParam, LPARAM lParam)
 
 bool CChannelMenu::OnMenuSelect(HWND hwnd, WPARAM wParam, LPARAM lParam)
 {
-	HMENU hmenu = reinterpret_cast<HMENU>(lParam);
-	UINT Command = LOWORD(wParam);
+	const HMENU hmenu = reinterpret_cast<HMENU>(lParam);
+	const UINT Command = LOWORD(wParam);
 
 	if (hmenu == nullptr || hmenu != m_hmenu || hwnd != m_hwnd || HIWORD(wParam) == 0xFFFF
 			|| Command < m_FirstCommand || Command > m_LastCommand) {
@@ -996,10 +953,7 @@ bool CChannelMenu::OnMenuSelect(HWND hwnd, WPARAM wParam, LPARAM lParam)
 			}
 			if (pEventInfo1 != nullptr) {
 				TCHAR szText[256 * 2 + 1];
-				int Length;
-				POINT pt;
-
-				Length = GetEventText(pEventInfo1, szText, lengthof(szText) / 2);
+				int Length = GetEventText(pEventInfo1, szText, lengthof(szText) / 2);
 				pEventInfo2 = pItem->GetEventInfo(&GetAppClass().EPGDatabase, 1);
 				if (pEventInfo2 != nullptr) {
 					szText[Length++] = _T('\r');
@@ -1007,6 +961,8 @@ bool CChannelMenu::OnMenuSelect(HWND hwnd, WPARAM wParam, LPARAM lParam)
 					GetEventText(pEventInfo2, szText + Length, lengthof(szText) / 2);
 				}
 				m_Tooltip.SetText(1, szText);
+
+				POINT pt;
 				::GetCursorPos(&pt);
 				pt.x += 16;
 				pt.y +=
@@ -1080,8 +1036,8 @@ int CChannelMenu::GetEventText(
 	EpgUtil::FormatEventTime(
 		*pEventInfo, szTime, lengthof(szTime), EpgUtil::FormatEventTimeFlag::Hour2Digits);
 
-	return StringPrintf(
-		pszText, MaxLength, TEXT("%s %s"), szTime, pEventInfo->EventName.c_str());
+	return static_cast<int>(StringFormat(
+		pszText, MaxLength, TEXT("{} {}"), szTime, pEventInfo->EventName));
 }
 
 
@@ -1096,7 +1052,7 @@ void CChannelMenu::CreateFont(HDC hdc)
 	if (hdc != nullptr)
 		m_TextHeight = m_Font.GetHeight(hdc);
 	else
-		m_TextHeight = abs(lf.lfHeight);
+		m_TextHeight = std::abs(lf.lfHeight);
 }
 
 
@@ -1109,28 +1065,19 @@ void CChannelMenu::GetBaseTime(LibISDB::DateTime *pTime)
 
 
 
-CPopupMenu::CPopupMenu()
-	: m_hmenu(nullptr)
-{
-}
-
-
 CPopupMenu::CPopupMenu(HINSTANCE hinst, LPCTSTR pszName)
-	: m_hmenu(nullptr)
 {
 	Load(hinst, pszName);
 }
 
 
 CPopupMenu::CPopupMenu(HINSTANCE hinst, UINT ID)
-	: m_hmenu(nullptr)
 {
 	Load(hinst, ID);
 }
 
 
 CPopupMenu::CPopupMenu(HMENU hmenu)
-	: m_hmenu(nullptr)
 {
 	Attach(hmenu);
 }
@@ -1260,7 +1207,7 @@ bool CPopupMenu::CheckItem(UINT ID, bool fCheck)
 {
 	if (m_hmenu == nullptr)
 		return false;
-	return ::CheckMenuItem(m_hmenu, ID, MF_BYCOMMAND | (fCheck ? MFS_CHECKED : MFS_UNCHECKED)) != (DWORD)-1;
+	return ::CheckMenuItem(m_hmenu, ID, MF_BYCOMMAND | (fCheck ? MFS_CHECKED : MFS_UNCHECKED)) != static_cast<DWORD>(-1);
 }
 
 
@@ -1333,12 +1280,6 @@ int CPopupMenu::Show(
 
 
 
-CIconMenu::CIconMenu()
-	: m_hmenu(nullptr)
-{
-}
-
-
 CIconMenu::~CIconMenu()
 {
 	Finalize();
@@ -1353,7 +1294,7 @@ bool CIconMenu::Initialize(HMENU hmenu, HINSTANCE hinst, const ItemInfo *pItemLi
 		return false;
 
 	for (int i = 0; i < ItemCount; i++) {
-		HICON hicon = LoadIconStandardSize(hinst, pItemList[i].pszIcon, IconSizeType::Small);
+		const HICON hicon = LoadIconStandardSize(hinst, pItemList[i].pszIcon, IconSizeType::Small);
 
 		if (hicon != nullptr) {
 			ICONINFO ii;
@@ -1363,12 +1304,12 @@ bool CIconMenu::Initialize(HMENU hmenu, HINSTANCE hinst, const ItemInfo *pItemLi
 					ii.hbmColor は DDB になっていて、そのままメニューの画像に指定すると
 					アルファチャンネルが無視されるため、DIB に変換する
 				*/
-				HBITMAP hbm = (HBITMAP)::CopyImage(ii.hbmColor, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION);
+				const HBITMAP hbm = static_cast<HBITMAP>(::CopyImage(ii.hbmColor, IMAGE_BITMAP, 0, 0, LR_CREATEDIBSECTION));
 				if (hbm != nullptr) {
 					m_BitmapList.push_back(hbm);
 					ItemIconInfo Item;
 					Item.ID = pItemList[i].ID;
-					Item.Icon = (int)m_BitmapList.size() - 1;
+					Item.Icon = static_cast<int>(m_BitmapList.size()) - 1;
 					m_ItemList.push_back(Item);
 				}
 				::DeleteObject(ii.hbmColor);
@@ -1403,8 +1344,8 @@ bool CIconMenu::OnInitMenuPopup(HWND hwnd, HMENU hmenu)
 
 	MENUITEMINFO mii;
 	mii.cbSize = sizeof(mii);
-	int Count = ::GetMenuItemCount(hmenu);
-	int j = 0;
+	const int Count = ::GetMenuItemCount(hmenu);
+
 	for (int i = 0; i < Count; i++) {
 		mii.fMask = MIIM_ID | MIIM_STATE | MIIM_DATA;
 		if (::GetMenuItemInfo(hmenu, i, TRUE, &mii)) {
@@ -1521,14 +1462,6 @@ bool CDropDownMenu::Initialize(HINSTANCE hinst)
 }
 
 
-CDropDownMenu::CDropDownMenu()
-	: m_hwnd(nullptr)
-	, m_hwndMessage(nullptr)
-	, m_fDarkMode(false)
-{
-}
-
-
 void CDropDownMenu::Clear()
 {
 	m_ItemList.clear();
@@ -1546,7 +1479,7 @@ bool CDropDownMenu::AppendItem(CItem *pItem)
 
 bool CDropDownMenu::InsertItem(int Index, CItem *pItem)
 {
-	if (pItem == nullptr || Index < 0 || (size_t)Index > m_ItemList.size())
+	if (pItem == nullptr || Index < 0 || static_cast<size_t>(Index) > m_ItemList.size())
 		return false;
 	auto it = m_ItemList.begin();
 	std::advance(it, Index);
@@ -1581,7 +1514,7 @@ bool CDropDownMenu::InsertSeparator(int Index)
 
 bool CDropDownMenu::DeleteItem(int Command)
 {
-	int Index = CommandToIndex(Command);
+	const int Index = CommandToIndex(Command);
 
 	if (Index < 0)
 		return false;
@@ -1594,7 +1527,7 @@ bool CDropDownMenu::DeleteItem(int Command)
 
 bool CDropDownMenu::SetItemText(int Command, LPCTSTR pszText)
 {
-	int Index = CommandToIndex(Command);
+	const int Index = CommandToIndex(Command);
 
 	if (Index < 0)
 		return false;
@@ -1609,7 +1542,7 @@ int CDropDownMenu::CommandToIndex(int Command) const
 		return -1;
 	for (size_t i = 0; i < m_ItemList.size(); i++) {
 		if (m_ItemList[i]->GetCommand() == Command)
-			return (int)i;
+			return static_cast<int>(i);
 	}
 	return -1;
 }
@@ -1620,14 +1553,14 @@ bool CDropDownMenu::Show(HWND hwndOwner, HWND hwndMessage, const POINT *pPos, in
 	if (m_ItemList.empty() || m_hwnd != nullptr)
 		return false;
 
-	HMONITOR hMonitor = ::MonitorFromPoint(*pPos, MONITOR_DEFAULTTONEAREST);
+	const HMONITOR hMonitor = ::MonitorFromPoint(*pPos, MONITOR_DEFAULTTONEAREST);
 
 	if (DPI != 0)
 		m_DPI = DPI;
 	else
 		m_DPI = GetMonitorDPI(hMonitor);
 
-	HWND hwnd = ::CreateWindowEx(
+	const HWND hwnd = ::CreateWindowEx(
 		WS_EX_NOACTIVATE | WS_EX_TOPMOST, DROPDOWNMENU_WINDOW_CLASS,
 		nullptr, WS_POPUP, 0, 0, 0, 0, hwndOwner, nullptr, m_hinst, this);
 	if (hwnd == nullptr)
@@ -1636,11 +1569,11 @@ bool CDropDownMenu::Show(HWND hwndOwner, HWND hwndMessage, const POINT *pPos, in
 	m_HotItem = CommandToIndex(CurItem);
 	m_hwndMessage = hwndMessage;
 
-	HDC hdc = ::GetDC(hwnd);
-	HFONT hfontOld = DrawUtil::SelectObject(hdc, m_Font);
+	const HDC hdc = ::GetDC(hwnd);
+	const HFONT hfontOld = DrawUtil::SelectObject(hdc, m_Font);
 	int MaxWidth = 0;
 	for (const auto &Item : m_ItemList) {
-		int Width = Item->GetWidth(hdc);
+		const int Width = Item->GetWidth(hdc);
 		if (Width > MaxWidth)
 			MaxWidth = Width;
 	}
@@ -1653,30 +1586,30 @@ bool CDropDownMenu::Show(HWND hwndOwner, HWND hwndMessage, const POINT *pPos, in
 
 	const int HorzMargin = m_WindowMargin.cxLeftWidth + m_WindowMargin.cxRightWidth;
 	const int VertMargin = m_WindowMargin.cyTopHeight + m_WindowMargin.cyBottomHeight;
-	m_MaxRows = (int)m_ItemList.size();
+	m_MaxRows = static_cast<int>(m_ItemList.size());
 	int Columns = 1;
 	int x = pPos->x, y = pPos->y;
 	MONITORINFO mi;
 	mi.cbSize = sizeof(mi);
 	if (::GetMonitorInfo(hMonitor, &mi)) {
-		int Rows = ((mi.rcMonitor.bottom - y) - VertMargin) / m_ItemHeight;
+		const int Rows = ((mi.rcMonitor.bottom - y) - VertMargin) / m_ItemHeight;
 
-		if ((int)m_ItemList.size() > Rows) {
-			int MaxColumns = ((mi.rcMonitor.right - mi.rcMonitor.left) - HorzMargin) / m_ItemWidth;
+		if (static_cast<int>(m_ItemList.size()) > Rows) {
+			const int MaxColumns = ((mi.rcMonitor.right - mi.rcMonitor.left) - HorzMargin) / m_ItemWidth;
 			if (MaxColumns > 1) {
-				if (Rows * MaxColumns >= (int)m_ItemList.size()) {
-					Columns = ((int)m_ItemList.size() + Rows - 1) / Rows;
+				if (Rows * MaxColumns >= static_cast<int>(m_ItemList.size())) {
+					Columns = (static_cast<int>(m_ItemList.size()) + Rows - 1) / Rows;
 					m_MaxRows = Rows;
 				} else {
 					Columns = MaxColumns;
-					m_MaxRows = ((int)m_ItemList.size() + Columns - 1) / Columns;
-					if ((Columns - 1) * m_MaxRows >= (int)m_ItemList.size())
+					m_MaxRows = (static_cast<int>(m_ItemList.size()) + Columns - 1) / Columns;
+					if ((Columns - 1) * m_MaxRows >= static_cast<int>(m_ItemList.size()))
 						Columns--;
 				}
 			}
 		}
-		int Width = Columns * m_ItemWidth + HorzMargin;
-		int Height = m_MaxRows * m_ItemHeight + VertMargin;
+		const int Width = Columns * m_ItemWidth + HorzMargin;
+		const int Height = m_MaxRows * m_ItemHeight + VertMargin;
 		if (x + Width > mi.rcMonitor.right)
 			x = std::max(mi.rcMonitor.right - Width, 0L);
 		if (y + Height > mi.rcMonitor.bottom)
@@ -1712,7 +1645,7 @@ bool CDropDownMenu::GetPosition(RECT *pRect)
 
 bool CDropDownMenu::GetItemRect(int Index, RECT *pRect) const
 {
-	if (Index < 0 || (size_t)Index >= m_ItemList.size())
+	if (Index < 0 || static_cast<size_t>(Index) >= m_ItemList.size())
 		return false;
 	pRect->left = (Index / m_MaxRows) * m_ItemWidth;
 	pRect->top = (Index % m_MaxRows) * m_ItemHeight;
@@ -1725,11 +1658,9 @@ bool CDropDownMenu::GetItemRect(int Index, RECT *pRect) const
 
 int CDropDownMenu::HitTest(int x, int y) const
 {
-	POINT pt;
+	const POINT pt = {x, y};
 
-	pt.x = x;
-	pt.y = y;
-	for (int i = 0; i < (int)m_ItemList.size(); i++) {
+	for (int i = 0; i < static_cast<int>(m_ItemList.size()); i++) {
 		RECT rc;
 
 		GetItemRect(i, &rc);
@@ -1755,16 +1686,16 @@ void CDropDownMenu::UpdateItem(int Index) const
 
 void CDropDownMenu::Draw(HDC hdc, const RECT *pPaintRect)
 {
-	HFONT hfontOld = DrawUtil::SelectObject(hdc, m_Font);
-	int OldBkMode = ::SetBkMode(hdc, TRANSPARENT);
-	COLORREF OldTextColor = ::GetTextColor(hdc);
+	const HFONT hfontOld = DrawUtil::SelectObject(hdc, m_Font);
+	const int OldBkMode = ::SetBkMode(hdc, TRANSPARENT);
+	const COLORREF OldTextColor = ::GetTextColor(hdc);
 	RECT rc;
 
 	::GetClientRect(m_hwnd, &rc);
 	m_MenuPainter.DrawBackground(hdc, rc);
 	m_MenuPainter.DrawBorder(hdc, rc);
 
-	for (int i = 0; i < (int)m_ItemList.size(); i++) {
+	for (int i = 0; i < static_cast<int>(m_ItemList.size()); i++) {
 		GetItemRect(i, &rc);
 		if (rc.bottom > pPaintRect->top && rc.top < pPaintRect->bottom) {
 			CItem *pItem = m_ItemList[i].get();
@@ -1843,10 +1774,10 @@ LRESULT CALLBACK CDropDownMenu::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 	case WM_MOUSEMOVE:
 		{
 			CDropDownMenu *pThis = GetThis(hwnd);
-			int Item = pThis->HitTest(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
+			const int Item = pThis->HitTest(GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam));
 
 			if (Item != pThis->m_HotItem) {
-				int OldHotItem = pThis->m_HotItem;
+				const int OldHotItem = pThis->m_HotItem;
 
 				pThis->m_HotItem = Item;
 				if (OldHotItem >= 0)
@@ -1906,12 +1837,6 @@ LRESULT CALLBACK CDropDownMenu::WndProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPA
 CDropDownMenu::CItem::CItem(int Command, LPCTSTR pszText)
 	: m_Command(Command)
 	, m_Text(StringFromCStr(pszText))
-	, m_Width(0)
-{
-}
-
-
-CDropDownMenu::CItem::~CItem()
 {
 }
 
@@ -1927,7 +1852,7 @@ int CDropDownMenu::CItem::GetWidth(HDC hdc)
 	if (!m_Text.empty() && m_Width == 0) {
 		SIZE sz;
 
-		::GetTextExtentPoint32(hdc, m_Text.data(), (int)m_Text.length(), &sz);
+		::GetTextExtentPoint32(hdc, m_Text.data(), static_cast<int>(m_Text.length()), &sz);
 		m_Width = sz.cx;
 	}
 	return m_Width;
@@ -1940,7 +1865,7 @@ void CDropDownMenu::CItem::Draw(HDC hdc, const RECT *pRect)
 		RECT rc = *pRect;
 
 		::DrawText(
-			hdc, m_Text.data(), (int)m_Text.length(), &rc,
+			hdc, m_Text.data(), static_cast<int>(m_Text.length()), &rc,
 			DT_LEFT | DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX);
 	}
 }
