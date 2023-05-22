@@ -23,6 +23,7 @@
 
 
 #include "DrawUtil.h"
+#include "Graphics.h"
 #include "WindowUtil.h"
 
 
@@ -48,6 +49,12 @@ namespace TVTest
 			TVTEST_ENUM_FLAGS_TRAILER
 		};
 
+		enum class ImageFlag : unsigned int {
+			None         = 0x0000U,
+			DirectSource = 0x0001U,
+			TVTEST_ENUM_FLAGS_TRAILER
+		};
+
 		enum class ImageEffect : unsigned int {
 			None  = 0x0000U,
 			Gloss = 0x0001U,
@@ -63,9 +70,11 @@ namespace TVTest
 
 		bool Create(HWND hwndParent, bool fLayeredWindow = false);
 		bool Destroy();
+		bool IsCreated() const;
 		bool Show(DWORD Time = 0, bool fAnimation = false);
 		bool Hide();
 		bool IsVisible() const;
+		bool Update();
 		bool SetText(LPCTSTR pszText, HBITMAP hbmIcon = nullptr, int IconWidth = 0, int IconHeight = 0, ImageEffect Effect = ImageEffect::None);
 		bool SetPosition(int Left, int Top, int Width, int Height);
 		void GetPosition(int *pLeft, int *pTop, int *pWidth, int *pHeight) const;
@@ -74,7 +83,7 @@ namespace TVTest
 		bool SetTextStyle(TextStyle Style);
 		bool SetFont(const LOGFONT &Font);
 		bool CalcTextSize(SIZE *pSize);
-		bool SetImage(HBITMAP hbm, ImageEffect Effect = ImageEffect::None);
+		bool SetImage(HBITMAP hbm, ImageEffect Effect = ImageEffect::None, ImageFlag Flags = ImageFlag::None);
 		void OnParentMove();
 
 	private:
@@ -89,6 +98,7 @@ namespace TVTest
 		int m_IconHeight = 0;
 		HBITMAP m_hbm = nullptr;
 		ImageEffect m_ImageEffect = ImageEffect::None;
+		ImageFlag m_ImageFlags = ImageFlag::None;
 		struct {
 			int Left, Top, Width, Height;
 		} m_Position = {0, 0, 0, 0};
@@ -101,6 +111,7 @@ namespace TVTest
 
 		void Draw(HDC hdc, const RECT &PaintRect) const;
 		void DrawImageEffect(HDC hdc, const RECT *pRect) const;
+		void DrawImageEffect(Graphics::CCanvas &Canvas, const RECT *pRect) const;
 		void UpdateLayeredWindow();
 
 		static const LPCTSTR m_pszWindowClass;
