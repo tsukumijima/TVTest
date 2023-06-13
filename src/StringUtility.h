@@ -37,8 +37,6 @@ namespace TVTest
 	bool UInt64ToString(ULONGLONG Value, LPTSTR pszString, int MaxLength, int Radix = 10);
 	bool StringIsDigit(LPCTSTR pszString);
 
-	[[nodiscard]] LPSTR DuplicateString(LPCSTR pszString);
-	[[nodiscard]] LPWSTR DuplicateString(LPCWSTR pszString);
 	int RemoveTrailingWhitespace(LPTSTR pszString);
 	LPTSTR SkipLeadingWhitespace(LPTSTR pszString);
 	LPCTSTR SkipLeadingWhitespace(LPCTSTR pszString);
@@ -111,6 +109,7 @@ namespace TVTest
 		int CompareNoCase(const String &String1, LPCWSTR pszString2);
 		int CompareNoCase(const String &String1, const String &String2, String::size_type Length);
 		int CompareNoCase(const String &String1, LPCWSTR pszString2, String::size_type Length);
+		bool IsEqualNoCase(StringView String1, StringView String2);
 		bool Trim(String &Str, LPCWSTR pszSpaces = L" \t");
 		bool TrimEnd(String &Str, LPCWSTR pszSpaces = L" \t");
 		bool Replace(String &Str, LPCWSTR pszFrom, LPCWSTR pszTo);
@@ -162,7 +161,7 @@ namespace TVTest
 
 		struct EqualNoCase {
 			bool operator()(const String &Str1, const String &Str2) const {
-				return StringUtility::CompareNoCase(Str1, Str2) == 0;
+				return StringUtility::IsEqualNoCase(Str1, Str2);
 			}
 		};
 

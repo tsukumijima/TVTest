@@ -75,30 +75,6 @@ bool StringIsDigit(LPCTSTR pszString)
 }
 
 
-[[nodiscard]] LPSTR DuplicateString(LPCSTR pszString)
-{
-	if (pszString == nullptr)
-		return nullptr;
-
-	const size_t Length = lstrlenA(pszString) + 1;
-	const LPSTR pszNewString = new char[Length];
-	std::memcpy(pszNewString, pszString, Length);
-	return pszNewString;
-}
-
-
-[[nodiscard]] LPWSTR DuplicateString(LPCWSTR pszString)
-{
-	if (pszString == nullptr)
-		return nullptr;
-
-	const size_t Length = lstrlenW(pszString) + 1;
-	const LPWSTR pszNewString = new WCHAR[Length];
-	std::memcpy(pszNewString, pszString, Length * sizeof(WCHAR));
-	return pszNewString;
-}
-
-
 static inline bool IsWhitespace(TCHAR c)
 {
 	return c == _T(' ') || c == _T('\r') || c == _T('\n') || c == _T('\t');
@@ -246,6 +222,11 @@ int CompareNoCase(const String &String1, LPCWSTR pszString2, String::size_type L
 	}
 
 	return ::StrCmpNIW(String1.c_str(), pszString2, static_cast<int>(Length));
+}
+
+bool IsEqualNoCase(StringView String1, StringView String2)
+{
+	return LibISDB::StringEqualsI(String1, String2);
 }
 
 bool Trim(String &Str, LPCWSTR pszSpaces)

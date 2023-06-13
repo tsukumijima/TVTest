@@ -337,11 +337,7 @@ bool CTSProcessor::GetModuleList(std::vector<String> *pList) const
 	pEnumModule->Release();
 
 	if (pList->size() > 1) {
-		std::ranges::sort(
-			*pList,
-			[](const String &Lib1, const String &Lib2) {
-				return StringUtility::CompareNoCase(Lib1, Lib2) < 0;
-			});
+		std::ranges::sort(*pList, StringFunctional::LessNoCase());
 	}
 
 	return true;
@@ -701,7 +697,7 @@ bool CTSProcessor::OpenFilter(int Device, LPCWSTR pszName)
 				if (m_CurFilter.empty())
 					return true;
 			} else {
-				if (StringUtility::CompareNoCase(m_CurFilter, pszName) == 0)
+				if (StringUtility::IsEqualNoCase(m_CurFilter, pszName))
 					return true;
 			}
 		}

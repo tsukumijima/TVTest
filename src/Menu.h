@@ -138,7 +138,8 @@ namespace TVTest
 		int m_LogoWidth = 26;
 		int m_LogoHeight = 16;
 		bool m_fNoFrame = false;
-		Graphics::CImage m_FrameImage;
+		DrawUtil::CBitmap m_FrameBitmap;
+		Graphics::CImage m_FrameImage; // m_FrameBitmap より先に破棄されるようにする必要がある
 	};
 
 	class CChannelMenu
@@ -151,6 +152,8 @@ namespace TVTest
 			ShowToolTip     = 0x0004U,
 			SpaceBreak      = 0x0008U,
 			CurrentServices = 0x0010U,
+			NoClear         = 0x0020U,
+			IncludeDisabled = 0x0040U,
 			Shared          = 0x1000U,
 			TVTEST_ENUM_FLAGS_TRAILER
 		};
@@ -175,6 +178,7 @@ namespace TVTest
 		MARGINS m_Margins;
 		int m_MenuLogoMargin = 3;
 		CTooltip m_Tooltip;
+		std::vector<UINT> m_ExtraItemList;
 
 		int GetEventText(const LibISDB::EventInfo *pEventInfo, LPTSTR pszText, int MaxLength) const;
 		void CreateFont(HDC hdc);
@@ -194,6 +198,10 @@ namespace TVTest
 		void Destroy();
 		int Show(UINT Flags, int x, int y, const RECT *pExcludeRect = nullptr);
 		bool SetHighlightedItem(int Index);
+		bool AppendExtraItem(UINT ID, LPCTSTR pszText, UINT Flags = MF_ENABLED);
+		bool AppendSeparator() { return AppendExtraItem(0, nullptr, MF_SEPARATOR); }
+		bool RegisterExtraItem(UINT ID);
+
 		bool OnMeasureItem(HWND hwnd, WPARAM wParam, LPARAM lParam);
 		bool OnDrawItem(HWND hwnd, WPARAM wParam, LPARAM lParam);
 		bool OnMenuSelect(HWND hwnd, WPARAM wParam, LPARAM lParam);
@@ -206,7 +214,7 @@ namespace TVTest
 		enum class PopupMenuType {
 			Resource,
 			Created,
-			Attached,
+			Shared,
 		};
 
 		HMENU m_hmenu = nullptr;
@@ -216,7 +224,7 @@ namespace TVTest
 		CPopupMenu() = default;
 		CPopupMenu(HINSTANCE hinst, LPCTSTR pszName);
 		CPopupMenu(HINSTANCE hinst, UINT ID);
-		CPopupMenu(HMENU hmenu);
+		CPopupMenu(HMENU hmenu, bool fOwn);
 		~CPopupMenu();
 
 		CPopupMenu(const CPopupMenu &) = delete;
@@ -226,7 +234,7 @@ namespace TVTest
 		bool IsCreated() const { return m_hmenu != nullptr; }
 		bool Load(HINSTANCE hinst, LPCTSTR pszName);
 		bool Load(HINSTANCE hinst, UINT ID) { return Load(hinst, MAKEINTRESOURCE(ID)); }
-		bool Attach(HMENU hmenu);
+		bool Attach(HMENU hmenu, bool fOwn);
 		void Destroy();
 		int GetItemCount() const;
 		void Clear();
@@ -240,18 +248,6 @@ namespace TVTest
 		bool CheckRadioItem(UINT FirstID, UINT LastID, UINT CheckID, UINT Flags = MF_BYCOMMAND);
 		HMENU GetSubMenu(int Pos) const;
 		int Show(HWND hwnd, const POINT *pPos = nullptr, UINT Flags = TPM_RIGHTBUTTON, const RECT *pExcludeRect = nullptr);
-		int Show(
-			HMENU hmenu, HWND hwnd, const POINT *pPos = nullptr, UINT Flags = TPM_RIGHTBUTTON,
-			bool fToggle = true, const RECT *pExcludeRect = nullptr);
-		int Show(
-			HINSTANCE hinst, LPCTSTR pszName, HWND hwnd, const POINT *pPos = nullptr,
-			UINT Flags = TPM_RIGHTBUTTON, bool fToggle = true, const RECT *pExcludeRect = nullptr);
-		int Show(
-			HINSTANCE hinst, int ID, HWND hwnd, const POINT *pPos = nullptr,
-			UINT Flags = TPM_RIGHTBUTTON, bool fToggle = true, const RECT *pExcludeRect = nullptr)
-		{
-			return Show(hinst, MAKEINTRESOURCE(ID), hwnd, pPos, Flags, fToggle, pExcludeRect);
-		}
 	};
 
 	class CIconMenu

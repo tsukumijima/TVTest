@@ -800,11 +800,7 @@ bool CRecordManager::GetWritePluginList(std::vector<String> *pList)
 	::FindClose(hFind);
 
 	if (pList->size() > 1) {
-		std::ranges::sort(
-			*pList,
-			[](const String & Lib1, const String & Lib2) {
-				return StringUtility::CompareNoCase(Lib1, Lib2) < 0;
-			});
+		std::ranges::sort(*pList, StringFunctional::LessNoCase());
 	}
 
 	return true;
@@ -1104,11 +1100,9 @@ INT_PTR CRecordManager::CRecordSettingsDialog::DlgProc(HWND hDlg, UINT uMsg, WPA
 		case IDC_RECORD_FILENAMEFORMAT:
 			{
 				RECT rc;
-
 				::GetWindowRect(::GetDlgItem(hDlg, IDC_RECORD_FILENAMEFORMAT), &rc);
-				const POINT pt = {rc.left, rc.bottom};
 				CEventVariableStringMap EventVarStrMap;
-				EventVarStrMap.InputParameter(hDlg, IDC_RECORD_FILENAME, pt);
+				EventVarStrMap.InputParameter(hDlg, IDC_RECORD_FILENAME, rc);
 			}
 			return TRUE;
 

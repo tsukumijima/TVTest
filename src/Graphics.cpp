@@ -111,6 +111,7 @@ CImage &CImage::operator=(const CImage &Src)
 					Src.m_Bitmap->GetWidth(),
 					Src.m_Bitmap->GetHeight(),
 					Src.m_Bitmap->GetPixelFormat()));
+			VerifyConstruct();
 		}
 	}
 	return *this;
@@ -126,14 +127,14 @@ void CImage::Free()
 bool CImage::LoadFromFile(LPCWSTR pszFileName)
 {
 	m_Bitmap.reset(Gdiplus::Bitmap::FromFile(pszFileName));
-	return static_cast<bool>(m_Bitmap);
+	return VerifyConstruct();
 }
 
 
 bool CImage::LoadFromResource(HINSTANCE hinst, LPCWSTR pszName)
 {
 	m_Bitmap.reset(Gdiplus::Bitmap::FromResource(hinst, pszName));
-	return static_cast<bool>(m_Bitmap);
+	return VerifyConstruct();
 }
 
 
@@ -168,7 +169,7 @@ bool CImage::LoadFromResource(HINSTANCE hinst, LPCTSTR pszName, LPCTSTR pszType)
 	}
 	m_Bitmap.reset(Gdiplus::Bitmap::FromStream(pStream));
 	pStream->Release();
-	return static_cast<bool>(m_Bitmap);
+	return VerifyConstruct();
 }
 
 
@@ -187,7 +188,7 @@ bool CImage::Create(int Width, int Height, int BitsPerPixel)
 	default: return false;
 	}
 	m_Bitmap.reset(new Gdiplus::Bitmap(Width, Height, Format));
-	if (!m_Bitmap)
+	if (!VerifyConstruct())
 		return false;
 	Clear();
 	return true;
@@ -204,6 +205,7 @@ bool CImage::CreateFromBitmap(HBITMAP hbm, HPALETTE hpal)
 
 	// Bitmap::FromHBITMAP() はアルファチャンネルが無視される
 	if (bm.bmBitsPixel == 32) {
+#if 0
 		if (!Create(bm.bmWidth, bm.bmHeight, 32))
 			return false;
 
@@ -224,18 +226,86 @@ bool CImage::CreateFromBitmap(HBITMAP hbm, HPALETTE hpal)
 			q += Data.Stride;
 		}
 		m_Bitmap->UnlockBits(&Data);
+#else
+		BITMAPINFO bmi = {};
+		bmi.bmiHeader.biSize = sizeof(BITMAPINFO);
+		bmi.bmiHeader.biWidth = bm.bmWidth;
+		bmi.bmiHeader.biHeight = bm.bmHeight;
+		bmi.bmiHeader.biPlanes = 1;
+		bmi.bmiHeader.biBitCount = 32;
+		if (!CreateFromDIB(&bmi, bm.bmBits))
+			return false;
+#endif
 	} else {
 		m_Bitmap.reset(Gdiplus::Bitmap::FromHBITMAP(hbm, hpal));
+		if (!VerifyConstruct())
+			return false;
 	}
 
-	return static_cast<bool>(m_Bitmap);
+	return true;
 }
 
 
-bool CImage::CreateFromDIB(const BITMAPINFO *pbmi, const void *pBits)
+bool CImage::CreateFromDIB(const BITMAPINFO *pbmi, void *pBits)
 {
-	m_Bitmap.reset(new Gdiplus::Bitmap(pbmi, const_cast<void*>(pBits)));
-	return static_cast<bool>(m_Bitmap);
+	Free();
+
+	if (pbmi == nullptr || pBits == nullptr)
+		return false;
+
+	// Bitmap::FromBITMAPINFO() はアルファチャンネルが無視される
+	if (pbmi->bmiHeader.biBitCount == 32) {
+		const int Width = pbmi->bmiHeader.biWidth;
+		const int Height = std::abs(pbmi->bmiHeader.biHeight);
+
+#if 0
+		if (!Create(Width, Height, 32))
+			return false;
+
+		const Gdiplus::Rect rc(0, 0, Width, Height);
+		Gdiplus::BitmapData Data;
+
+		if (m_Bitmap->LockBits(
+					&rc, Gdiplus::ImageLockModeWrite,
+					m_Bitmap->GetPixelFormat(), &Data) != Gdiplus::Ok) {
+			Free();
+			return false;
+		}
+
+		const BYTE *p = static_cast<const BYTE*>(pBits);
+		std::ptrdiff_t Stride = Width * 4;
+		if (pbmi->bmiHeader.biHeight > 0) {
+			p += (Height - 1) * Stride;
+			Stride = -Stride;
+		}
+
+		BYTE *q = static_cast<BYTE*>(Data.Scan0);
+		for (UINT y = 0; y < Data.Height; y++) {
+			std::memcpy(q, p, Width * 4);
+			p += Stride;
+			q += Data.Stride;
+		}
+
+		m_Bitmap->UnlockBits(&Data);
+#else
+		BYTE *p = static_cast<BYTE*>(pBits);
+		int Stride = Width * 4;
+		if (pbmi->bmiHeader.biHeight > 0) {
+			p += (Height - 1) * Stride;
+			Stride = -Stride;
+		}
+
+		m_Bitmap.reset(new Gdiplus::Bitmap(Width, Height, Stride, PixelFormat32bppARGB, p));
+		if (!VerifyConstruct())
+			return false;
+#endif
+	} else {
+		m_Bitmap.reset(Gdiplus::Bitmap::FromBITMAPINFO(pbmi, pBits));
+		if (!VerifyConstruct())
+			return false;
+	}
+
+	return true;
 }
 
 
@@ -294,17 +364,29 @@ HBITMAP CImage::CreateBitmap()
 }
 
 
+bool CImage::VerifyConstruct()
+{
+	if (!m_Bitmap)
+		return false;
+	if (m_Bitmap->GetLastStatus() != Gdiplus::Ok) {
+		m_Bitmap.reset();
+		return false;
+	}
+	return true;
+}
+
+
 
 
 CBrush::CBrush(BYTE r, BYTE g, BYTE b, BYTE a)
-	: m_Brush(new Gdiplus::SolidBrush(Gdiplus::Color(a, r, g, b)))
 {
+	CreateSolidBrush(r, g, b, a);
 }
 
 
 CBrush::CBrush(const CColor &Color)
-	: m_Brush(new Gdiplus::SolidBrush(GdiplusColor(Color)))
 {
+	CreateSolidBrush(Color);
 }
 
 
@@ -319,10 +401,11 @@ bool CBrush::CreateSolidBrush(BYTE r, BYTE g, BYTE b, BYTE a)
 	const Gdiplus::Color Color(a, r, g, b);
 
 	if (m_Brush) {
-		m_Brush->SetColor(Color);
+		if (m_Brush->SetColor(Color) != Gdiplus::Ok)
+			return false;
 	} else {
 		m_Brush.reset(new Gdiplus::SolidBrush(Color));
-		if (!m_Brush)
+		if (!VerifyConstruct())
 			return false;
 	}
 	return true;
@@ -335,9 +418,39 @@ bool CBrush::CreateSolidBrush(const CColor &Color)
 }
 
 
+bool CBrush::IsCreated() const
+{
+	return static_cast<bool>(m_Brush);
+}
+
+
+bool CBrush::VerifyConstruct()
+{
+	if (!m_Brush)
+		return false;
+	if (m_Brush->GetLastStatus() != Gdiplus::Ok) {
+		m_Brush.reset();
+		return false;
+	}
+	return true;
+}
+
+
 
 
 CFont::CFont(const LOGFONT &lf)
+{
+	Create(lf);
+}
+
+
+void CFont::Free()
+{
+	m_Font.reset();
+}
+
+
+bool CFont::Create(const LOGFONT &lf)
 {
 	int FontStyle = 0;
 	if (lf.lfWeight >= FW_BOLD)
@@ -348,18 +461,33 @@ CFont::CFont(const LOGFONT &lf)
 		FontStyle |= Gdiplus::FontStyleUnderline;
 	if (lf.lfStrikeOut)
 		FontStyle |= Gdiplus::FontStyleStrikeout;
+
 	m_Font.reset(
 		new Gdiplus::Font(
 			lf.lfFaceName,
 			static_cast<Gdiplus::REAL>(std::abs(lf.lfHeight)),
 			FontStyle,
 			Gdiplus::UnitPixel));
+
+	return VerifyConstruct();
 }
 
 
-void CFont::Free()
+bool CFont::IsCreated() const
 {
-	m_Font.reset();
+	return static_cast<bool>(m_Font);
+}
+
+
+bool CFont::VerifyConstruct()
+{
+	if (!m_Font)
+		return false;
+	if (m_Font->GetLastStatus() != Gdiplus::Ok) {
+		m_Font.reset();
+		return false;
+	}
+	return true;
 }
 
 
@@ -367,15 +495,19 @@ void CFont::Free()
 
 CCanvas::CCanvas(HDC hdc)
 {
-	if (hdc != nullptr)
+	if (hdc != nullptr) {
 		m_Graphics.reset(new Gdiplus::Graphics(hdc));
+		VerifyConstruct();
+	}
 }
 
 
 CCanvas::CCanvas(CImage *pImage)
 {
-	if (pImage != nullptr && pImage->m_Bitmap)
+	if (pImage != nullptr && pImage->m_Bitmap) {
 		m_Graphics.reset(new Gdiplus::Graphics(pImage->m_Bitmap.get()));
+		VerifyConstruct();
+	}
 }
 
 
@@ -398,7 +530,7 @@ bool CCanvas::SetComposition(bool fComposite)
 }
 
 
-bool CCanvas::DrawImage(CImage *pImage, int x, int y)
+bool CCanvas::DrawImage(const CImage *pImage, int x, int y)
 {
 	if (!m_Graphics
 			|| pImage == nullptr || !pImage->m_Bitmap)
@@ -412,7 +544,7 @@ bool CCanvas::DrawImage(CImage *pImage, int x, int y)
 
 bool CCanvas::DrawImage(
 	int DstX, int DstY, int DstWidth, int DstHeight,
-	CImage *pImage, int SrcX, int SrcY, int SrcWidth, int SrcHeight, float Opacity)
+	const CImage *pImage, int SrcX, int SrcY, int SrcWidth, int SrcHeight, float Opacity)
 {
 	if (m_Graphics
 			&& pImage != nullptr && pImage->m_Bitmap) {
@@ -436,7 +568,7 @@ bool CCanvas::DrawImage(
 }
 
 
-bool CCanvas::FillRect(CBrush *pBrush, const RECT &Rect)
+bool CCanvas::FillRect(const CBrush *pBrush, const RECT &Rect)
 {
 	if (m_Graphics
 			&& pBrush != nullptr && pBrush->m_Brush) {
@@ -471,15 +603,14 @@ bool CCanvas::FillGradient(
 
 
 bool CCanvas::DrawText(
-	LPCTSTR pszText, const LOGFONT &lf,
-	const RECT &Rect, CBrush *pBrush, TextFlag Flags)
+	LPCTSTR pszText, const CFont &Font,
+	const RECT &Rect, const CBrush *pBrush, TextFlag Flags)
 {
 	if (!m_Graphics
 			|| IsStringEmpty(pszText)
+			|| !Font.m_Font
 			|| pBrush == nullptr || !pBrush->m_Brush)
 		return false;
-
-	CFont Font(lf);
 
 	Gdiplus::StringFormat Format;
 	SetStringFormat(&Format, Flags);
@@ -521,7 +652,7 @@ bool CCanvas::DrawText(
 
 
 bool CCanvas::GetTextSize(
-	LPCTSTR pszText, const LOGFONT &lf, TextFlag Flags, SIZE *pSize)
+	LPCTSTR pszText, const CFont &Font, TextFlag Flags, SIZE *pSize)
 {
 	if (pSize == nullptr)
 		return false;
@@ -531,13 +662,11 @@ bool CCanvas::GetTextSize(
 	pSize->cx = 0;
 	pSize->cy = 0;
 
-	if (!m_Graphics)
+	if (!m_Graphics || !Font.m_Font)
 		return false;
 
 	if (IsStringEmpty(pszText))
 		return true;
-
-	CFont Font(lf);
 
 	Gdiplus::StringFormat Format;
 	SetStringFormat(&Format, Flags);
@@ -585,17 +714,16 @@ bool CCanvas::GetTextSize(
 
 
 bool CCanvas::DrawOutlineText(
-	LPCTSTR pszText, const LOGFONT &lf,
-	const RECT &Rect, CBrush *pBrush,
+	LPCTSTR pszText, const CFont &Font,
+	const RECT &Rect, const CBrush *pBrush,
 	const CColor &OutlineColor, float OutlineWidth,
 	TextFlag Flags)
 {
 	if (!m_Graphics
 			|| IsStringEmpty(pszText)
+			|| !Font.m_Font
 			|| pBrush == nullptr || !pBrush->m_Brush)
 		return false;
-
-	CFont Font(lf);
 
 	Gdiplus::StringFormat Format;
 	SetStringFormat(&Format, Flags);
@@ -628,7 +756,7 @@ bool CCanvas::DrawOutlineText(
 
 
 bool CCanvas::GetOutlineTextSize(
-	LPCTSTR pszText, const LOGFONT &lf, float OutlineWidth, TextFlag Flags, SIZE *pSize)
+	LPCTSTR pszText, const CFont &Font, float OutlineWidth, TextFlag Flags, SIZE *pSize)
 {
 	if (pSize == nullptr)
 		return false;
@@ -638,13 +766,11 @@ bool CCanvas::GetOutlineTextSize(
 	pSize->cx = 0;
 	pSize->cy = 0;
 
-	if (!m_Graphics)
+	if (!m_Graphics || !Font.m_Font)
 		return false;
 
 	if (IsStringEmpty(pszText))
 		return true;
-
-	CFont Font(lf);
 
 	Gdiplus::StringFormat Format;
 	SetStringFormat(&Format, Flags);
@@ -680,6 +806,62 @@ bool CCanvas::GetOutlineTextSize(
 	pSize->cx = static_cast<long>(Bounds.GetRight() + 1.0f);
 	pSize->cy = static_cast<long>(Bounds.GetBottom() + 1.0f);
 
+	return true;
+}
+
+
+float CCanvas::GetLineSpacing(const CFont &Font) const
+{
+	if (!m_Graphics || !Font.m_Font)
+		return 0.0f;
+	return Font.m_Font->GetHeight(m_Graphics.get());
+}
+
+
+float CCanvas::GetFontAscent(const CFont &Font) const
+{
+	if (!m_Graphics || !Font.m_Font)
+		return 0.0f;
+
+	Gdiplus::FontFamily Family;
+	if (Font.m_Font->GetFamily(&Family) != Gdiplus::Ok)
+		return 0.0f;
+
+	const INT Style = Font.m_Font->GetStyle();
+	const UINT16 EmHeight = Family.GetEmHeight(Style);
+	if (EmHeight == 0)
+		return 0.0f;
+
+	return Font.m_Font->GetSize() * static_cast<float>(Family.GetCellAscent(Style)) / static_cast<float>(EmHeight);
+}
+
+
+float CCanvas::GetFontDescent(const CFont &Font) const
+{
+	if (!m_Graphics || !Font.m_Font)
+		return 0.0f;
+
+	Gdiplus::FontFamily Family;
+	if (Font.m_Font->GetFamily(&Family) != Gdiplus::Ok)
+		return 0.0f;
+
+	const INT Style = Font.m_Font->GetStyle();
+	const UINT16 EmHeight = Family.GetEmHeight(Style);
+	if (EmHeight == 0)
+		return 0.0f;
+
+	return Font.m_Font->GetSize() * static_cast<float>(Family.GetCellDescent(Style)) / static_cast<float>(EmHeight);
+}
+
+
+bool CCanvas::VerifyConstruct()
+{
+	if (!m_Graphics)
+		return false;
+	if (m_Graphics->GetLastStatus() != Gdiplus::Ok) {
+		m_Graphics.reset();
+		return false;
+	}
 	return true;
 }
 

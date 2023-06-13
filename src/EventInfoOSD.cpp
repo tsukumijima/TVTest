@@ -21,6 +21,7 @@
 #include "stdafx.h"
 #include "TVTest.h"
 #include "EventInfoOSD.h"
+#include "AppMain.h"
 #include "EpgUtil.h"
 #include "Graphics.h"
 #include "Common/DebugDef.h"
@@ -197,6 +198,7 @@ void CEventInfoOSD::SetStyle(const Style::CStyleManager *pStyleManager)
 	pStyleManager->Get(TEXT("event-osd.text-outline"), &m_Style.TextOutline);
 	pStyleManager->Get(TEXT("event-osd.use-hinting"), &m_Style.fUseHinting);
 	pStyleManager->Get(TEXT("event-osd.use-path"), &m_Style.fUsePath);
+	pStyleManager->Get(TEXT("event-osd.logo.show"), &m_Style.fShowLogo);
 }
 
 
@@ -260,6 +262,7 @@ void CEventInfoOSD::Draw(Graphics::CCanvas &Canvas, const RECT &Rect) const
 	LOGFONT lf = m_TitleFont;
 	lf.lfHeight = -FontSize;
 	lf.lfWidth = 0;
+	Graphics::CFont Font(lf);
 
 	const float OutlineWidth = static_cast<float>(m_Style.TextOutline.Value * FontSize) / 100.0f;
 
@@ -270,28 +273,41 @@ void CEventInfoOSD::Draw(Graphics::CCanvas &Canvas, const RECT &Rect) const
 		TextFlags |= Graphics::TextFlag::Draw_Path;
 	const Graphics::TextFlag DrawTextFlags = TextFlags | Graphics::TextFlag::Format_EndEllipsis | Graphics::TextFlag::Format_ClipLastLine;
 
-	SIZE TitleSize = {ContentRect.right - ContentRect.left, ContentRect.bottom - ContentRect.top};
+	RECT TitleRect = ContentRect;
+
+	if (m_Style.fShowLogo) {
+		const int LogoHeight = FontSize;
+		const int LogoWidth = ::MulDiv(LogoHeight, 16, 9);
+		const Graphics::CImage *pImage = GetAppClass().LogoManager.GetAssociatedLogoImage(
+			m_EventInfo.NetworkID, m_EventInfo.ServiceID, CLogoManager::LOGOTYPE_BIG);
+		if (pImage != nullptr) {
+			Canvas.DrawImage(
+				TitleRect.left,
+				TitleRect.top + std::max((static_cast<int>(Canvas.GetLineSpacing(Font)) - LogoHeight) / 2, 0),
+				LogoWidth, LogoHeight,
+				pImage, 0, 0, pImage->GetWidth(), pImage->GetHeight());
+			TitleRect.left += LogoWidth + FontSize / 4;
+		}
+	}
+
+	SIZE TitleSize = {TitleRect.right - TitleRect.left, TitleRect.bottom - TitleRect.top};
 	if (OutlineWidth > 0.0f)
-		Canvas.GetOutlineTextSize(Text.c_str(), lf, OutlineWidth, TextFlags, &TitleSize);
+		Canvas.GetOutlineTextSize(Text.c_str(), Font, OutlineWidth, TextFlags, &TitleSize);
 	else
-		Canvas.GetTextSize(Text.c_str(), lf, TextFlags, &TitleSize);
+		Canvas.GetTextSize(Text.c_str(), Font, TextFlags, &TitleSize);
 
 	Graphics::CBrush Brush(GraphicsColorFromThemeColor(m_ColorScheme.Title));
-	RECT TitleRect = {
-		ContentRect.left, ContentRect.top, ContentRect.right,
-		// ぴったりのサイズで指定すると最後の行が表示されないことがある
-		//ContentRect.top + TitleSize.cy
-		ContentRect.bottom
-		};
+	// ぴったりのサイズで指定すると最後の行が表示されないことがある
+	//TitleRect.bottom = TitleRect.top + TitleSize.cy;
 	if (OutlineWidth > 0.0f) {
 		Canvas.DrawOutlineText(
-			Text.c_str(), lf, TitleRect, &Brush,
+			Text.c_str(), Font, TitleRect, &Brush,
 			GraphicsColorFromThemeColor(m_ColorScheme.TitleOutline), OutlineWidth,
 			DrawTextFlags);
 	} else {
-		Canvas.DrawText(Text.c_str(), lf, TitleRect, &Brush, DrawTextFlags);
+		Canvas.DrawText(Text.c_str(), Font, TitleRect, &Brush, DrawTextFlags);
 	}
-	TitleRect.bottom = ContentRect.top + TitleSize.cy;
+	TitleRect.bottom = TitleRect.top + TitleSize.cy;
 
 	if (ContentRect.bottom > TitleRect.bottom) {
 		Text = m_EventInfo.EventText;
@@ -341,16 +357,18 @@ void CEventInfoOSD::Draw(Graphics::CCanvas &Canvas, const RECT &Rect) const
 			lf = m_Font;
 			lf.lfHeight = -FontSize;
 			lf.lfWidth = 0;
+			if (!CompareLogFont(&lf, &m_Font))
+				Font.Create(lf);
 
 			Brush.CreateSolidBrush(GraphicsColorFromThemeColor(m_ColorScheme.Text));
 			const RECT TextRect = {ContentRect.left, TitleRect.bottom, ContentRect.right, ContentRect.bottom};
 			if (OutlineWidth > 0.0f) {
 				Canvas.DrawOutlineText(
-					Text.c_str(), lf, TextRect, &Brush,
+					Text.c_str(), Font, TextRect, &Brush,
 					GraphicsColorFromThemeColor(m_ColorScheme.TextOutline), OutlineWidth,
 					DrawTextFlags);
 			} else {
-				Canvas.DrawText(Text.c_str(), lf, TextRect, &Brush, DrawTextFlags);
+				Canvas.DrawText(Text.c_str(), Font, TextRect, &Brush, DrawTextFlags);
 			}
 		}
 	}

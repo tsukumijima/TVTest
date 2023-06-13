@@ -470,8 +470,8 @@ void CTSProcessorManager::OnTunerChange(LPCTSTR pszOldTuner, LPCTSTR pszNewTuner
 		} else {
 			pOldFilter = &pSettings->m_DefaultFilter;
 		}
-		if (StringUtility::CompareNoCase(pOldFilter->Device, pNewFilter->Device) != 0
-				|| StringUtility::CompareNoCase(pOldFilter->Filter, pNewFilter->Filter) != 0)
+		if (!StringUtility::IsEqualNoCase(pOldFilter->Device, pNewFilter->Device)
+				|| !StringUtility::IsEqualNoCase(pOldFilter->Filter, pNewFilter->Filter))
 			pTSProcessor->CloseFilter();
 		if (!IsEqualFileName(pOldFilter->Module.c_str(), pNewFilter->Module.c_str()))
 			pTSProcessor->UnloadModule();
@@ -679,10 +679,9 @@ void CTSProcessorManager::OnFinalize(CTSProcessor *pTSProcessor)
 void CTSProcessorManager::OnNotify(
 	CTSProcessor *pTSProcessor, Interface::NotifyType Type, LPCWSTR pszMessage)
 {
-	GetAppClass().MainWindow.PostMessage(
-		WM_APP_SHOWNOTIFICATIONBAR,
-		MAKEWPARAM(static_cast<WORD>(Type), CNotificationBarOptions::NOTIFY_TSPROCESSORERROR),
-		reinterpret_cast<LPARAM>(DuplicateString(pszMessage)));
+	GetAppClass().MainWindow.PostNotification(
+		pszMessage, CNotificationBarOptions::NOTIFY_TSPROCESSORERROR,
+		static_cast<CNotificationBar::MessageType>(Type));
 }
 
 

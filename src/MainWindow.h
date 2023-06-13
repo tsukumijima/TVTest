@@ -48,7 +48,6 @@ namespace TVTest
 
 // (*) が付いたものは、変えると異なるバージョン間での互換性が無くなるので注意
 	constexpr UINT WM_APP_SERVICEUPDATE          = WM_APP + 0;
-	constexpr UINT WM_APP_IMAGESAVE              = WM_APP + 2;
 	constexpr UINT WM_APP_TRAYICON               = WM_APP + 3;
 	constexpr UINT WM_APP_QUERYPORT              = WM_APP + 5;  // (*)
 	constexpr UINT WM_APP_FILEWRITEERROR         = WM_APP + 6;
@@ -178,6 +177,12 @@ namespace TVTest
 		bool ShowProgramGuide(
 			bool fShow, ShowProgramGuideFlag Flags = ShowProgramGuideFlag::None,
 			const ProgramGuideSpaceInfo *pSpaceInfo = nullptr);
+
+		bool PostNotification(
+			LPCTSTR pszText,
+			unsigned int NotifyType,
+			CNotificationBar::MessageType MessageType = CNotificationBar::MessageType::Info,
+			bool fSkippable = false);
 
 		static bool Initialize(HINSTANCE hinst);
 
@@ -468,6 +473,15 @@ namespace TVTest
 			void OnCommandRadioCheckedStateChanged(int FirstID, int LastID, int CheckedID) override;
 		};
 
+		struct NotificationInfo
+		{
+			String Text;
+			unsigned int NotifyType;
+			CNotificationBar::MessageType MessageType;
+			DWORD Duration;
+			bool fSkippable;
+		};
+
 		static constexpr DWORD UPDATE_TIMER_INTERVAL = 500;
 
 		CAppMain &m_App;
@@ -482,6 +496,8 @@ namespace TVTest
 		CViewWindowEventHandler m_ViewWindowEventHandler{this};
 		CFullscreen m_Fullscreen{*this};
 		CNotificationBar m_NotificationBar;
+		std::vector<NotificationInfo> m_PendingNotificationList;
+		MutexLock m_NotificationLock;
 		CCommandEventListener m_CommandEventListener{this};
 		CWindowTimerManager m_Timer;
 		std::map<HWND, CMenuPainter> m_MenuPainter;
