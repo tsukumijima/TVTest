@@ -370,7 +370,7 @@ bool CInformationPanel::CreateProgramInfoEdit()
 		if (m_hwndProgramInfo == nullptr)
 			return false;
 		CRichEditUtil::DisableAutoFont(m_hwndProgramInfo);
-		::SendMessage(m_hwndProgramInfo, EM_SETEVENTMASK, 0, ENM_MOUSEEVENTS | ENM_LINK);
+		::SendMessage(m_hwndProgramInfo, EM_SETEVENTMASK, 0, ENM_MOUSEEVENTS | ENM_KEYEVENTS | ENM_LINK);
 		::SendMessage(
 			m_hwndProgramInfo, EM_SETBKGNDCOLOR, 0,
 			static_cast<COLORREF>(m_Theme.ProgramInfoStyle.Back.Fill.GetSolidColor()));
@@ -504,18 +504,15 @@ LRESULT CInformationPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
 
 	case WM_RBUTTONUP:
 		{
-			const HMENU hmenu = ::LoadMenu(m_hinst, MAKEINTRESOURCE(IDM_INFORMATIONPANEL));
+			CPopupMenu Menu(m_hinst, IDM_INFORMATIONPANEL);
 
 			for (int i = 0; i < NUM_ITEMS; i++) {
-				CheckMenuItem(
-					hmenu, CM_INFORMATIONPANEL_ITEM_FIRST + i,
-					MF_BYCOMMAND | (IsItemVisible(i) ? MFS_CHECKED : MFS_UNCHECKED));
+				Menu.CheckItem(CM_INFORMATIONPANEL_ITEM_FIRST + i, IsItemVisible(i));
 			}
 
 			POINT pt = {GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
 			::ClientToScreen(hwnd, &pt);
-			::TrackPopupMenu(::GetSubMenu(hmenu, 0), TPM_RIGHTBUTTON, pt.x, pt.y, 0, hwnd, nullptr);
-			::DestroyMenu(hmenu);
+			Menu.Show(hwnd, &pt);
 		}
 		return TRUE;
 
@@ -560,6 +557,16 @@ LRESULT CInformationPanel::OnMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM
 				switch (pMsgFilter->msg) {
 				case WM_RBUTTONUP:
 					EventInfoUtil::EventInfoContextMenu(hwnd, m_hwndProgramInfo);
+					break;
+
+				/*
+					複数行(リッチ)エディットコントロールは Esc キーが押されると親ウィンドウに WM_CLOSE をポストするため、
+					それによってウィンドウが破棄されてしまうので、Esc キーを処理させないようにする。
+				*/
+				case WM_KEYDOWN:
+				case WM_KEYUP:
+					if (pMsgFilter->wParam == VK_ESCAPE)
+						return 1;
 					break;
 
 				default:
@@ -887,6 +894,16 @@ LRESULT CInformationPanel::CProgramInfoSubclass::OnMessage(
 			}
 		}
 		return 0;
+
+	/*
+		複数行(リッチ)エディットコントロールは Esc キーが押されると親ウィンドウに WM_CLOSE をポストするため、
+		それによってウィンドウが破棄されてしまうので、Esc キーを処理させないようにする。
+	*/
+	case WM_KEYDOWN:
+	case WM_KEYUP:
+		if (wParam == VK_ESCAPE)
+			return 0;
+		break;
 
 	case WM_NCDESTROY:
 		m_pInfoPanel->m_hwndProgramInfo = nullptr;
