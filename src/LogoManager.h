@@ -53,6 +53,8 @@ namespace TVTest
 		bool GetSaveLogo() const { return m_fSaveLogo; }
 		bool SetSaveLogoBmp(bool fSave);
 		bool GetSaveLogoBmp() const { return m_fSaveBmp; }
+		void SetForceUpdate(bool fForce);
+		bool GetForceUpdate() const { return m_fForceUpdate; }
 		bool AssociateLogoID(WORD NetworkID, WORD ServiceID, WORD LogoID);
 		bool SaveLogoFile(LPCTSTR pszFileName);
 		bool LoadLogoFile(LPCTSTR pszFileName);
@@ -81,8 +83,8 @@ namespace TVTest
 			LOGOTYPE_64x36,
 			LOGOTYPE_FIRST  = LOGOTYPE_48x24,
 			LOGOTYPE_LAST   = LOGOTYPE_64x36,
-			LOGOTYPE_SMALL  = 0xFF,	// 取得できる中から小さいもの優先
-			LOGOTYPE_BIG    = 0xFE	// 取得できる中から大きいもの優先
+			LOGOTYPE_SMALL  = 0xFF, // 取得できる中から小さいもの優先
+			LOGOTYPE_BIG    = 0xFE  // 取得できる中から大きいもの優先
 		};
 
 	private:
@@ -130,6 +132,7 @@ namespace TVTest
 		CFilePath m_LogoDirectory{TEXT(".\\Logo")};
 		bool m_fSaveLogo = false;
 		bool m_fSaveBmp = false;
+		bool m_fForceUpdate = false;
 		LogoMap m_LogoMap;
 		LogoIDMap m_LogoIDMap;
 		CImageCodec m_ImageCodec;
@@ -147,7 +150,7 @@ namespace TVTest
 		void OnLogoDownloaded(const LibISDB::LogoDownloaderFilter::LogoData &Data) override;
 	};
 
-}	// namespace TVTest
+} // namespace TVTest
 
 
 #endif
